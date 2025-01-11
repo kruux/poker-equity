@@ -76,12 +76,6 @@ pub enum EquityError {
     NoPlayers,
     NotEnoughCards(usize),
     InvalidSimulationCount(usize),
-    /// Method not implemented for this variant
-    ///
-    /// # Fields
-    /// * `method_name` - Name of the method that isn't implemented
-    /// * `variant_name` - Name of the poker variant
-    NotImplemented(String, String),
     UnequalHandSizes,
 }
 
@@ -91,9 +85,6 @@ impl EquityError {
             EquityError::NoPlayers => format!("Need atleast 2 players for a simulation"),
             EquityError::NotEnoughCards(n) => format!("Not enough cards in hand: {}", n),
             EquityError::InvalidSimulationCount(n) => format!("Invalid number of simulations: {n}"),
-            EquityError::NotImplemented(method, variant) => {
-                format!("Missing {} method for {}", method, variant)
-            }
             EquityError::UnequalHandSizes => format!("Starting hands with different sizes"),
         }
     }

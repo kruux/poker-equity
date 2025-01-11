@@ -1,13 +1,13 @@
 mod deuce_seven;
 mod equity;
 mod rankings;
-// mod razz;
+mod razz;
 mod stud;
 
 pub use deuce_seven::DeuceSeven;
 pub use equity::EquityCalculation;
-pub use rankings::{DeuceSevenRank, HighHandRank};
-// pub use razz::Razz;
+pub use rankings::{DeuceSevenRank, HighHandRank, LowHandRank};
+pub use razz::Razz;
 pub use stud::SevenCardStud;
 
 use std::collections::HashMap;
@@ -201,6 +201,6 @@ pub trait PokerVariant: Clone + Copy {
 #[cfg(test)]
 mod tests {
     mod deuce_seven_tests;
-    // mod razz_tests;
+    mod razz_tests;
     mod stud_tests;
 }

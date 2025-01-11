@@ -1,10 +1,10 @@
 mod deuce_seven;
 mod high;
-// mod low;
+mod low;
 
 pub use deuce_seven::DeuceSevenRank;
 pub use high::HighHandRank;
-// pub use low::LowHandRank;
+pub use low::LowHandRank;
 
 macro_rules! impl_hand_rank_eq {
     ($type:ty) => {

@@ -16,7 +16,7 @@ fn test_stud_validation_errors() -> Result<(), PokerError> {
     let alice_hand = Hand::from_str(stud, "As Ks Qs")?;
     calc.add_player("Alice".to_string(), alice_hand)?;
     assert!(matches!(
-        calc.calculate(),
+        calc.calculate(drop),
         Err(PokerError::Equity(EquityError::NoPlayers))
     ));
 
@@ -27,7 +27,7 @@ fn test_stud_validation_errors() -> Result<(), PokerError> {
     calc.add_player("Alice".to_string(), alice_hand)?;
     calc.add_player("Bob".to_string(), bob_hand)?;
     assert!(matches!(
-        calc.calculate(),
+        calc.calculate(drop),
         Err(PokerError::Equity(EquityError::UnequalHandSizes))
     ));
 
@@ -38,7 +38,7 @@ fn test_stud_validation_errors() -> Result<(), PokerError> {
     calc.add_player("Alice".to_string(), alice_hand)?;
     calc.add_player("Bob".to_string(), bob_hand)?;
     assert!(matches!(
-        calc.calculate(),
+        calc.calculate(drop),
         Err(PokerError::Equity(EquityError::NotEnoughCards(2)))
     ));
 
@@ -57,7 +57,7 @@ fn test_stud_100_percent() -> Result<(), PokerError> {
     calc.add_player("Royal".to_string(), royal_hand)?;
     calc.add_player("Lower".to_string(), sf_hand)?;
 
-    let results = calc.calculate()?;
+    let results = calc.calculate(drop)?;
     assert_eq!(results["Royal"], 100.0);
     assert_eq!(results["Lower"], 0.0);
 
@@ -75,7 +75,7 @@ fn test_equity_identical_hands() -> Result<(), PokerError> {
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Should split equity
     assert!((results["Alice"] - 50.0).abs() < 1.0);
@@ -96,7 +96,7 @@ fn test_equity_quads_vs_pair() -> Result<(), PokerError> {
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Quads should always win here
     assert!((results["Alice"] - 100.0).abs() < 1.0);
@@ -116,7 +116,7 @@ fn test_equity_trips_vs_three_cards() -> Result<(), PokerError> {
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Known percentages from 600k simulations: 97.92% vs 2.08%
     assert!((results["Alice"] - 97.92).abs() < 1.0);
@@ -136,7 +136,7 @@ fn test_equity_trips_vs_flush_draw() -> Result<(), PokerError> {
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Known percentages from 600k simulations: 76.61% vs 23.39%
     assert!((results["Alice"] - 76.61).abs() < 1.0);
@@ -158,7 +158,7 @@ fn test_equity_three_way_trips_vs_draws() -> Result<(), PokerError> {
     calculator.add_player("Bob".to_string(), bob_hand)?;
     calculator.add_player("Charlie".to_string(), charlie_hand)?;
 
-    let results = calculator.calculate_with_updates(drop)?;
+    let results = calculator.calculate(drop)?;
 
     // Known percentages from simulations: 58.98% vs 20.89% vs 20.13%
     assert!((results["Alice"] - 58.98).abs() < 1.0);
@@ -179,7 +179,7 @@ fn test_close_equity_stud() -> Result<(), PokerError> {
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Add expected percentages once you have them
     println!("Alice: {}", results["Alice"]);

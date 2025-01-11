@@ -1,35 +1,27 @@
 use std::collections::HashMap;
 
-use crate::{
-    cards::Deck,
-    error::{EquityError, PokerError},
-    hand::Hand,
-    odds::EquityCalculator,
-};
+use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator};
 
 use super::PokerVariant;
 
 mod deuce_seven;
+mod razz;
 mod stud;
+mod stud_base;
+
+pub(crate) use stud_base::StudEquity;
 
 pub trait EquityCalculation: PokerVariant
 where
     Self: Sized,
 {
-    fn validate(&self, _calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
-        Err(EquityError::NotImplemented("validate".to_string(), self.to_string()).into())
-    }
+    fn validate(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError>;
 
     fn run_single_simulation(
         &self,
-        mut _deck: Deck,
-        _calculator: &EquityCalculator<Self>,
-    ) -> Result<HashMap<String, f64>, PokerError> {
-        Err(
-            EquityError::NotImplemented("run_single_simulation".to_string(), self.to_string())
-                .into(),
-        )
-    }
+        deck: Deck,
+        calculator: &EquityCalculator<Self>,
+    ) -> Result<HashMap<String, f64>, PokerError>;
 
     /// Returns a 2 dimensional array. It's 2 dimensional to handle any ties in any position.
     /// First position contain a vec with the winners.

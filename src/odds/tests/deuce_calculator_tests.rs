@@ -17,7 +17,7 @@ fn test_equity_pat_vs_pat() -> Result<(), PokerError> {
     calculator.add_draw_player("Alice".to_string(), alice_hand, None)?; // Empty vec or None means no discards
     calculator.add_draw_player("Bob".to_string(), bob_hand, None)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     assert!((results["Alice"] - 50.0).abs() < 0.1); // Allow small floating point difference
     assert!((results["Bob"] - 50.0).abs() < 0.1);
@@ -36,7 +36,7 @@ fn test_equity_pat_vs_drawing_to_seven() -> Result<(), PokerError> {
     calculator.add_draw_player("Alice".to_string(), alice_hand, None)?;
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     println!("Alice: {}", results["Alice"]);
     println!("Bob: {}", results["Bob"]);
@@ -64,7 +64,7 @@ fn test_dead_cards() -> Result<(), PokerError> {
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(discard))?;
     calculator.add_dead_cards(dead_cards)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Now Bob only has 1/40 chance of hitting the last 7
     // 1/40 * 0.5 = 1.25% equity
@@ -87,7 +87,7 @@ fn test_three_way_tie() -> Result<(), PokerError> {
     calculator.add_draw_player("Bob".to_string(), bob_hand, None)?;
     calculator.add_draw_player("Charlie".to_string(), charlie_hand, None)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Each player should get exactly 33.33%
     assert!((results["Alice"] - 33.33).abs() < 1.0);
@@ -113,7 +113,7 @@ fn test_drawing_multiple_cards() -> Result<(), PokerError> {
     calculator.add_draw_player("Alice".to_string(), alice_hand, None)?;
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Bob needs to hit very specific cards to tie/win
     // Could calculate exact equity but it's quite small
@@ -135,7 +135,7 @@ fn test_slightly_better_pat() -> Result<(), PokerError> {
     calculator.add_draw_player("Alice".to_string(), alice_hand, None)?;
     calculator.add_draw_player("Bob".to_string(), bob_hand, None)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Alice should win 100%
     assert!((results["Alice"] - 100.0).abs() < 0.1);
@@ -183,7 +183,7 @@ fn test_deck_removal() -> Result<(), PokerError> {
     // At this point the deck should have:
     // 52 - 5 (Alice's cards) - 2 (Bob's cards) - 2 (dead cards) = 43 cards
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Bob needs specific cards to beat 75432
     assert!(results["Alice"] > 95.0);
@@ -206,7 +206,7 @@ fn test_close_equity_deuce_seven() -> Result<(), PokerError> {
     calculator.add_draw_player("Alice".to_string(), alice_hand, Some(alice_discard))?;
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Add expected percentages once you have them
     assert!((results["Alice"] - 45.57).abs() < 1.0);
@@ -231,7 +231,7 @@ fn test_equity_deuce_seven_t8_vs_97() -> Result<(), PokerError> {
     calculator.add_draw_player("Alice".to_string(), alice_hand, Some(alice_discard))?;
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Add expected percentages once you have them
     println!("Alice: {}", results["Alice"]);

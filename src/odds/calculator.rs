@@ -15,7 +15,6 @@ pub struct EquityCalculator<V: PokerVariant + EquityCalculation> {
     players: Vec<(String, Hand<V>, Vec<Card>)>, // (name, current_hand, cards_to_discard)
     dead_cards: Vec<Card>,
     num_simulations: usize,
-    results: HashMap<String, f64>,
     variant: V,
 }
 
@@ -25,7 +24,6 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
             players: Vec::new(),
             dead_cards: Vec::new(),
             num_simulations,
-            results: HashMap::new(),
             variant,
         }
     }
@@ -74,63 +72,63 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
         &self.dead_cards
     }
 
-    pub fn calculate(&mut self) -> Result<&HashMap<String, f64>, PokerError> {
-        if self.players.len() < 2 {
-            return Err(EquityError::NoPlayers.into());
-        }
-        // Validate that simulation is ok. Every poker variant have to implement their own validation here
-        self.variant.validate(self)?;
+    // pub fn calculate(&mut self) -> Result<&HashMap<String, f64>, PokerError> {
+    //     if self.players.len() < 2 {
+    //         return Err(EquityError::NoPlayers.into());
+    //     }
+    //     // Validate that simulation is ok. Every poker variant have to implement their own validation here
+    //     self.variant.validate(self)?;
 
-        // Clear previous results
-        self.results.clear();
+    //     // Clear previous results
+    //     self.results.clear();
 
-        // Initialize equity results
-        let mut total_equity: HashMap<String, f64> = self
-            .players
-            .iter()
-            .map(|(name, _, _)| (name.clone(), 0.0))
-            .collect();
+    //     // Initialize equity results
+    //     let mut total_equity: HashMap<String, f64> = self
+    //         .players
+    //         .iter()
+    //         .map(|(name, _, _)| (name.clone(), 0.0))
+    //         .collect();
 
-        // Run simulations
-        for _ in 0..self.num_simulations {
-            // Create a new deck
-            let mut deck = Deck::new();
+    //     // Run simulations
+    //     for _ in 0..self.num_simulations {
+    //         // Create a new deck
+    //         let mut deck = Deck::new();
 
-            // Remove known cards from deck
-            for card in &self.dead_cards {
-                deck.remove_card(card)?;
-            }
+    //         // Remove known cards from deck
+    //         for card in &self.dead_cards {
+    //             deck.remove_card(card)?;
+    //         }
 
-            // Remove all cards that are in players' hands
-            for (_, hand, _) in &self.players {
-                for card in hand.cards() {
-                    deck.remove_card(card)?;
-                }
-            }
+    //         // Remove all cards that are in players' hands
+    //         for (_, hand, _) in &self.players {
+    //             for card in hand.cards() {
+    //                 deck.remove_card(card)?;
+    //             }
+    //         }
 
-            deck.shuffle();
+    //         deck.shuffle();
 
-            let equity = self.variant.run_single_simulation(deck, self)?;
-            for (name, eq) in equity {
-                total_equity
-                    .entry(name)
-                    .and_modify(|current_eq| *current_eq += eq) // Add equity from latest simulation
-                    .or_insert(eq); // If it's the first time the player get's equity
-            }
-        }
+    //         let equity = self.variant.run_single_simulation(deck, self)?;
+    //         for (name, eq) in equity {
+    //             total_equity
+    //                 .entry(name)
+    //                 .and_modify(|current_eq| *current_eq += eq) // Add equity from latest simulation
+    //                 .or_insert(eq); // If it's the first time the player get's equity
+    //         }
+    //     }
 
-        // Convert summed equity to percentages
-        for (name, eq) in total_equity {
-            self.results
-                .insert(name, (eq as f64) / (self.num_simulations as f64) * 100.0);
-        }
+    //     // Convert summed equity to percentages
+    //     for (name, eq) in total_equity {
+    //         self.results
+    //             .insert(name, (eq as f64) / (self.num_simulations as f64) * 100.0);
+    //     }
 
-        Ok(&self.results)
-    }
+    //     Ok(&self.results)
+    // }
 }
 
 impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
-    pub fn calculate_with_updates<F>(&self, callback: F) -> Result<HashMap<String, f64>, PokerError>
+    pub fn calculate<F>(&self, callback: F) -> Result<HashMap<String, f64>, PokerError>
     where
         F: Fn(SimulationProgress) + Send + Sync,
     {

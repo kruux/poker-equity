@@ -17,7 +17,7 @@ fn test_pat_vs_drawing_scenario() -> Result<(), PokerError> {
     calculator.add_draw_player("Alice".to_string(), alice_hand, None)?;
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Known percentages for this scenario
     assert!((results["Alice"] - 96.43).abs() < 1.0);
@@ -46,7 +46,7 @@ fn test_multiway_pat_and_drawing() -> Result<(), PokerError> {
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
     calculator.add_draw_player("Charlie".to_string(), charlie_hand, None)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Alice should have best equity
     assert!(results["Alice"] > results["Bob"]);
@@ -75,7 +75,7 @@ fn test_dead_cards_impact() -> Result<(), PokerError> {
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
     calculator.add_dead_cards(dead_cards)?;
 
-    let results = calculator.calculate()?;
+    let results = calculator.calculate(drop)?;
 
     // Only one 7 left in deck, so Bob's equity should be very low
     assert!(results["Bob"] < 2.0);
