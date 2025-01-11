@@ -24,10 +24,8 @@ impl Deck {
     }
 
     pub fn shuffle(&mut self) {
-        for i in 0..52 as usize {
-            let rnd = get_random_number(i as u32, 51) as usize;
-            self.cards.swap(i, rnd);
-        }
+        let mut rng = rand::thread_rng();
+        self.cards.shuffle(&mut rng);
     }
 
     pub fn deal(&mut self) -> Option<Card> {
@@ -52,12 +50,4 @@ impl Deck {
     pub fn remaining_cards(&self) -> usize {
         self.cards.len()
     }
-}
-
-fn get_random_number(from: u32, to: u32) -> u32 {
-    let mut rng = rand::thread_rng();
-    let y: f64 = rng.gen();
-    let offset = to - from + 1;
-    let n: u32 = (y * offset as f64) as u32 + from;
-    return n;
 }

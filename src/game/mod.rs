@@ -1,8 +1,8 @@
-mod state;
+// mod state;
 
-pub use state::GameState;
+// pub use state::GameState;
 
-#[cfg(test)]
-mod tests {
-    mod state_tests;
-}
+// #[cfg(test)]
+// mod tests {
+//     mod state_tests;
+// }

@@ -1,8 +1,9 @@
 mod calculator;
 
-pub use calculator::EquityCalculator;
+pub use calculator::{EquityCalculator, SimulationProgress};
 
 #[cfg(test)]
 mod tests {
-    mod calculator_tests;
+    mod deuce_calculator_tests;
+    mod stud_calculator_tests;
 }

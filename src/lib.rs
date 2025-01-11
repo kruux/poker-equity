@@ -1,5 +1,6 @@
 pub mod cards;
 pub mod error;
-pub mod game;
+pub mod hand;
 pub mod odds;
-pub mod poker;
+pub mod player;
+pub mod variants;
