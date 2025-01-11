@@ -121,7 +121,7 @@ fn test_razz_equity_three_players() -> Result<(), PokerError> {
 
 #[test]
 fn test_razz_equity_drawing_hands() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(Razz, 10000);
+    let mut calculator = EquityCalculator::new(Razz, 100000);
 
     // Player 1 with 3 cards to a wheel (A23)
     let hand1 = Hand::from_str(Razz, "Ah 2h 3h")?;

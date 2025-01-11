@@ -141,6 +141,11 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
         let completed_sims = Arc::new(Mutex::new(0));
         let results = Arc::new(Mutex::new(HashMap::<String, f64>::new()));
 
+        // Add all players to the results with 0 equity
+        for (name, _, _) in &self.players {
+            results.lock().unwrap().insert(name.clone(), 0.0);
+        }
+
         let chunk_size = 1000;
         let mut chunks = vec![chunk_size; self.num_simulations / chunk_size];
         let remainder = self.num_simulations % chunk_size;

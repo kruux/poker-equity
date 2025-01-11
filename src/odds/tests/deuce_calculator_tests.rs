@@ -19,8 +19,8 @@ fn test_equity_pat_vs_pat() -> Result<(), PokerError> {
 
     let results = calculator.calculate(drop)?;
 
-    assert!((results["Alice"] - 50.0).abs() < 0.1); // Allow small floating point difference
-    assert!((results["Bob"] - 50.0).abs() < 0.1);
+    assert!((results["Alice"] - 50.0).abs() < 0.001); // Allow small floating point difference
+    assert!((results["Bob"] - 50.0).abs() < 0.001);
 
     Ok(())
 }
@@ -41,8 +41,8 @@ fn test_equity_pat_vs_drawing_to_seven() -> Result<(), PokerError> {
     println!("Alice: {}", results["Alice"]);
     println!("Bob: {}", results["Bob"]);
 
-    assert!((results["Alice"] - 96.43).abs() < 1.0);
-    assert!((results["Bob"] - 3.57).abs() < 1.0);
+    assert!((results["Alice"] - 96.43).abs() < 0.5);
+    assert!((results["Bob"] - 3.57).abs() < 0.5);
 
     Ok(())
 }
@@ -68,8 +68,8 @@ fn test_dead_cards() -> Result<(), PokerError> {
 
     // Now Bob only has 1/40 chance of hitting the last 7
     // 1/40 * 0.5 = 1.25% equity
-    assert!((results["Alice"] - 98.75).abs() < 1.0);
-    assert!((results["Bob"] - 1.25).abs() < 1.0);
+    assert!((results["Alice"] - 98.75).abs() < 0.5);
+    assert!((results["Bob"] - 1.25).abs() < 0.5);
 
     Ok(())
 }
@@ -90,16 +90,16 @@ fn test_three_way_tie() -> Result<(), PokerError> {
     let results = calculator.calculate(drop)?;
 
     // Each player should get exactly 33.33%
-    assert!((results["Alice"] - 33.33).abs() < 1.0);
-    assert!((results["Bob"] - 33.33).abs() < 1.0);
-    assert!((results["Charlie"] - 33.33).abs() < 1.0);
+    assert!((results["Alice"] - 33.33).abs() < 0.5);
+    assert!((results["Bob"] - 33.33).abs() < 0.5);
+    assert!((results["Charlie"] - 33.33).abs() < 0.5);
 
     Ok(())
 }
 
 #[test]
 fn test_drawing_multiple_cards() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(DeuceSeven, 10000);
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
 
     // Alice pat with 75432
     let alice_hand = Hand::from_str(DeuceSeven, "7d5h4c3s2h")?;
@@ -137,7 +137,6 @@ fn test_slightly_better_pat() -> Result<(), PokerError> {
 
     let results = calculator.calculate(drop)?;
 
-    // Alice should win 100%
     assert!((results["Alice"] - 100.0).abs() < 0.1);
     assert!((results["Bob"] - 0.0).abs() < 0.1);
 
@@ -165,7 +164,7 @@ fn test_duplicate_dead_card() -> Result<(), PokerError> {
 
 #[test]
 fn test_deck_removal() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(DeuceSeven, 1000);
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
 
     // Alice has a pat 75432
     let alice_hand = Hand::from_str(DeuceSeven, "7d5h4c3s2h")?;
@@ -194,7 +193,7 @@ fn test_deck_removal() -> Result<(), PokerError> {
 
 #[test]
 fn test_close_equity_deuce_seven() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(DeuceSeven, 300000);
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
 
     // 98 drawing 1 vs 97 drawing 1
     let alice_hand = Hand::from_str(DeuceSeven, "As 9h 8c 4d 2h")?;
@@ -208,37 +207,33 @@ fn test_close_equity_deuce_seven() -> Result<(), PokerError> {
 
     let results = calculator.calculate(drop)?;
 
-    // Add expected percentages once you have them
-    assert!((results["Alice"] - 45.57).abs() < 1.0);
-    assert!((results["Bob"] - 54.43).abs() < 1.0);
-    println!("Alice: {}", results["Alice"]);
-    println!("Bob: {}", results["Bob"]);
+    // Bob should have 54.43% equity
+    assert!((results["Alice"] - 45.57).abs() < 0.5);
+    assert!((results["Bob"] - 54.43).abs() < 0.5);
 
     Ok(())
 }
 
 #[test]
 fn test_equity_deuce_seven_t8_vs_97() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(DeuceSeven, 10000);
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
 
     // T8 drawing 1 vs 97 drawing 1
-    let alice_hand = Hand::from_str(DeuceSeven, "Th 8c 5d 4s 2h")?;
-    let bob_hand = Hand::from_str(DeuceSeven, "9d 7h 5s 4h 2d")?;
+    let alice_hand = Hand::from_str(DeuceSeven, "Th 8c Kd 4s 2h")?;
+    let bob_hand = Hand::from_str(DeuceSeven, "9d 7h Ks 4h 2d")?;
 
-    let alice_discard = Card::from_str("5d")?;
-    let bob_discard = Card::from_str("5s")?;
+    let alice_discard = Card::from_str("Kd")?;
+    let bob_discard = Card::from_str("Ks")?;
 
     calculator.add_draw_player("Alice".to_string(), alice_hand, Some(alice_discard))?;
     calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
 
     let results = calculator.calculate(drop)?;
 
-    // Add expected percentages once you have them
-    println!("Alice: {}", results["Alice"]);
-    println!("Bob: {}", results["Bob"]);
-
-    // Add equities
-    assert!(false);
+    // Bob should have 57.75% equity.
+    // When verifying this test, I only used 4 cards without a draw. Shouldn't make a big difference.
+    assert!((results["Alice"] - 42.24).abs() < 0.5);
+    assert!((results["Bob"] - 57.75).abs() < 0.5);
 
     Ok(())
 }

@@ -5,7 +5,7 @@ use poker_calculator::{
 
 #[test]
 fn test_pat_vs_drawing_scenario() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(DeuceSeven, 10000);
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
 
     // The nuts pat
     let alice_hand = Hand::from_str(DeuceSeven, "7d5h4c3s2h")?;
@@ -20,15 +20,15 @@ fn test_pat_vs_drawing_scenario() -> Result<(), PokerError> {
     let results = calculator.calculate(drop)?;
 
     // Known percentages for this scenario
-    assert!((results["Alice"] - 96.43).abs() < 1.0);
-    assert!((results["Bob"] - 3.57).abs() < 1.0);
+    assert!((results["Alice"] - 96.43).abs() < 0.5);
+    assert!((results["Bob"] - 3.57).abs() < 0.5);
 
     Ok(())
 }
 
 #[test]
 fn test_multiway_pat_and_drawing() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(DeuceSeven, 10000);
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
 
     // Three players:
     // Alice: pat with 75432
@@ -59,7 +59,7 @@ fn test_multiway_pat_and_drawing() -> Result<(), PokerError> {
 
 #[test]
 fn test_dead_cards_impact() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(DeuceSeven, 10000);
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
 
     // Alice pat with 75432
     let alice_hand = Hand::from_str(DeuceSeven, "7d5h4c3s2h")?;
