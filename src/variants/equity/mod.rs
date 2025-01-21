@@ -2,15 +2,19 @@ use std::collections::HashMap;
 
 use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator};
 
-use super::PokerVariant;
+use super::{LowHandRank, PokerVariant};
 
 mod deuce_seven;
 mod razz;
 mod stud;
 mod stud_base;
+mod stud_hi_lo;
 
 pub(crate) use stud_base::StudEquity;
 
+pub trait HasLow {
+    fn low(&self) -> Option<&LowHandRank>;
+}
 pub trait EquityCalculation: PokerVariant
 where
     Self: Sized,
@@ -58,5 +62,55 @@ where
         result.push(current_group);
 
         Ok(result)
+    }
+
+    /// ## Only works for HiLo variants that implement HasLow.
+    /// Returns an Option with a 2 dimensional array. It's 2 dimensional to handle any ties in any position.
+    /// First position contain a vec with the winners.
+    /// Second index a vec with the players in second.
+    /// In case of no low hands, return None.
+    fn rank_low_hands(
+        &self,
+        hands: &[(String, Hand<Self>)],
+    ) -> Result<Option<Vec<Vec<String>>>, PokerError>
+    where
+        Self::HandRank: HasLow,
+    {
+        // Filter out low hands
+        let mut low_hands: Vec<(String, LowHandRank)> = hands
+            .iter()
+            .filter_map(|(name, hand)| {
+                hand.evaluate()
+                    .low()
+                    .cloned()
+                    .map(|low| (name.clone(), low.clone()))
+            })
+            .collect();
+
+        if low_hands.is_empty() {
+            return Ok(None);
+        }
+
+        // Sort by strength, lower is better
+        low_hands.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+
+        // Check for multiple winners and second places etc.
+        let mut result: Vec<Vec<String>> = vec![];
+        let mut current_group: Vec<String> = vec![low_hands[0].0.clone()];
+
+        for i in 1..low_hands.len() {
+            // .0 is player name, .1 is low hand rank
+            let prev_hand = &low_hands[i - 1].1;
+            let curr_hand = &low_hands[i].1;
+            if curr_hand == prev_hand {
+                current_group.push(low_hands[i].0.clone());
+            } else {
+                result.push(current_group);
+                current_group = vec![low_hands[i].0.clone()];
+            }
+        }
+        // Add last vec to result
+        result.push(current_group);
+        Ok(Some(result))
     }
 }

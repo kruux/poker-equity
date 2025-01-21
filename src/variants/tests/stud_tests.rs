@@ -76,11 +76,17 @@ fn test_straight_flush() {
 #[test]
 fn test_four_of_a_kind() {
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "Ah Ac Ad As Kh Qc Jd").unwrap();
-    assert_eq!(hand.evaluate(), HighHandRank::FourOfAKind(Rank::Ace));
+    assert_eq!(
+        hand.evaluate(),
+        HighHandRank::FourOfAKind(Rank::Ace, Rank::King)
+    );
 
     // Test with potential straight/flush doesn't override quads
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "7h 7c 7s 7d 8h 9h Th").unwrap();
-    assert_eq!(hand.evaluate(), HighHandRank::FourOfAKind(Rank::Seven));
+    assert_eq!(
+        hand.evaluate(),
+        HighHandRank::FourOfAKind(Rank::Seven, Rank::Ten)
+    );
 }
 
 #[test]
@@ -163,15 +169,37 @@ fn test_straight() {
 fn test_three_of_a_kind() {
     // Basic three of a kind
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "Ah Ac Ad Qh Jc 9c 2d").unwrap();
-    assert_eq!(hand.evaluate(), HighHandRank::ThreeOfAKind(Rank::Ace));
+    if let HighHandRank::ThreeOfAKind(rank, kickers) = hand.evaluate() {
+        assert_eq!(rank, Rank::Ace);
+        assert_eq!(kickers, vec![Rank::Queen, Rank::Jack]);
+    } else {
+        panic!("Expected ThreeOfAKind, got different hand rank");
+    }
+
+    // if let DeuceSevenRank::Pair(rank, kickers) = pair_with_kickers.evaluate() {
+    //     assert_eq!(rank, Rank::Seven);
+    //     assert_eq!(kickers, vec![Rank::Ace, Rank::Five, Rank::Two]);
+    // } else {
+    //     panic!("Expected Pair, got different hand rank");
+    // }
 
     // Three of a kind with potential straight draw
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "7h 7c 7d 8h 9c Tc 2d").unwrap();
-    assert_eq!(hand.evaluate(), HighHandRank::ThreeOfAKind(Rank::Seven));
+    if let HighHandRank::ThreeOfAKind(rank, kickers) = hand.evaluate() {
+        assert_eq!(rank, Rank::Seven);
+        assert_eq!(kickers, vec![Rank::Ten, Rank::Nine]);
+    } else {
+        panic!("Expected ThreeOfAKind, got different hand rank");
+    }
 
     // Three of a kind with potential flush draw
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "7h 7c 7d 2h 3h 4h 9c").unwrap();
-    assert_eq!(hand.evaluate(), HighHandRank::ThreeOfAKind(Rank::Seven));
+    if let HighHandRank::ThreeOfAKind(rank, kickers) = hand.evaluate() {
+        assert_eq!(rank, Rank::Seven);
+        assert_eq!(kickers, vec![Rank::Nine, Rank::Four]);
+    } else {
+        panic!("Expected ThreeOfAKind, got different hand rank");
+    }
 }
 
 #[test]
@@ -316,7 +344,7 @@ fn test_detailed_hand_ranking() {
     // Four of a Kind
     let quad_high = Hand::<SevenCardStud>::from_str(SevenCardStud, "Ah Ac Ad As Kh 2c 3d").unwrap();
     let quad_high_diff =
-        Hand::<SevenCardStud>::from_str(SevenCardStud, "Ah Ac Ad As Qh 4c 5d").unwrap();
+        Hand::<SevenCardStud>::from_str(SevenCardStud, "Ah Ac Ad As Ks 4c 5d").unwrap();
     let quad_low = Hand::<SevenCardStud>::from_str(SevenCardStud, "Kh Kc Kd Ks 2h 3c 4d").unwrap();
 
     // Full House

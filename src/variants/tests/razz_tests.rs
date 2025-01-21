@@ -83,3 +83,50 @@ fn test_hand_comparisons() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+#[test]
+fn test_detailed_razz_ranking() -> Result<(), PokerError> {
+    // Two unique card hands (worse because more pairs)
+    let two_rank_high = Hand::from_str(Razz, "AhAcAdAs2h2c2d")?;
+    let two_rank_high_diff = Hand::from_str(Razz, "AhAcAdAs2h2c2s")?;
+    let two_rank_low = Hand::from_str(Razz, "AhAcAdAs3h3c3d")?;
+
+    // Three unique card hands
+    let three_rank_high = Hand::from_str(Razz, "AhAcAd2h2c3h")?;
+    let three_rank_high_diff = Hand::from_str(Razz, "AhAcAd2h2c3s")?;
+    let three_rank_low = Hand::from_str(Razz, "AhAcAd2h2c5s")?;
+
+    // Four unique card hands
+    let four_rank_high = Hand::from_str(Razz, "AhAc2h2c3d4s")?;
+    let four_rank_high_diff = Hand::from_str(Razz, "AhAc2h2c3d4h")?;
+    let four_rank_low = Hand::from_str(Razz, "AhAc2h2c3d6s")?;
+
+    // Five unique card hands (best type of hand in Razz)
+    let five_rank_high = Hand::from_str(Razz, "Ah2h3h4h5hKsQd")?; // Perfect low: A2345
+    let five_rank_high_diff = Hand::from_str(Razz, "Ac2c3c4c5cJsTd")?;
+    let five_rank_low = Hand::from_str(Razz, "Ah2h3h4h6hKsQd")?; // A2346
+
+    // Test equal hands
+    assert!(two_rank_high == two_rank_high_diff);
+    assert!(three_rank_high == three_rank_high_diff);
+    assert!(four_rank_high == four_rank_high_diff);
+    assert!(five_rank_high == five_rank_high_diff);
+
+    // Test within same rank count (remember in Razz lower is better)
+    assert!(two_rank_high > two_rank_low); // AAAA222 > AAAA333
+    assert!(three_rank_high > three_rank_low); // AAA22[3] > AAA22[5]
+    assert!(four_rank_high > four_rank_low); // AA23[4] > AA23[6]
+    assert!(five_rank_high > five_rank_low); // A2345 > A2346
+
+    // Test between different rank counts (fewer duplicates is better)
+    assert!(five_rank_high > four_rank_high); // 5 unique > 4 unique
+    assert!(four_rank_high > three_rank_high); // 4 unique > 3 unique
+    assert!(three_rank_high > two_rank_high); // 3 unique > 2 unique
+
+    // Test transitivity
+    assert!(five_rank_high > two_rank_high); // Best possible > Worst possible
+    assert!(four_rank_high > two_rank_high); // Middle ranks transitive
+    assert!(five_rank_high > three_rank_high); // Best beats middle
+
+    Ok(())
+}

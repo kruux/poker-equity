@@ -91,7 +91,7 @@ fn test_hand_evaluation() -> Result<(), PokerError> {
     let quads = Hand::from_str(DeuceSeven, "7c7h7s7dAh")?;
     assert!(matches!(
         quads.evaluate(),
-        DeuceSevenRank::FourOfAKind(Rank::Seven)
+        DeuceSevenRank::FourOfAKind(Rank::Seven, Rank::Ace)
     ));
 
     // Test full house
@@ -114,10 +114,12 @@ fn test_hand_evaluation() -> Result<(), PokerError> {
 
     // Test three of a kind
     let trips = Hand::from_str(DeuceSeven, "7c7h7sAh2d")?;
-    assert!(matches!(
-        trips.evaluate(),
-        DeuceSevenRank::ThreeOfAKind(Rank::Seven)
-    ));
+    if let DeuceSevenRank::ThreeOfAKind(rank, kickers) = trips.evaluate() {
+        assert_eq!(rank, Rank::Seven);
+        assert_eq!(kickers, vec![Rank::Ace, Rank::Two]);
+    } else {
+        panic!("Expected ThreeOfAKind, got different hand rank");
+    }
 
     // Test two pair
     let two_pair = Hand::from_str(DeuceSeven, "7c7h2s2dAh")?;

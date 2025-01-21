@@ -38,6 +38,6 @@ fn test_shuffle() {
     deck1.shuffle();
 
     // Note: There's a tiny chance this could fail even with a good shuffle
-    // That chance is 52! however. So if it fails it's almost guaranteed to be bad rng
+    // That chance is 52! however. So if this test fails it's almost guaranteed to be bad rng
     assert_ne!(deck1.cards(), deck2.cards());
 }
