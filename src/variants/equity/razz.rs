@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator, variants::Razz};
 
-use super::{EquityCalculation, StudEquity};
+use super::{EquityCalculation, StudCardGame};
 
-impl StudEquity for Razz {}
+impl StudCardGame for Razz {}
 impl EquityCalculation for Razz {
     fn validate(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         self.validate_stud(calculator)
@@ -24,7 +24,7 @@ impl EquityCalculation for Razz {
             final_hands.push((name, hand));
         }
 
-        // For Razz, lowest hand wins 100% of pot
+        // For Razz, lowest hand(s) wins 100% of pot
         let rankings = self.rank_hands(&final_hands)?;
         let winners = &rankings[0];
 

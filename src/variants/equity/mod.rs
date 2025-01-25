@@ -4,13 +4,16 @@ use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator};
 
 use super::{LowHandRank, PokerVariant};
 
+mod community_base;
 mod deuce_seven;
+mod holdem;
 mod razz;
 mod stud;
 mod stud_base;
 mod stud_hi_lo;
 
-pub(crate) use stud_base::StudEquity;
+pub(crate) use community_base::CommunityCardGame;
+pub(crate) use stud_base::StudCardGame;
 
 pub trait HasLow {
     fn low(&self) -> Option<&LowHandRank>;

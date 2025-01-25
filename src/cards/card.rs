@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fmt};
 
 use crate::error::CardError;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Card {
     suit: Suit,
     rank: Rank,

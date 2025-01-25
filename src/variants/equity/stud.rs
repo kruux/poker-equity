@@ -2,9 +2,9 @@ use std::collections::HashMap;
 
 use crate::{hand::Hand, variants::SevenCardStud};
 
-use super::{EquityCalculation, StudEquity};
+use super::{EquityCalculation, StudCardGame};
 
-impl StudEquity for SevenCardStud {}
+impl StudCardGame for SevenCardStud {}
 impl EquityCalculation for SevenCardStud {
     fn validate(
         &self,

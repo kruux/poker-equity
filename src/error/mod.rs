@@ -77,6 +77,7 @@ pub enum EquityError {
     NotEnoughCards(usize),
     InvalidSimulationCount(usize),
     UnequalHandSizes,
+    InvalidCommunityCards(usize),
 }
 
 impl EquityError {
@@ -86,6 +87,9 @@ impl EquityError {
             EquityError::NotEnoughCards(n) => format!("Not enough cards in hand: {}", n),
             EquityError::InvalidSimulationCount(n) => format!("Invalid number of simulations: {n}"),
             EquityError::UnequalHandSizes => format!("Starting hands with different sizes"),
+            EquityError::InvalidCommunityCards(n) => {
+                format!("Invalid number of community cards: {n}")
+            }
         }
     }
 }

@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
-use super::{EquityCalculation, StudEquity};
+use super::{EquityCalculation, StudCardGame};
 use crate::{
     cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator, variants::StudHiLo,
 };
 
-impl StudEquity for StudHiLo {}
+impl StudCardGame for StudHiLo {}
 impl EquityCalculation for StudHiLo {
     fn validate(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         self.validate_stud(calculator)

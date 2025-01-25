@@ -7,7 +7,6 @@ pub type StudHandRank = HighHandRank;
 pub type RazzHandRank = LowHandRank;
 pub type StudHiLoHandRank = HiLoHandRank;
 pub type HoldemHandRank = HighHandRank;
-
 pub use deuce_seven::DeuceSevenRank;
 pub use hi_lo::HiLoHandRank;
 pub use high::HighHandRank;

@@ -1,6 +1,6 @@
 use rayon::prelude::*;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
 };
 
@@ -8,13 +8,14 @@ use crate::{
     cards::{Card, Deck},
     error::{EquityError, GameError, PokerError},
     hand::Hand,
-    variants::{EquityCalculation, PokerVariant},
+    variants::{CommunityCardGame, EquityCalculation, PokerVariant},
 };
 
 pub struct EquityCalculator<V: PokerVariant + EquityCalculation> {
     players: Vec<(String, Hand<V>, Vec<Card>)>, // (name, current_hand, cards_to_discard)
     dead_cards: Vec<Card>,
     num_simulations: usize,
+    community_cards: Vec<Card>,
     variant: V,
 }
 
@@ -24,6 +25,7 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
             players: Vec::new(),
             dead_cards: Vec::new(),
             num_simulations,
+            community_cards: Vec::new(),
             variant,
         }
     }
@@ -68,63 +70,54 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
         Ok(())
     }
 
+    /// Validation that will be checked for every poker variant
+    /// - At least 2 players
+    /// - No duplicated cards
+    pub fn validate_base(&self) -> Result<(), PokerError> {
+        if self.players.len() < 2 {
+            return Err(EquityError::NoPlayers.into());
+        }
+
+        // Check for duplicated cards
+        let mut seen_cards = HashSet::new();
+        // Check all players
+        for (_, hand, _) in &self.players {
+            for card in hand.cards() {
+                if !seen_cards.insert(card) {
+                    return Err(GameError::DuplicateCard(*card).into());
+                }
+            }
+        }
+        // Check all dead cards
+        for card in &self.dead_cards {
+            if !seen_cards.insert(card) {
+                return Err(GameError::DuplicateCard(*card).into());
+            }
+        }
+        // Check all community cards
+        for card in &self.community_cards {
+            if !seen_cards.insert(card) {
+                return Err(GameError::DuplicateCard(*card).into());
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn dead_cards(&self) -> &[Card] {
         &self.dead_cards
     }
 
-    // pub fn calculate(&mut self) -> Result<&HashMap<String, f64>, PokerError> {
-    //     if self.players.len() < 2 {
-    //         return Err(EquityError::NoPlayers.into());
-    //     }
-    //     // Validate that simulation is ok. Every poker variant have to implement their own validation here
-    //     self.variant.validate(self)?;
+    pub fn community_cards(&self) -> &[Card] {
+        &self.community_cards
+    }
+}
 
-    //     // Clear previous results
-    //     self.results.clear();
-
-    //     // Initialize equity results
-    //     let mut total_equity: HashMap<String, f64> = self
-    //         .players
-    //         .iter()
-    //         .map(|(name, _, _)| (name.clone(), 0.0))
-    //         .collect();
-
-    //     // Run simulations
-    //     for _ in 0..self.num_simulations {
-    //         // Create a new deck
-    //         let mut deck = Deck::new();
-
-    //         // Remove known cards from deck
-    //         for card in &self.dead_cards {
-    //             deck.remove_card(card)?;
-    //         }
-
-    //         // Remove all cards that are in players' hands
-    //         for (_, hand, _) in &self.players {
-    //             for card in hand.cards() {
-    //                 deck.remove_card(card)?;
-    //             }
-    //         }
-
-    //         deck.shuffle();
-
-    //         let equity = self.variant.run_single_simulation(deck, self)?;
-    //         for (name, eq) in equity {
-    //             total_equity
-    //                 .entry(name)
-    //                 .and_modify(|current_eq| *current_eq += eq) // Add equity from latest simulation
-    //                 .or_insert(eq); // If it's the first time the player get's equity
-    //         }
-    //     }
-
-    //     // Convert summed equity to percentages
-    //     for (name, eq) in total_equity {
-    //         self.results
-    //             .insert(name, (eq as f64) / (self.num_simulations as f64) * 100.0);
-    //     }
-
-    //     Ok(&self.results)
-    // }
+impl<V: PokerVariant + CommunityCardGame + EquityCalculation> EquityCalculator<V> {
+    pub fn set_community_cards(&mut self, cards: Vec<Card>) -> Result<(), PokerError> {
+        self.community_cards = cards;
+        Ok(())
+    }
 }
 
 impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
@@ -136,6 +129,7 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
             return Err(EquityError::NoPlayers.into());
         }
         // Validate that simulation is ok. Every poker variant have to implement its own validation
+        self.validate_base()?;
         self.variant.validate(self)?;
 
         let completed_sims = Arc::new(Mutex::new(0));
@@ -146,7 +140,7 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
             results.lock().unwrap().insert(name.clone(), 0.0);
         }
 
-        let chunk_size = 1000;
+        let chunk_size = 10000;
         let mut chunks = vec![chunk_size; self.num_simulations / chunk_size];
         let remainder = self.num_simulations % chunk_size;
         if remainder > 0 {
@@ -174,6 +168,11 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
                             deck.remove_card(card)?;
                         }
                     }
+                    // Remove all community cards
+                    for card in &self.community_cards {
+                        deck.remove_card(card)?;
+                    }
+
                     deck.shuffle();
 
                     let sim_results = self.variant.run_single_simulation(deck, self)?;

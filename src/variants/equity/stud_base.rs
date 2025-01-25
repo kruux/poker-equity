@@ -7,7 +7,7 @@ use crate::{
 use super::EquityCalculation;
 
 /// Has code that will be reused when simulating all stud based games
-pub(crate) trait StudEquity: EquityCalculation {
+pub(crate) trait StudCardGame: EquityCalculation {
     fn validate_stud(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         // At least 2 players for a meaningful simulation
         let players = calculator.players();

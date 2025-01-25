@@ -7,6 +7,7 @@ mod stud;
 mod stud_hi_lo;
 
 pub use deuce_seven::DeuceSeven;
+pub(crate) use equity::CommunityCardGame;
 pub use equity::EquityCalculation;
 pub(crate) use equity::HasLow;
 pub use holdem::Holdem;
@@ -38,6 +39,7 @@ pub trait PokerVariant: Clone + Copy {
 #[cfg(test)]
 mod tests {
     mod deuce_seven_tests;
+    mod holdem_tests;
     mod razz_tests;
     mod stud_hi_lo_tests;
     mod stud_tests;

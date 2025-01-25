@@ -36,6 +36,9 @@ impl<V: PokerVariant> Hand<V> {
         let mut cards: Vec<Card> = Vec::with_capacity(max_cards);
         // Make sure it's even to avoid breaking the for loop
         let len = cards_chars.len();
+        if len == 0 {
+            return Ok(Self { cards, variant });
+        }
         if len % 2 != 0 {
             return Err(CardError::InvalidFormat(
                 "Both suit and rank have to be provided for every card".to_string(),
@@ -59,12 +62,19 @@ impl<V: PokerVariant> Hand<V> {
 
     pub fn add_card(&mut self, card: Card) -> Result<(), CardError> {
         let n = self.num_cards() + 1;
-        if n > 5 {
+        if n > self.variant.max_cards() {
             Err(CardError::TooManyCards(n))
         } else {
             self.cards.push(card);
             Ok(())
         }
+    }
+
+    pub fn add_cards(&mut self, cards: Vec<Card>) -> Result<(), CardError> {
+        for card in cards {
+            self.add_card(card)?;
+        }
+        Ok(())
     }
 
     pub fn cards(&self) -> &[Card] {
