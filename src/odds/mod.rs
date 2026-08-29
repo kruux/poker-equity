@@ -6,7 +6,9 @@ mod runner;
 pub use calculator::{EquityCalculator, SimulationProgress};
 pub use chunk::{ChunkResult, PlayerEquity};
 pub use request::{run_chunk, run_exact, run_exact_within, EquityRequest, EXACT_DEAL_LIMIT};
-pub use runner::{equity, equity_with_progress, Progress, Target};
+pub use runner::{
+    default_threads, equity, equity_with_progress, run_batch, Progress, Target,
+};
 
 #[cfg(test)]
 mod tests {

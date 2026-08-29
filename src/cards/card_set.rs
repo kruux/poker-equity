@@ -144,14 +144,20 @@ impl FromIterator<Card> for CardSet {
 }
 
 impl fmt::Display for CardSet {
+    /// Highest card first, which is how a hand is read aloud.
+    ///
+    /// Not the order [`iter`](CardSet::iter) walks: a card's index is
+    /// `rank * 4 + suit`, so walking the bits gives the lowest rank first.
+    /// That is the right order for a set and the wrong one for a person, who
+    /// expects `Ah Kd` rather than `Kd Ah`.
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let mut first = true;
-        for card in self.iter() {
-            if !first {
+        let mut cards: Vec<Card> = self.iter().collect();
+        cards.reverse();
+        for (position, card) in cards.iter().enumerate() {
+            if position > 0 {
                 write!(f, " ")?;
             }
             write!(f, "{}", card)?;
-            first = false;
         }
         Ok(())
     }

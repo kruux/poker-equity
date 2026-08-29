@@ -100,7 +100,7 @@ board	5	Kh, Qh	err	UnknownGlyph
 # --- 3.5 dead cards must be exact -------------------------------------------
 dead	-		ok	
 dead	-	Ah	ok	Ah
-dead	-	Ah Kd	ok	Kd Ah
+dead	-	Ah Kd	ok	Ah Kd
 dead	-	c	err	DeadCardNotExact
 dead	-	A	err	DeadCardNotExact
 dead	-	*	err	DeadCardNotExact

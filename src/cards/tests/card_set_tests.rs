@@ -104,11 +104,28 @@ fn test_nth_walks_the_set_in_order() {
     assert_eq!(CardSet::EMPTY.nth(0), None);
 }
 
+/// A set prints highest card first, which is how a hand is read aloud.
+///
+/// Walking the bits gives the opposite, since a card's index is
+/// `rank * 4 + suit`. fpdb matches against this, so the order is part of the
+/// grammar rather than an accident of the representation.
 #[test]
-fn test_display_reads_as_cards() -> Result<(), PokerError> {
-    let set = CardSet::from_cards(&Card::from_str("Ah Kh")?);
-    let shown = set.to_string();
-    assert!(shown.contains("Ah") && shown.contains("Kh"), "got {}", shown);
+fn test_display_reads_highest_first() -> Result<(), PokerError> {
+    assert_eq!(
+        CardSet::from_cards(&Card::from_str("Ah Kd")?).to_string(),
+        "Ah Kd",
+        "not Kd Ah, which is the order the bits are in"
+    );
+    assert_eq!(
+        CardSet::from_cards(&Card::from_str("2c 7d Ts Ah")?).to_string(),
+        "Ah Ts 7d 2c"
+    );
     assert_eq!(CardSet::EMPTY.to_string(), "");
+
+    // The set itself still walks lowest first; only the rendering differs.
+    let set = CardSet::from_cards(&Card::from_str("Ah Kd")?);
+    let walked: Vec<String> = set.iter().map(|c| c.to_string()).collect();
+    assert_eq!(walked, vec!["Kd", "Ah"]);
+
     Ok(())
 }
