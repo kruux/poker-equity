@@ -218,3 +218,42 @@ fn test_six_player_three_card_equity() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// Two hands that rank equally for high must split the high half, even when
+/// their lows differ. Grouping ties with `==` rather than with the ordering
+/// used to sort them split these two apart and handed the first the whole
+/// high half.
+#[test]
+fn test_equal_highs_split_the_high_half() -> Result<(), PokerError> {
+    let mut calculator = EquityCalculator::new(StudHiLo, 10);
+
+    // Both are a pair of kings with an 8-7-6 kicker, so the high is a tie.
+    // Hero's low, 8-7-6-3-2, beats Villain's 8-7-6-5-3.
+    let hero = Hand::from_str(StudHiLo, "Kh Kd 8c 7d 6h 3s 2c")?;
+    let villain = Hand::from_str(StudHiLo, "Ks Kc 8d 7h 6s 5c 3d")?;
+
+    assert_eq!(
+        hero.evaluate().high.partial_cmp(&villain.evaluate().high),
+        Some(std::cmp::Ordering::Equal),
+        "the two hands must tie for high for this test to mean anything"
+    );
+
+    calculator.add_player("Hero".to_string(), hero)?;
+    calculator.add_player("Villain".to_string(), villain)?;
+
+    // Both hands are complete, so there is nothing to sample: half the high
+    // half each, and the whole low half to Hero.
+    let results = calculator.calculate(drop)?;
+    assert!(
+        (results["Hero"] - 75.0).abs() < 0.001,
+        "Hero takes half the high and all the low, got {}",
+        results["Hero"]
+    );
+    assert!(
+        (results["Villain"] - 25.0).abs() < 0.001,
+        "Villain takes half the high, got {}",
+        results["Villain"]
+    );
+
+    Ok(())
+}
