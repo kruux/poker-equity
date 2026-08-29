@@ -5,7 +5,7 @@ use crate::cards::{Card, Rank, Suit};
 use super::FastHandRank;
 
 /// Used for many of the usual game types, like hold em and stud
-#[derive(Clone, Debug, Eq, Hash)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum HighHandRank {
     StraightFlush(Rank),
     FourOfAKind(Rank, Rank),
@@ -260,7 +260,7 @@ impl HighHandRank {
         for &card in cards {
             cards_by_suit
                 .entry(card.suit())
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(card);
         }
         cards_by_suit

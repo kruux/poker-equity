@@ -68,14 +68,14 @@ impl FastHandRank {
 
 impl PartialOrd for FastHandRank {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // Lower scores are better hands
-        other.0.partial_cmp(&self.0)
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for FastHandRank {
+    /// Better hands compare greater, which means lower scores: the table
+    /// numbers hands from the royal flush down.
     fn cmp(&self, other: &Self) -> Ordering {
-        // Lower scores are better hands
         other.0.cmp(&self.0)
     }
 }

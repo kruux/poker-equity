@@ -4,7 +4,7 @@ use crate::cards::{Card, Rank};
 
 use super::HighHandRank;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum DeuceSevenRank {
     StraightFlush(Rank),           // Rank of highest card
     FourOfAKind(Rank, Rank),       // Rank of quads
@@ -38,7 +38,7 @@ impl DeuceSevenRank {
                 if r == Rank::Five {
                     Self::HighCard([Rank::Ace, Rank::Five, Rank::Four, Rank::Three, Rank::Two])
                 } else {
-                    return Self::Straight(r);
+                    Self::Straight(r)
                 }
             }
             HighHandRank::ThreeOfAKind(r, k) => Self::ThreeOfAKind(r, k),

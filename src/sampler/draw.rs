@@ -61,10 +61,7 @@ fn extract_forced(slots: &[CardSet], available: CardSet) -> (Vec<Card>, Vec<Card
     let mut open: Vec<CardSet> = slots.iter().map(|s| s.intersection(available)).collect();
     let mut fixed: Vec<Card> = Vec::new();
 
-    loop {
-        let Some(index) = open.iter().position(|slot| slot.len() == 1) else {
-            break;
-        };
+    while let Some(index) = open.iter().position(|slot| slot.len() == 1) {
         let Some(card) = open[index].iter().next() else {
             break;
         };

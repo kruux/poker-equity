@@ -98,15 +98,14 @@ fn disagreements(hands: impl Iterator<Item = Vec<Card>>) -> Vec<String> {
 
     for pair in ranked.windows(2) {
         let ((better, better_score), (worse, worse_score)) = (pair[0], pair[1]);
-        if better_score >= worse_score {
-            if problems.len() < 16 {
+        if better_score >= worse_score
+            && problems.len() < 16 {
                 problems.push(format!(
                     "order reversed: {} beats {}, but scores {} against {} \
                      (lower scores are better hands)",
                     better, worse, better_score, worse_score
                 ));
             }
-        }
     }
 
     problems

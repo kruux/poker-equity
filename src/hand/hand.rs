@@ -39,7 +39,7 @@ impl<V: PokerVariant> Hand<V> {
         if len == 0 {
             return Ok(Self { cards, variant });
         }
-        if len % 2 != 0 {
+        if !len.is_multiple_of(2) {
             return Err(CardError::InvalidFormat(
                 "Both suit and rank have to be provided for every card".to_string(),
             )

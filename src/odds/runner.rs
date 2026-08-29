@@ -97,9 +97,9 @@ where
     loop {
         // One batch per thread, each with its own seed, merged afterwards.
         let seeds: Vec<u64> = (0..threads as u64)
-            .map(|offset| seed.wrapping_add(offset.wrapping_mul(0x1000_0000_1B3)))
+            .map(|offset| seed.wrapping_add(offset.wrapping_mul(0x0100_0000_01B3)))
             .collect();
-        seed = seed.wrapping_add(threads as u64 * 0x1000_0000_1B3);
+        seed = seed.wrapping_add(threads as u64 * 0x0100_0000_01B3);
 
         let batches = seeds
             .par_iter()

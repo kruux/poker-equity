@@ -47,7 +47,7 @@ impl Card {
         let mut cards: Vec<Card> = Vec::<Card>::new();
         // Make sure it's even to avoid breaking the for loop
         let len = cards_chars.len();
-        if len % 2 != 0 {
+        if !len.is_multiple_of(2) {
             return Err(CardError::InvalidFormat(
                 "Uneven number of chars".to_string(),
             ));
@@ -113,10 +113,10 @@ impl Suit {
     /// Takes a suit and returns the matching char
     pub fn to_char(suit: Suit) -> char {
         match suit {
-            Suit::Club => return 'c',
-            Suit::Diamond => return 'd',
-            Suit::Heart => return 'h',
-            Suit::Spade => return 's',
+            Suit::Club => 'c',
+            Suit::Diamond => 'd',
+            Suit::Heart => 'h',
+            Suit::Spade => 's',
         }
     }
 
@@ -182,19 +182,19 @@ impl Rank {
     /// Takes a rank and returns the matching char
     pub fn to_char(rank: Rank) -> char {
         match rank {
-            Rank::Two => return '2',
-            Rank::Three => return '3',
-            Rank::Four => return '4',
-            Rank::Five => return '5',
-            Rank::Six => return '6',
-            Rank::Seven => return '7',
-            Rank::Eight => return '8',
-            Rank::Nine => return '9',
-            Rank::Ten => return 'T',
-            Rank::Jack => return 'J',
-            Rank::Queen => return 'Q',
-            Rank::King => return 'K',
-            Rank::Ace => return 'A',
+            Rank::Two => '2',
+            Rank::Three => '3',
+            Rank::Four => '4',
+            Rank::Five => '5',
+            Rank::Six => '6',
+            Rank::Seven => '7',
+            Rank::Eight => '8',
+            Rank::Nine => '9',
+            Rank::Ten => 'T',
+            Rank::Jack => 'J',
+            Rank::Queen => 'Q',
+            Rank::King => 'K',
+            Rank::Ace => 'A',
         }
     }
 

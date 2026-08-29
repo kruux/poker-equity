@@ -61,7 +61,7 @@ impl CardError {
         match self {
             CardError::IncompleteHand(n) => format!("All hands not dealt yet: {}", n),
             CardError::InvalidComparison => "Error comparing hands".to_string(),
-            CardError::InvalidFormat(s) => format!("{}", s),
+            CardError::InvalidFormat(s) => s.to_string(),
             CardError::InvalidRank(c) => format!("Invalid rank character: {}", c),
             CardError::InvalidSuit(c) => format!("Invalid suit character: {}", c),
             CardError::TooManyCards(n) => format!("Too many cards in Vec: {}", n),
@@ -87,10 +87,10 @@ pub enum EquityError {
 impl EquityError {
     pub fn description(&self) -> String {
         match self {
-            EquityError::NoPlayers => format!("Need atleast 2 players for a simulation"),
+            EquityError::NoPlayers => "Need atleast 2 players for a simulation".to_string(),
             EquityError::NotEnoughCards(n) => format!("Not enough cards in hand: {}", n),
             EquityError::InvalidSimulationCount(n) => format!("Invalid number of simulations: {n}"),
-            EquityError::UnequalHandSizes => format!("Starting hands with different sizes"),
+            EquityError::UnequalHandSizes => "Starting hands with different sizes".to_string(),
             EquityError::Infeasible(field) => {
                 format!("No deal can satisfy {}", field)
             }

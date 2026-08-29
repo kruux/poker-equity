@@ -54,7 +54,7 @@ impl CardSet {
     /// Every card of one suit, the mask behind a pattern like `c`.
     pub fn of_suit(suit: Suit) -> Self {
         // One bit every four, thirteen times, shifted to the suit.
-        Self(0x0001_1111_1111_1111 << (suit as u8))
+        Self(0x1_1111_1111_1111 << (suit as u8))
     }
 
     /// Whether `card` is in the set.

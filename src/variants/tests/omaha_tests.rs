@@ -47,8 +47,11 @@ fn test_empty_hand_comparison() -> Result<(), PokerError> {
     // Comparison of Hand instances.
     // Two empty evaluated hands should be equal.
     assert_eq!(empty_hand1, empty_hand2);
-    assert!(!(empty_hand1 > empty_hand2));
-    assert!(!(empty_hand1 < empty_hand2));
+    assert_eq!(
+        empty_hand1.partial_cmp(&empty_hand2),
+        Some(Ordering::Equal),
+        "neither hand is ahead of the other"
+    );
 
     // A hand with a card should beat an empty hand.
     assert!(one_card_hand > empty_hand1);
