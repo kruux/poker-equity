@@ -183,3 +183,70 @@ fn test_small_constrained_spaces_are_listed() {
     let wide = [CardSet::of_rank(Rank::Ace); 7];
     assert_eq!(SlotSampler::new(&wide, CardSet::FULL_DECK).strategy(), "listed");
 }
+
+/// Filling the tightest slot first is a tempting way to sample, and it is
+/// wrong. This is the measurement that says so.
+///
+/// The sampler does fix *forced* slots first -- a slot with exactly one
+/// candidate takes that card in every valid deal, so setting it aside removes
+/// no possibility. The tempting next step is to carry on that way and fill
+/// the partly constrained slots before the wildcards. That is a different
+/// thing entirely: a slot with a choice changes how many ways the rest can go
+/// once it has chosen.
+///
+/// With `A *` -- any ace, and any card -- filling the ace slot first picks
+/// evenly among four aces and then a second card from the fifty-one left. A
+/// hand holding two aces is reachable twice over, because either ace could
+/// have been the one chosen first, so it collects double the weight it should.
+#[test]
+fn test_filling_the_tightest_slot_first_would_bias_the_draw() {
+    let slots = [CardSet::of_rank(Rank::Ace), CardSet::FULL_DECK];
+
+    let every_set = SlotSampler::new(&slots, CardSet::FULL_DECK)
+        .all_sets(CardSet::FULL_DECK, 1_000_000)
+        .expect("small enough to list");
+    let two_aces = every_set
+        .iter()
+        .filter(|set| set.iter().filter(|card| card.rank() == Rank::Ace).count() == 2)
+        .count();
+    let truth = two_aces as f64 / every_set.len() as f64;
+    assert_eq!(every_set.len(), 198);
+    assert_eq!(two_aces, 6, "six ways to hold two of the four aces");
+
+    // What the sampler does: draw a subset, keep it if the slots can be
+    // filled from it.
+    let sampler = SlotSampler::new(&slots, CardSet::FULL_DECK);
+    let mut rng = StdRng::seed_from_u64(11);
+    let mut out = Vec::new();
+    let (mut drawn, mut paired) = (0u32, 0u32);
+    for _ in 0..400_000 {
+        if sampler.draw(CardSet::FULL_DECK, &mut rng, &mut out) {
+            drawn += 1;
+            if out.iter().filter(|card| card.rank() == Rank::Ace).count() == 2 {
+                paired += 1;
+            }
+        }
+    }
+    let measured = paired as f64 / drawn as f64;
+
+    assert!(
+        (measured - truth).abs() < 0.002,
+        "the sampler should hold two aces {:.4}% of the time, and holds them {:.4}%",
+        truth * 100.0,
+        measured * 100.0
+    );
+
+    // And the ordering that would have been wrong: fill the ace slot first,
+    // then take any second card. Worked out exactly rather than sampled.
+    // Each ordered pair has probability 1/4 * 1/51; a two-ace hand is two
+    // such pairs, a one-ace hand only one.
+    let ordered_pairs = 4.0 * 51.0;
+    let biased = (two_aces as f64 * 2.0) / ordered_pairs;
+    assert!(
+        biased > truth * 1.9,
+        "filling the ace slot first should nearly double the rate of two-ace \
+         hands: {:.4}% against the true {:.4}%",
+        biased * 100.0,
+        truth * 100.0
+    );
+}
