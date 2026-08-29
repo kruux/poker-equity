@@ -14,7 +14,6 @@
 //! are cross-checked against each other by the test suite; sharing code here
 //! would mean a bug in one silently agrees with the other.
 
-use std::collections::HashMap;
 use std::env;
 use std::fs::File;
 use std::io::{BufWriter, Write};
@@ -123,10 +122,19 @@ impl RefRank {
     }
 }
 
+/// The ace playing low in a full deck: A-5-4-3-2.
+const WHEEL: u16 = (1 << 12) | 0b1111;
+
+/// The ace playing low in a short deck: A-9-8-7-6. There is nothing below a
+/// six to make the usual wheel from.
+const SHORT_WHEEL: u16 = (1 << 12) | (0b1111 << 4);
+
 /// The highest straight in a rank mask, as a rank index.
 ///
-/// The ace plays low as well as high, so `A5432` is a five-high straight.
-fn straight_high(mask: u16) -> Option<u8> {
+/// `wheel` is the hand the ace plays low in, or `None` where it does not play
+/// low at all -- deuce-to-seven counts the ace as high always, which is why
+/// `A5432` is a bad high card hand there rather than a straight.
+fn straight_high(mask: u16, wheel: Option<u16>) -> Option<u8> {
     // A non-wheel straight is topped by a six or better.
     for high in (4..13u8).rev() {
         let run = 0b11111u16 << (high - 4);
@@ -134,9 +142,12 @@ fn straight_high(mask: u16) -> Option<u8> {
             return Some(high);
         }
     }
-    const WHEEL: u16 = (1 << 12) | 0b1111; // A, 5, 4, 3, 2
-    if mask & WHEEL == WHEEL {
-        return Some(3); // five high
+    if let Some(wheel) = wheel {
+        if mask & wheel == wheel {
+            // The highest card of the wheel other than the ace tops it: a
+            // five in a full deck, a nine in a short one.
+            return Some(15 - (wheel & !(1 << 12)).leading_zeros() as u8);
+        }
     }
     None
 }
@@ -151,7 +162,7 @@ fn ranks_desc(counts: &[u8; 13]) -> Vec<u8> {
 
 /// The best five-card hand from a rank multiset, given that no flush is
 /// possible. This is the table consulted once the flush check has missed.
-fn eval_no_flush(counts: &[u8; 13]) -> RefRank {
+fn eval_no_flush(counts: &[u8; 13], wheel: Option<u16>) -> RefRank {
     let mask: u16 = (0..13)
         .filter(|&r| counts[r] > 0)
         .map(|r| 1u16 << r)
@@ -184,7 +195,7 @@ fn eval_no_flush(counts: &[u8; 13]) -> RefRank {
         }
     }
 
-    if let Some(high) = straight_high(mask) {
+    if let Some(high) = straight_high(mask, wheel) {
         return RefRank::new(STRAIGHT, &[high]);
     }
 
@@ -214,12 +225,184 @@ fn eval_no_flush(counts: &[u8; 13]) -> RefRank {
 
 /// The best five-card hand from the ranks of a single suit holding five or
 /// more cards. Such a hand always plays as a flush or better.
-fn eval_flush(mask: u16) -> RefRank {
-    if let Some(high) = straight_high(mask) {
+fn eval_flush(mask: u16, wheel: Option<u16>) -> RefRank {
+    if let Some(high) = straight_high(mask, wheel) {
         return RefRank::new(STRAIGHT_FLUSH, &[high]);
     }
     let top: Vec<u8> = (0..13u8).rev().filter(|&r| mask & (1 << r) != 0).take(5).collect();
     RefRank::new(FLUSH, &top)
+}
+
+/// The rankings this library scores hands under.
+///
+/// Each is a way of reading a hand, and each gets its own score table over
+/// the same keys, so that a variant's hot path is a lookup whichever ranking
+/// it plays by.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Kernel {
+    /// The five-card high hand: hold'em, Omaha, stud.
+    High,
+    /// The high hand read upside down, with the ace forced high so that
+    /// `A5432` is a bad high-card hand rather than a straight, and straights
+    /// and flushes counting against you.
+    DeuceSeven,
+    /// The high hand over thirty-six cards: a flush beats a full house, and
+    /// the ace plays low below the six.
+    ShortDeck,
+    /// The ace-to-five low: straights and flushes do not count and the ace is
+    /// the lowest card, so suits never matter and there is no flush table.
+    LowA5,
+}
+
+impl Kernel {
+    /// What the file holding this kernel's scores is called.
+    fn name(self) -> &'static str {
+        match self {
+            Kernel::High => "high",
+            Kernel::DeuceSeven => "deuce_seven",
+            Kernel::ShortDeck => "short_deck",
+            Kernel::LowA5 => "low_a5",
+        }
+    }
+
+    /// The hand the ace plays low in, if it plays low at all.
+    fn wheel(self) -> Option<u16> {
+        match self {
+            Kernel::High => Some(WHEEL),
+            Kernel::ShortDeck => Some(SHORT_WHEEL),
+            // Deuce-to-seven counts the ace as high, always.
+            Kernel::DeuceSeven => None,
+            Kernel::LowA5 => None,
+        }
+    }
+
+    /// Whether a flush is a thing in this ranking at all.
+    fn has_flushes(self) -> bool {
+        !matches!(self, Kernel::LowA5)
+    }
+
+    /// Scores a rank multiset, given that no flush is present.
+    fn rank_value(self, counts: &[u8; 13]) -> RefRank {
+        match self {
+            Kernel::LowA5 => eval_low(counts),
+            _ => eval_no_flush(counts, self.wheel()),
+        }
+    }
+
+    /// Scores a suit's ranks, where five or more of them are held.
+    fn flush_value(self, mask: u16) -> RefRank {
+        eval_flush(mask, self.wheel())
+    }
+
+    /// Which of two hands this ranking prefers, best first.
+    fn better_first(self, a: &RefRank, b: &RefRank) -> std::cmp::Ordering {
+        match self {
+            // The best high hand wins.
+            Kernel::High => b.cmp(a),
+            // The worst high hand wins, which is the whole of the game.
+            Kernel::DeuceSeven => a.cmp(b),
+            // As High, but a flush outranks a full house.
+            Kernel::ShortDeck => short_deck_order(b).cmp(&short_deck_order(a)),
+            // The lowest low wins, and the encoding already sorts that way.
+            Kernel::LowA5 => a.cmp(b),
+        }
+    }
+}
+
+/// A short-deck hand's place, with the flush lifted above the full house.
+fn short_deck_order(rank: &RefRank) -> (u8, [u8; 5]) {
+    let category = match rank.category {
+        FLUSH => FULL_HOUSE,
+        FULL_HOUSE => FLUSH,
+        other => other,
+    };
+    (category, rank.tiebreak)
+}
+
+/// Scores a rank multiset as an ace-to-five low.
+///
+/// Suits never matter here, so there is no flush to check. The five cards
+/// that play are whichever five make the lowest hand, and pairing is what
+/// hurts: any hand with no pair beats any hand with one, one pair beats two
+/// pair, and so on.
+fn eval_low(counts: &[u8; 13]) -> RefRank {
+    /// Where a rank sits in a low hand: the ace is the lowest card.
+    fn low_value(rank: u8) -> u8 {
+        if rank == 12 {
+            1
+        } else {
+            rank + 2
+        }
+    }
+
+    // Every five-card sub-multiset, scored, keeping the best. At seven cards
+    // this is a handful of candidates, and trying them all is cheaper than
+    // reasoning about which duplicate to keep.
+    let mut ranks: Vec<u8> = Vec::new();
+    for (rank, &count) in counts.iter().enumerate() {
+        for _ in 0..count {
+            ranks.push(rank as u8);
+        }
+    }
+
+    let mut best: Option<RefRank> = None;
+    let held = ranks.len();
+    for choice in 0u32..(1 << held) {
+        if choice.count_ones() != 5.min(held as u32) {
+            continue;
+        }
+        let played: Vec<u8> = (0..held)
+            .filter(|i| choice & (1 << i) != 0)
+            .map(|i| ranks[i])
+            .collect();
+
+        // How the played ranks group up, largest first. Comparing those
+        // lists is the category order: no pair is best, then one pair, two
+        // pair, trips, a full house and quads.
+        let mut group = [0u8; 13];
+        for &rank in &played {
+            group[rank as usize] += 1;
+        }
+        let mut sizes: Vec<u8> = group.iter().copied().filter(|&n| n > 0).collect();
+        sizes.sort_unstable_by(|a, b| b.cmp(a));
+        let category = match sizes.as_slice() {
+            [1, 1, 1, 1, 1] => 0,
+            [2, 1, 1, 1] => 1,
+            [2, 2, 1] => 2,
+            [3, 1, 1] => 3,
+            [3, 2] => 4,
+            [4, 1] => 5,
+            // Fewer than five cards held, which only happens on a short
+            // holding. Order those after every complete hand.
+            _ => 6,
+        };
+
+        // Within a category the biggest group decides first, then the higher
+        // card, and a lower card is the better low.
+        let mut ordered = played.clone();
+        ordered.sort_by(|a, b| {
+            group[*b as usize]
+                .cmp(&group[*a as usize])
+                .then(low_value(*b).cmp(&low_value(*a)))
+        });
+        let mut tiebreak = [0u8; 5];
+        for (slot, rank) in tiebreak.iter_mut().zip(&ordered) {
+            *slot = low_value(*rank);
+        }
+
+        let candidate = RefRank {
+            category,
+            tiebreak,
+        };
+        if best.as_ref().is_none_or(|found| candidate < *found) {
+            best = Some(candidate);
+        }
+    }
+
+    best.unwrap_or(RefRank {
+        category: u8::MAX,
+        tiebreak: [u8::MAX; 5],
+    })
 }
 
 /// Every rank multiset of `size` cards holding at most four of any rank.
@@ -246,40 +429,106 @@ fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-changed=src/variants/rankings/table_index.rs");
 
-    // Non-flush keys: a hand of five to seven cards reaches the rank table
-    // only once the flush check has missed, so every multiset in that range
-    // needs an entry.
-    let mut hand_ranks: HashMap<u32, RefRank> = HashMap::new();
+    let out_dir = env::var("OUT_DIR").expect("OUT_DIR is set by cargo");
+    let out_dir = Path::new(&out_dir);
+
+    // Every rank multiset of five to seven cards. A hand reaches the rank
+    // table only once the flush check has missed, so all of them are needed.
+    let mut multisets: Vec<(u32, [u8; 13])> = Vec::new();
     for size in 5..=7u8 {
         for counts in enumerate_multisets(size) {
-            let key: u32 = (0..13)
-                .map(|r| counts[r] as u32 * RANK_KEYS[r])
-                .sum();
-            hand_ranks.insert(key, eval_no_flush(&counts));
+            let key: u32 = (0..13).map(|r| counts[r] as u32 * RANK_KEYS[r]).sum();
+            multisets.push((key, counts));
         }
     }
 
-    // Flush keys: a thirteen-bit rank mask for one suit. Fewer than five bits
-    // is not a flush and must fall through to the rank table.
-    let mut flush_ranks: HashMap<u32, RefRank> = HashMap::new();
-    for mask in 0u16..(1 << 13) {
-        if mask.count_ones() >= 5 {
-            flush_ranks.insert(mask as u32, eval_flush(mask));
+    // One placement, shared by every kernel. The keys are the same whichever
+    // ranking reads them, so the displacements are worked out once and each
+    // kernel only needs its own array of scores.
+    let keys: Vec<u32> = multisets.iter().map(|(key, _)| *key).collect();
+    let displacements = place_keys(&keys);
+    write_u16s(&out_dir.join("hand_displacements.bin"), &displacements)?;
+
+    let flush_masks: Vec<u16> = (0u16..(1 << 13)).filter(|m| m.count_ones() >= 5).collect();
+
+    let mut generated = Vec::new();
+    for kernel in [
+        Kernel::High,
+        Kernel::DeuceSeven,
+        Kernel::ShortDeck,
+        Kernel::LowA5,
+    ] {
+        let scored = score_kernel(kernel, &multisets, &flush_masks);
+
+        let mut hand_values = vec![NOTHING; SLOT_COUNT];
+        for (key, score) in &scored.hands {
+            hand_values[slot_of(*key, displacements[bucket_of(*key)])] = *score;
         }
+        write_u16s(
+            &out_dir.join(format!("{}_hand_scores.bin", kernel.name())),
+            &hand_values,
+        )?;
+        generated.push((kernel.name(), "hand_scores"));
+
+        if kernel.has_flushes() {
+            let mut flush_values = vec![NOTHING; 1 << 13];
+            for (mask, score) in &scored.flushes {
+                flush_values[*mask as usize] = *score;
+            }
+            write_u16s(
+                &out_dir.join(format!("{}_flush_scores.bin", kernel.name())),
+                &flush_values,
+            )?;
+            generated.push((kernel.name(), "flush_scores"));
+        }
+
+        if kernel == Kernel::High {
+            write_translation_maps(out_dir, &scored.by_score)?;
+        }
+
+        println!(
+            "cargo:warning={} kernel: {} distinct hand values",
+            kernel.name(),
+            scored.by_score.len()
+        );
     }
 
-    // One dense numbering across both tables, best hand first, so that a flush
-    // score and a rank score are directly comparable. Equal hands share a score.
-    let mut all: Vec<(bool, u32, RefRank)> = hand_ranks
+    write_table_module(out_dir, &generated)?;
+
+    let kilobytes = (SLOT_COUNT * 2 * 4 + BUCKET_COUNT * 2 + 8192 * 2 * 3) / 1024;
+    println!("cargo:warning=lookup tables: {} KB in total", kilobytes);
+    Ok(())
+}
+
+/// One kernel's scores, and what each score means.
+struct Scored {
+    hands: Vec<(u32, u16)>,
+    flushes: Vec<(u16, u16)>,
+    by_score: Vec<(u16, RefRank)>,
+}
+
+/// Numbers every hand this kernel can see, best first, so that a flush score
+/// and a rank score are directly comparable and equal hands share a score.
+fn score_kernel(kernel: Kernel, multisets: &[(u32, [u8; 13])], flush_masks: &[u16]) -> Scored {
+    let mut all: Vec<(bool, u32, RefRank)> = multisets
         .iter()
-        .map(|(&key, &rank)| (false, key, rank))
-        .chain(flush_ranks.iter().map(|(&key, &rank)| (true, key, rank)))
+        .map(|(key, counts)| (false, *key, kernel.rank_value(counts)))
         .collect();
-    all.sort_by(|a, b| b.2.cmp(&a.2).then(a.1.cmp(&b.1)));
+    if kernel.has_flushes() {
+        all.extend(
+            flush_masks
+                .iter()
+                .map(|mask| (true, *mask as u32, kernel.flush_value(*mask))),
+        );
+    }
 
-    let mut hand_scores: Vec<(u32, u16)> = Vec::with_capacity(hand_ranks.len());
-    let mut flush_scores: Vec<(u32, u16)> = Vec::with_capacity(flush_ranks.len());
-    let mut score_to_rank: Vec<(u16, RefRank)> = Vec::new();
+    all.sort_by(|a, b| kernel.better_first(&a.2, &b.2).then(a.1.cmp(&b.1)));
+
+    let mut scored = Scored {
+        hands: Vec::new(),
+        flushes: Vec::new(),
+        by_score: Vec::new(),
+    };
     let mut score: u16 = 0;
     let mut previous: Option<RefRank> = None;
     for (is_flush, key, rank) in all {
@@ -289,74 +538,43 @@ fn main() -> std::io::Result<()> {
             }
         }
         if previous != Some(rank) {
-            score_to_rank.push((score, rank));
+            scored.by_score.push((score, rank));
         }
         previous = Some(rank);
         if is_flush {
-            flush_scores.push((key, score));
+            scored.flushes.push((key as u16, score));
         } else {
-            hand_scores.push((key, score));
+            scored.hands.push((key, score));
         }
     }
+    scored
+}
 
-    let out_dir = env::var("OUT_DIR").expect("OUT_DIR is set by cargo");
-    write_lookup_tables(Path::new(&out_dir), &hand_scores, &flush_scores)?;
-    println!(
-        "cargo:warning=lookup tables: {} rank keys in {} slots, {} KB total",
-        hand_scores.len(),
-        SLOT_COUNT,
-        (SLOT_COUNT * 2 + BUCKET_COUNT * 2 + 8192 * 2) / 1024
-    );
-    write_translation_maps(Path::new(&out_dir), &score_to_rank)?;
-    Ok(())
+/// Writes the module that names every generated table.
+fn write_table_module(out_dir: &Path, generated: &[(&str, &str)]) -> std::io::Result<()> {
+    let mut file = BufWriter::new(File::create(out_dir.join("hand_rank_table.rs"))?);
+    writeln!(
+        file,
+        "/// The displacement each bucket needs to clear its collisions,\n\
+         /// shared by every kernel because they all key on the same hands.\n\
+         pub(crate) static HAND_DISPLACEMENTS: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/hand_displacements.bin\"));"
+    )?;
+    for (kernel, kind) in generated {
+        writeln!(
+            file,
+            "pub(crate) static {}_{}: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/{}_{}.bin\"));",
+            kernel.to_uppercase(),
+            kind.to_uppercase(),
+            kernel,
+            kind
+        )?;
+    }
+    file.flush()
 }
 
 /// The value stored where no hand belongs, and the score a hand too short to
 /// evaluate reports.
 const NOTHING: u16 = u16::MAX;
-
-/// Writes the two lookup tables, plus the displacements the rank table needs.
-///
-/// The scores go out as raw little-endian `u16`s rather than as Rust source.
-/// A hundred and thirty thousand array literals would be slow to compile and
-/// enormous to read, and nobody reads a generated table anyway -- the
-/// generator above is the part worth reviewing.
-fn write_lookup_tables(
-    out_dir: &Path,
-    hand_scores: &[(u32, u16)],
-    flush_scores: &[(u32, u16)],
-) -> std::io::Result<()> {
-    // Flush keys are thirteen-bit rank masks, so they index a dense table
-    // directly with nothing computed at all.
-    let mut flushes = vec![NOTHING; 1 << 13];
-    for (key, score) in flush_scores {
-        flushes[*key as usize] = *score;
-    }
-    write_u16s(&out_dir.join("flush_scores.bin"), &flushes)?;
-
-    let (displacements, values) = build_perfect_hash(hand_scores);
-    write_u16s(&out_dir.join("hand_displacements.bin"), &displacements)?;
-    write_u16s(&out_dir.join("hand_scores.bin"), &values)?;
-
-    let mut file = BufWriter::new(File::create(out_dir.join("hand_rank_table.rs"))?);
-    writeln!(
-        file,
-        "/// Scores for every rank multiset, behind the perfect hash in\n\
-         /// `table_index`. Little-endian `u16`s.\n\
-         pub(crate) static HAND_SCORES: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/hand_scores.bin\"));"
-    )?;
-    writeln!(
-        file,
-        "/// The displacement each bucket needs to clear its collisions.\n\
-         pub(crate) static HAND_DISPLACEMENTS: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/hand_displacements.bin\"));"
-    )?;
-    writeln!(
-        file,
-        "/// Scores for every thirteen-bit flush mask, indexed directly.\n\
-         pub(crate) static FLUSH_SCORES: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/flush_scores.bin\"));"
-    )?;
-    file.flush()
-}
 
 /// Writes a slice of scores as little-endian bytes.
 fn write_u16s(path: &Path, values: &[u16]) -> std::io::Result<()> {
@@ -370,22 +588,24 @@ fn write_u16s(path: &Path, values: &[u16]) -> std::io::Result<()> {
 /// Places every key in its own slot, and reports the displacement each bucket
 /// needed to get there.
 ///
+/// The placement depends only on the keys, not on what they are worth, so
+/// every kernel shares it and only the arrays of scores differ.
+///
 /// This is the usual displacement construction. Keys are scattered into
 /// buckets; each bucket is then given a displacement that shifts its handful
 /// of keys onto slots nobody has claimed. Crowded buckets are placed first,
 /// because they have the fewest arrangements left to them once the table
 /// fills up -- leaving them until last is what makes a search like this fail.
-fn build_perfect_hash(entries: &[(u32, u16)]) -> (Vec<u16>, Vec<u16>) {
-    let mut buckets: Vec<Vec<(u32, u16)>> = vec![Vec::new(); BUCKET_COUNT];
-    for &(key, score) in entries {
-        buckets[bucket_of(key)].push((key, score));
+fn place_keys(keys: &[u32]) -> Vec<u16> {
+    let mut buckets: Vec<Vec<u32>> = vec![Vec::new(); BUCKET_COUNT];
+    for &key in keys {
+        buckets[bucket_of(key)].push(key);
     }
 
     let mut order: Vec<usize> = (0..BUCKET_COUNT).collect();
     order.sort_by_key(|&bucket| std::cmp::Reverse(buckets[bucket].len()));
 
     let mut displacements = vec![0u16; BUCKET_COUNT];
-    let mut values = vec![NOTHING; SLOT_COUNT];
     let mut taken = vec![false; SLOT_COUNT];
     let mut slots = Vec::new();
 
@@ -397,7 +617,7 @@ fn build_perfect_hash(entries: &[(u32, u16)]) -> (Vec<u16>, Vec<u16>) {
         let displacement = (0..=u16::MAX)
             .find(|&displacement| {
                 slots.clear();
-                buckets[bucket].iter().all(|&(key, _)| {
+                buckets[bucket].iter().all(|&key| {
                     let slot = slot_of(key, displacement);
                     let free = !taken[slot] && !slots.contains(&slot);
                     if free {
@@ -414,27 +634,21 @@ fn build_perfect_hash(entries: &[(u32, u16)]) -> (Vec<u16>, Vec<u16>) {
                 )
             });
 
-        for &(key, score) in &buckets[bucket] {
-            let slot = slot_of(key, displacement);
-            taken[slot] = true;
-            values[slot] = score;
+        for &key in &buckets[bucket] {
+            taken[slot_of(key, displacement)] = true;
         }
         displacements[bucket] = displacement;
     }
 
-    let placed = values.iter().filter(|&&v| v != NOTHING).count();
-    let distinct: std::collections::HashSet<u16> = entries.iter().map(|(_, score)| *score).collect();
     println!(
-        "cargo:warning=perfect hash: {} keys into {} slots ({}% full), \
-         largest displacement {}, {} distinct scores",
-        placed,
+        "cargo:warning=perfect hash: {} keys into {} slots ({}% full), largest displacement {}",
+        keys.len(),
         SLOT_COUNT,
-        placed * 100 / SLOT_COUNT,
+        keys.len() * 100 / SLOT_COUNT,
         displacements.iter().max().copied().unwrap_or(0),
-        distinct.len(),
     );
 
-    (displacements, values)
+    displacements
 }
 
 fn write_translation_maps(

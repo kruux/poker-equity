@@ -22,6 +22,7 @@ pub use holdem_fast::HoldemFast;
 pub use omaha::{Courchevel, Omaha, OmahaFive, OmahaSix};
 pub use omaha_hi_lo::{CourchevelHiLo, OmahaFiveHiLo, OmahaHiLo};
 pub use omaha_fast::OmahaFast;
+pub use rankings::{deuce_seven_score, high_score, low_a5_score, short_deck_score};
 pub use rankings::fast_to_high;
 pub use rankings::high_to_fast;
 pub use rankings::{

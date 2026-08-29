@@ -16,8 +16,14 @@ pub type OmahaHiLoHandRank = HiLoHandRank;
 pub type HoldemHandRank = HighHandRank;
 pub type OmahaHandRank = HighHandRank;
 pub use deuce_seven::DeuceSevenRank;
-pub use fast::{FastHandRank, FLUSH_KEYS, RANK_KEYS};
-pub(crate) use hand_rank_table::{FLUSH_SCORES, HAND_DISPLACEMENTS, HAND_SCORES};
+pub use fast::{
+    deuce_seven_score, high_score, low_a5_score, short_deck_score, FastHandRank, FLUSH_KEYS,
+    RANK_KEYS,
+};
+pub(crate) use hand_rank_table::{
+    DEUCE_SEVEN_FLUSH_SCORES, DEUCE_SEVEN_HAND_SCORES, HAND_DISPLACEMENTS, HIGH_FLUSH_SCORES,
+    HIGH_HAND_SCORES, LOW_A5_HAND_SCORES, SHORT_DECK_FLUSH_SCORES, SHORT_DECK_HAND_SCORES,
+};
 pub use hi_lo::HiLoHandRank;
 pub use high::HighHandRank;
 pub use low::LowHandRank;
