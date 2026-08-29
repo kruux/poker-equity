@@ -9,12 +9,13 @@ pub enum DeuceSevenRank {
     StraightFlush(Rank),           // Rank of highest card
     FourOfAKind(Rank, Rank),       // Rank of quads
     FullHouse(Rank, Rank),         // Rank of trips then pair
-    Flush(Vec<Rank>),              // Vec of rank in descending order
+    Flush([Rank; 5]),              // Vec of rank in descending order
     Straight(Rank),                // Highest card
-    ThreeOfAKind(Rank, Vec<Rank>), // Rank of trips
+    ThreeOfAKind(Rank, [Rank; 2]), // Rank of trips
     TwoPair(Rank, Rank, Rank),     // High pair, low pair, kicker
-    Pair(Rank, Vec<Rank>),         // Rank of pair, vec of kickers in descending order
-    HighCard(Vec<Rank>),           // High to low
+    Pair(Rank, [Rank; 3]),         // Rank of pair, vec of kickers in descending order
+    HighCard([Rank; 5]),           // High to low
+    Incomplete(usize),             // Incomplete hand
 }
 
 impl DeuceSevenRank {
@@ -24,7 +25,7 @@ impl DeuceSevenRank {
             HighHandRank::StraightFlush(r) => {
                 // A2345 flush
                 if r == Rank::Five {
-                    Self::Flush(Self::sorted_ranks(cards))
+                    Self::Flush([Rank::Ace, Rank::Five, Rank::Four, Rank::Three, Rank::Two])
                 } else {
                     Self::StraightFlush(r)
                 }
@@ -35,7 +36,7 @@ impl DeuceSevenRank {
             HighHandRank::Straight(r) => {
                 // A2345 straight
                 if r == Rank::Five {
-                    Self::HighCard(Self::sorted_ranks(cards))
+                    Self::HighCard([Rank::Ace, Rank::Five, Rank::Four, Rank::Three, Rank::Two])
                 } else {
                     return Self::Straight(r);
                 }
@@ -44,6 +45,7 @@ impl DeuceSevenRank {
             HighHandRank::TwoPair(h, l, k) => Self::TwoPair(h, l, k),
             HighHandRank::Pair(r, k) => Self::Pair(r, k),
             HighHandRank::HighCard(ranks) => Self::HighCard(ranks),
+            HighHandRank::Incomplete(n) => Self::Incomplete(n),
         }
     }
     pub fn sorted_ranks(cards: &[Card]) -> Vec<Rank> {
@@ -136,7 +138,7 @@ impl PartialOrd for DeuceSevenRank {
                 }
                 Some(Ordering::Equal)
             }
-
+            (DeuceSevenRank::Incomplete(n1), DeuceSevenRank::Incomplete(n2)) => n1.partial_cmp(n2),
             _ => None, // Should never occur since all scenarios are tested above
         }
     }
@@ -154,6 +156,7 @@ impl DeuceSevenRank {
             DeuceSevenRank::TwoPair(_, _, _) => 3,
             DeuceSevenRank::Pair(_, _) => 2,
             DeuceSevenRank::HighCard(_) => 1,
+            DeuceSevenRank::Incomplete(_) => 0,
         }
     }
 }
@@ -172,6 +175,7 @@ impl fmt::Display for DeuceSevenRank {
             }
             DeuceSevenRank::Pair(r, _) => write!(f, "Pair of {}s", r),
             DeuceSevenRank::HighCard(ranks) => write!(f, "High Card {}", ranks[0]),
+            DeuceSevenRank::Incomplete(n) => write!(f, "Incomplete hand ({} cards)", n),
         }
     }
 }

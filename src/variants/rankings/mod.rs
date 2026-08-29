@@ -1,16 +1,23 @@
 mod deuce_seven;
+mod fast;
+mod hand_rank_table;
 mod hi_lo;
 mod high;
 mod low;
+mod rank_translation;
 
 pub type StudHandRank = HighHandRank;
 pub type RazzHandRank = LowHandRank;
 pub type StudHiLoHandRank = HiLoHandRank;
 pub type HoldemHandRank = HighHandRank;
+pub type OmahaHandRank = HighHandRank;
 pub use deuce_seven::DeuceSevenRank;
+pub use fast::{FastHandRank, FLUSH_KEYS, RANK_KEYS};
+pub(crate) use hand_rank_table::{FLUSH_RANKS, HAND_RANKS};
 pub use hi_lo::HiLoHandRank;
 pub use high::HighHandRank;
 pub use low::LowHandRank;
+pub use rank_translation::{fast_to_high, high_to_fast};
 
 macro_rules! impl_hand_rank_eq {
     ($type:ty) => {
@@ -40,6 +47,7 @@ macro_rules! impl_hand_rank_eq {
                     (Self::HighCard(r1), Self::HighCard(r2)) => {
                         r1.len() == r2.len() && r1.iter().zip(r2.iter()).all(|(a, b)| a == b)
                     }
+                    (Self::Incomplete(n1), Self::Incomplete(n2)) => n1 == n2,
                     _ => false, // Not the same HandRank type.
                 }
             }

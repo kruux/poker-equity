@@ -2,22 +2,29 @@ use std::{cmp::Ordering, collections::HashMap, fmt, mem::discriminant};
 
 use crate::cards::{Card, Rank, Suit};
 
+use super::FastHandRank;
+
 /// Used for many of the usual game types, like hold em and stud
-#[derive(Debug)]
+#[derive(Clone, Debug, Eq, Hash)]
 pub enum HighHandRank {
     StraightFlush(Rank),
     FourOfAKind(Rank, Rank),
     FullHouse(Rank, Rank), // Higher trips/pair is better
-    Flush(Vec<Rank>),
+    Flush([Rank; 5]),
     Straight(Rank),
-    ThreeOfAKind(Rank, Vec<Rank>),
+    ThreeOfAKind(Rank, [Rank; 2]),
     TwoPair(Rank, Rank, Rank),
-    Pair(Rank, Vec<Rank>),
-    HighCard(Vec<Rank>),
+    Pair(Rank, [Rank; 3]),
+    HighCard([Rank; 5]),
+    Incomplete(usize),
 }
 
 impl HighHandRank {
     pub fn evaluate(cards: &[Card]) -> Self {
+        if cards.len() < 5 {
+            return Self::Incomplete(cards.len());
+        }
+
         let rank_counts = Self::rank_counts(cards);
 
         if let Some((rank, _)) = Self::is_straight_flush(cards) {
@@ -38,7 +45,7 @@ impl HighHandRank {
             Self::Pair(pair_rank, kickers)
         } else {
             let sorted = Self::sorted_ranks(cards);
-            Self::HighCard(Self::first_n_ranks(&sorted, 5))
+            Self::HighCard(Self::first_n_ranks::<5>(&sorted))
         }
     }
 
@@ -82,7 +89,7 @@ impl HighHandRank {
         Some((best_trips, best_pair))
     }
 
-    fn is_flush(cards: &[Card]) -> Option<Vec<Rank>> {
+    fn is_flush(cards: &[Card]) -> Option<[Rank; 5]> {
         let cards_by_suit = Self::sorted_suits(cards);
 
         cards_by_suit
@@ -90,7 +97,7 @@ impl HighHandRank {
             .filter(|(_, cards)| cards.len() >= 5)
             .map(|(_, cards)| {
                 let sorted = Self::sorted_ranks(cards);
-                Self::first_n_ranks(&sorted, 5)
+                Self::first_n_ranks::<5>(&sorted)
             })
             .next()
     }
@@ -122,7 +129,7 @@ impl HighHandRank {
         None
     }
 
-    fn is_three_of_kind(rank_counts: &HashMap<Rank, usize>) -> Option<(Rank, Vec<Rank>)> {
+    fn is_three_of_kind(rank_counts: &HashMap<Rank, usize>) -> Option<(Rank, [Rank; 2])> {
         // Check for trips
         if let Some((&trips_rank, _)) = rank_counts.iter().find(|&(_, &count)| count == 3) {
             // Get all non-trips ranks and take the highest two as kickers
@@ -135,9 +142,9 @@ impl HighHandRank {
             // Sort by value descending
             kickers.sort_by_key(|rank| std::cmp::Reverse(rank.to_value()));
             // Take only the highest two kickers
-            kickers.truncate(2);
+            let best_kickers = Self::first_n_ranks::<2>(&kickers);
 
-            return Some((trips_rank, kickers));
+            return Some((trips_rank, best_kickers));
         }
         None
     }
@@ -166,7 +173,7 @@ impl HighHandRank {
         Some((high_pair, low_pair, kicker))
     }
 
-    fn is_pair(rank_counts: &HashMap<Rank, usize>) -> Option<(Rank, Vec<Rank>)> {
+    fn is_pair(rank_counts: &HashMap<Rank, usize>) -> Option<(Rank, [Rank; 3])> {
         if let Some((&pair_rank, _)) = rank_counts.iter().find(|&(_, &count)| count == 2) {
             let mut kickers: Vec<Rank> = rank_counts
                 .iter()
@@ -174,7 +181,7 @@ impl HighHandRank {
                 .map(|(rank, _)| *rank)
                 .collect();
             kickers.sort_by(|a, b| b.cmp(a));
-            let best_kickers = Self::first_n_ranks(&kickers, 3);
+            let best_kickers = Self::first_n_ranks::<3>(&kickers);
             return Some((pair_rank, best_kickers));
         }
         None
@@ -205,8 +212,10 @@ impl HighHandRank {
         ranks
     }
 
-    fn first_n_ranks(ranks: &[Rank], n: usize) -> Vec<Rank> {
-        ranks.iter().take(n).cloned().collect()
+    fn first_n_ranks<const N: usize>(ranks: &[Rank]) -> [Rank; N] {
+        ranks[..N]
+            .try_into()
+            .expect("Slice doesn't contain enough elements")
     }
 }
 
@@ -289,8 +298,15 @@ impl PartialOrd for HighHandRank {
                 }
                 Some(Ordering::Equal)
             }
+            (HighHandRank::Incomplete(n1), HighHandRank::Incomplete(n2)) => n1.partial_cmp(n2),
             _ => None, // Should never occur since all cases are covered
         }
+    }
+}
+
+impl Ord for HighHandRank {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.partial_cmp(other).unwrap_or(Ordering::Equal)
     }
 }
 
@@ -306,7 +322,16 @@ impl HighHandRank {
             HighHandRank::TwoPair(_, _, _) => 3,
             HighHandRank::Pair(_, _) => 2,
             HighHandRank::HighCard(_) => 1,
+            HighHandRank::Incomplete(_) => 0,
         }
+    }
+}
+
+impl From<FastHandRank> for HighHandRank {
+    fn from(_fast_rank: FastHandRank) -> Self {
+        // We can't convert from FastHandRank to HighHandRank anymore since FastHandRank
+        // only contains a score. Instead, we'll need to evaluate the hand directly.
+        unimplemented!("Cannot convert from FastHandRank to HighHandRank - use evaluate() instead")
     }
 }
 
@@ -324,6 +349,7 @@ impl fmt::Display for HighHandRank {
             }
             HighHandRank::Pair(r, _) => write!(f, "Pair of {}s", r),
             HighHandRank::HighCard(ranks) => write!(f, "High Card {}", ranks[0]),
+            HighHandRank::Incomplete(n) => write!(f, "Incomplete hand ({} cards)", n),
         }
     }
 }

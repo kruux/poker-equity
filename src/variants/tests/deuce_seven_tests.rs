@@ -116,7 +116,7 @@ fn test_hand_evaluation() -> Result<(), PokerError> {
     let trips = Hand::from_str(DeuceSeven, "7c7h7sAh2d")?;
     if let DeuceSevenRank::ThreeOfAKind(rank, kickers) = trips.evaluate() {
         assert_eq!(rank, Rank::Seven);
-        assert_eq!(kickers, vec![Rank::Ace, Rank::Two]);
+        assert_eq!(kickers, [Rank::Ace, Rank::Two]);
     } else {
         panic!("Expected ThreeOfAKind, got different hand rank");
     }
@@ -164,7 +164,7 @@ fn test_kickers_order() -> Result<(), PokerError> {
     let pair_with_kickers = Hand::from_str(DeuceSeven, "7c7hAh5h2d")?;
     if let DeuceSevenRank::Pair(rank, kickers) = pair_with_kickers.evaluate() {
         assert_eq!(rank, Rank::Seven);
-        assert_eq!(kickers, vec![Rank::Ace, Rank::Five, Rank::Two]);
+        assert_eq!(kickers, [Rank::Ace, Rank::Five, Rank::Two]);
     } else {
         panic!("Expected Pair, got different hand rank");
     }
@@ -283,5 +283,39 @@ fn test_different_hand_types() -> Result<(), PokerError> {
     // Pair beats two pair
     let two_pair = Hand::from_str(DeuceSeven, "2c2h3s3dAh")?;
     assert!(pair > two_pair);
+    Ok(())
+}
+
+#[test]
+fn test_empty_hand_comparison() -> Result<(), PokerError> {
+    // Evaluate hands using from_str, which in turn produces a Hand
+    // whose ranking is computed via your evaluation logic.
+    let empty_hand1 = Hand::from_str(DeuceSeven, "")?;
+    let empty_hand2 = Hand::from_str(DeuceSeven, "")?;
+    let one_card_hand = Hand::from_str(DeuceSeven, "2h")?;
+
+    // Check that an empty hand evaluates to an incomplete hand with 0 cards.
+    match &empty_hand1.evaluate() {
+        DeuceSevenRank::Incomplete(n) => assert_eq!(*n, 0, "Empty hand should be Incomplete(0)"),
+        r => panic!("Expected Incomplete(0) for an empty hand, got {:?}", r),
+    }
+
+    // Check that a hand with one card evaluates to Incomplete(1).
+    match &one_card_hand.evaluate() {
+        DeuceSevenRank::Incomplete(n) => {
+            assert_eq!(*n, 1, "A one-card hand should be Incomplete(1)")
+        }
+        r => panic!("Expected Incomplete(1) for a one-card hand, got {:?}", r),
+    }
+
+    // Comparison example:
+    // Two empty hands should be equal.
+    assert_eq!(empty_hand1, empty_hand2, "Two empty hands should be equal");
+    // A hand with one card should compare as better than an empty hand.
+    assert!(
+        one_card_hand > empty_hand1,
+        "One-card hand should beat an empty hand"
+    );
+
     Ok(())
 }

@@ -1,6 +1,7 @@
 use crate::{
     cards::{Card, Deck},
     error::{EquityError, GameError, PokerError},
+    hand::Hand,
     odds::EquityCalculator,
 };
 
@@ -45,5 +46,25 @@ pub trait CommunityCardGame: EquityCalculation {
         }
 
         Ok(community_cards)
+    }
+
+    fn build_final_hands(
+        &self,
+        calculator: &EquityCalculator<Self>,
+        community_cards: Vec<Card>,
+    ) -> Result<Vec<(String, Hand<Self>)>, PokerError> {
+        let players = calculator.players();
+        let final_hands = players
+            .iter()
+            .map(|(name, hand, _)| {
+                let mut final_hand = hand.clone();
+                final_hand
+                    .add_cards(community_cards.clone())
+                    .map_err(PokerError::from)?;
+                Ok((name.clone(), final_hand))
+            })
+            .collect::<Result<Vec<_>, PokerError>>()?;
+
+        Ok(final_hands)
     }
 }

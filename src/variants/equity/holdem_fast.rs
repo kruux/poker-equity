@@ -5,11 +5,11 @@ use crate::{
     cards::Deck,
     error::{EquityError, PokerError},
     odds::EquityCalculator,
-    variants::Holdem,
+    variants::HoldemFast,
 };
 
-impl CommunityCardGame for Holdem {}
-impl EquityCalculation for Holdem {
+impl CommunityCardGame for HoldemFast {}
+impl EquityCalculation for HoldemFast {
     fn validate(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         // Validation reused by all community card games
         self.validate_community(calculator)?;

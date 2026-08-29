@@ -1,15 +1,17 @@
+use std::cmp::Ordering;
+
 use crate::{
     cards::Rank,
     error::PokerError,
     hand::Hand,
-    variants::{LowHandRank, Razz},
+    variants::{Razz, RazzHandRank},
 };
 
 #[test]
 fn test_hand_ranks() -> Result<(), PokerError> {
     // Test ascending ordering (after duplicates removed)
     let hand = Hand::from_str(Razz, "Ah 2h 3h 4h 5h 6h 7h")?;
-    let LowHandRank::Low(ranks) = hand.evaluate();
+    let RazzHandRank::Low(ranks) = hand.evaluate();
     assert_eq!(ranks.len(), 5, "Should keep only 5 ranks");
     assert_eq!(ranks[0], Rank::Five);
     assert_eq!(ranks[1], Rank::Four);
@@ -19,7 +21,7 @@ fn test_hand_ranks() -> Result<(), PokerError> {
 
     // Test with duplicate ranks
     let hand = Hand::from_str(Razz, "2h 2d 3h 3d 4h 4d 5h")?;
-    let LowHandRank::Low(ranks) = hand.evaluate();
+    let RazzHandRank::Low(ranks) = hand.evaluate();
     assert_eq!(ranks.len(), 4, "Should have 4 unique ranks");
     assert_eq!(ranks[0], Rank::Five);
     assert_eq!(ranks[1], Rank::Four);
@@ -28,7 +30,7 @@ fn test_hand_ranks() -> Result<(), PokerError> {
 
     // Test with multiple duplicates of the same rank
     let hand = Hand::from_str(Razz, "2h 2d 2c 3h 3d 3c 4h")?;
-    let LowHandRank::Low(ranks) = hand.evaluate();
+    let RazzHandRank::Low(ranks) = hand.evaluate();
     assert_eq!(ranks.len(), 3, "Should have 3 unique ranks");
     assert_eq!(ranks[0], Rank::Four);
     assert_eq!(ranks[1], Rank::Three);
@@ -36,7 +38,7 @@ fn test_hand_ranks() -> Result<(), PokerError> {
 
     // Test high cards (K, Q, J)
     let hand = Hand::from_str(Razz, "Kh Qh Jh Th 9h")?;
-    let LowHandRank::Low(ranks) = hand.evaluate();
+    let RazzHandRank::Low(ranks) = hand.evaluate();
     assert_eq!(ranks[0], Rank::King);
     assert_eq!(ranks[1], Rank::Queen);
     assert_eq!(ranks[2], Rank::Jack);
@@ -45,7 +47,7 @@ fn test_hand_ranks() -> Result<(), PokerError> {
 
     // Test typical low cards with Ace
     let hand = Hand::from_str(Razz, "5h 4h 3h 2h Ah")?;
-    let LowHandRank::Low(ranks) = hand.evaluate();
+    let RazzHandRank::Low(ranks) = hand.evaluate();
     assert_eq!(ranks[0], Rank::Five);
     assert_eq!(ranks[1], Rank::Four);
     assert_eq!(ranks[2], Rank::Three);
@@ -127,6 +129,37 @@ fn test_detailed_razz_ranking() -> Result<(), PokerError> {
     assert!(five_rank_high > two_rank_high); // Best possible > Worst possible
     assert!(four_rank_high > two_rank_high); // Middle ranks transitive
     assert!(five_rank_high > three_rank_high); // Best beats middle
+
+    Ok(())
+}
+
+#[test]
+fn test_empty_hand_comparison() -> Result<(), PokerError> {
+    // Test empty HandRanks
+    let empty1 = RazzHandRank::Low(vec![]);
+    let empty2 = RazzHandRank::Low(vec![]);
+    let some_hand = RazzHandRank::Low(vec![Rank::Two]);
+
+    // Empty hands should be equal
+    assert_eq!(empty1.partial_cmp(&empty2), Some(Ordering::Equal));
+
+    // Empty hand should be less than any non-empty hand
+    assert_eq!(empty1.partial_cmp(&some_hand), Some(Ordering::Less));
+    assert_eq!(some_hand.partial_cmp(&empty1), Some(Ordering::Greater));
+
+    // Test empty Hand instances
+    let empty_hand1 = Hand::from_str(Razz, "")?;
+    let empty_hand2 = Hand::from_str(Razz, "")?;
+    let one_card_hand = Hand::from_str(Razz, "2h")?;
+
+    // Empty hands should be equal
+    assert_eq!(empty_hand1, empty_hand2);
+    assert!(!(empty_hand1 > empty_hand2));
+    assert!(!(empty_hand1 < empty_hand2));
+
+    // Any hand with cards should beat an empty hand
+    assert!(one_card_hand > empty_hand1);
+    assert!(empty_hand1 < one_card_hand);
 
     Ok(())
 }
