@@ -15,7 +15,9 @@ use pyo3::types::{PyDict, PyList};
 use crate::cards::{Card, CardSet};
 use crate::error::PokerError;
 use crate::notation::{parse_dead, parse_hand, parse_hand_up_to, HandSpec};
-use crate::odds::{run_chunk, run_exact, ChunkResult, EquityRequest};
+use crate::odds::{
+    default_threads, run_batch, run_chunk, run_exact, ChunkResult, EquityRequest,
+};
 use crate::variants::*;
 
 /// Runs `body` with the variant named by `key` bound to `variant`.
@@ -149,7 +151,7 @@ fn variants(py: Python<'_>) -> PyResult<Py<PyList>> {
 /// The sampling runs with the GIL released, so a caller can keep repainting
 /// while it works.
 #[pyfunction]
-#[pyo3(signature = (variant, hands, board, dead, samples, seed=0))]
+#[pyo3(signature = (variant, hands, board, dead, samples, seed=0, threads=0))]
 fn chunk(
     py: Python<'_>,
     variant: &str,
@@ -158,7 +160,9 @@ fn chunk(
     dead: u64,
     samples: u64,
     seed: u64,
+    threads: usize,
 ) -> PyResult<Py<PyDict>> {
+    let threads = if threads == 0 { default_threads() } else { threads };
     let specs: Vec<HandSpec> = hands.into_iter().map(hand_spec).collect();
     let board: Vec<CardSet> = board.into_iter().map(CardSet::from_bits).collect();
     let dead = CardSet::from_bits(dead);
@@ -166,10 +170,48 @@ fn chunk(
     let result = with_variant!(variant, |game| {
         let request =
             EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
-        py.detach(|| run_chunk(&request, samples, seed)).map_err(to_py)
+        py.detach(|| run_batch(&request, samples, seed, threads))
+            .map_err(to_py)
     })?;
 
     to_dict(py, &result)
+}
+
+/// Walks every deal, taking masks, or returns `None` when there are too many.
+///
+/// The mask twin of [`exact_from_text`]. A caller passing masks could not ask
+/// for an exact answer at all before this, which is backwards: exact matters
+/// most on a river spot, and a river spot is exactly when someone has the
+/// calculator open.
+#[pyfunction]
+#[pyo3(signature = (variant, hands, board, dead))]
+fn exact(
+    py: Python<'_>,
+    variant: &str,
+    hands: Vec<Vec<Vec<u64>>>,
+    board: Vec<u64>,
+    dead: u64,
+) -> PyResult<Option<Py<PyDict>>> {
+    let specs: Vec<HandSpec> = hands.into_iter().map(hand_spec).collect();
+    let board: Vec<CardSet> = board.into_iter().map(CardSet::from_bits).collect();
+    let dead = CardSet::from_bits(dead);
+
+    let result = with_variant!(variant, |game| {
+        let request =
+            EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
+        py.detach(|| run_exact(&request)).map_err(to_py)
+    })?;
+
+    match result {
+        Some(result) => Ok(Some(to_dict(py, &result)?)),
+        None => Ok(None),
+    }
+}
+
+/// How many threads a batch spreads over when none is asked for.
+#[pyfunction]
+fn default_thread_count() -> usize {
+    default_threads()
 }
 
 /// Samples a batch of deals, taking this library's notation.
@@ -177,7 +219,7 @@ fn chunk(
 /// The convenience form: `["AhKh", "QsQd"]` for hold'em, `"Kh Qh Jh"` for a
 /// flop. fpdb drives the mask form; this is for everyone else.
 #[pyfunction]
-#[pyo3(signature = (variant, hands, board="", dead="", samples=100_000, seed=0))]
+#[pyo3(signature = (variant, hands, board="", dead="", samples=100_000, seed=0, threads=0))]
 fn chunk_from_text(
     py: Python<'_>,
     variant: &str,
@@ -186,12 +228,15 @@ fn chunk_from_text(
     dead: &str,
     samples: u64,
     seed: u64,
+    threads: usize,
 ) -> PyResult<Py<PyDict>> {
+    let threads = if threads == 0 { default_threads() } else { threads };
     let fields: Vec<&str> = hands.iter().map(String::as_str).collect();
 
     let result = with_variant!(variant, |game| {
         let request = EquityRequest::from_text(game, &fields, board, dead).map_err(to_py)?;
-        py.detach(|| run_chunk(&request, samples, seed)).map_err(to_py)
+        py.detach(|| run_batch(&request, samples, seed, threads))
+            .map_err(to_py)
     })?;
 
     to_dict(py, &result)
@@ -319,7 +364,9 @@ fn poker_calculator(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(variants, module)?)?;
     module.add_function(wrap_pyfunction!(chunk, module)?)?;
     module.add_function(wrap_pyfunction!(chunk_from_text, module)?)?;
+    module.add_function(wrap_pyfunction!(exact, module)?)?;
     module.add_function(wrap_pyfunction!(exact_from_text, module)?)?;
+    module.add_function(wrap_pyfunction!(default_thread_count, module)?)?;
     module.add_function(wrap_pyfunction!(parse_hand_field, module)?)?;
     module.add_function(wrap_pyfunction!(parse_dead_cards, module)?)?;
     module.add_function(wrap_pyfunction!(card_index, module)?)?;

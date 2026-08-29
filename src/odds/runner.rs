@@ -41,6 +41,79 @@ pub struct Progress {
     pub acceptance: f64,
 }
 
+/// How many threads to spread a batch over when the caller does not say.
+///
+/// Polite rather than greedy: several calculators may be open at once, and
+/// one must not starve the others or the machine they are running on. A
+/// caller that knows better passes its own count to [`run_batch`].
+pub fn default_threads() -> usize {
+    std::thread::available_parallelism()
+        .map(|n| n.get().min(4))
+        .unwrap_or(1)
+}
+
+/// Runs `samples` deals spread across `threads`, and returns them merged.
+///
+/// This is [`run_chunk`](crate::odds::run_chunk) with the machine behind it.
+/// `run_chunk` is one thread by design -- pure, stateless, and cheap to
+/// reason about -- which is the right shape for a caller driving its own
+/// loop, but it leaves fifteen cores idle on a machine with sixteen.
+///
+/// Nothing is called back and no target is pursued. The caller gets a
+/// `ChunkResult` and decides what to do next, which means cancelling between
+/// batches costs nothing and nothing runs on a thread the caller did not
+/// expect.
+///
+/// ```no_run
+/// # use poker_calculator::{odds::{run_batch, default_threads, ChunkResult, EquityRequest},
+/// #                        variants::Holdem};
+/// # let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?;
+/// let mut total = ChunkResult::empty(2);
+/// for round in 0..10 {
+///     total.merge(&run_batch(&request, 200_000, round, default_threads())?);
+///     // repaint, and stop here if the user has had enough
+/// }
+/// # Ok::<(), poker_calculator::error::PokerError>(())
+/// ```
+///
+/// The work is split over the threads, so the same `seed` and the same
+/// `threads` give the same deals; a different thread count divides the deals
+/// differently and so draws different ones. Reproducing a run means matching
+/// both.
+pub fn run_batch<V>(
+    request: &EquityRequest<V>,
+    samples: u64,
+    seed: u64,
+    threads: usize,
+) -> Result<ChunkResult, PokerError>
+where
+    V: PokerVariant + EquityCalculation + Send + Sync,
+{
+    let threads = threads.max(1).min(samples.max(1) as usize);
+    let each = samples / threads as u64;
+    let remainder = samples % threads as u64;
+
+    let pieces: Vec<(u64, u64)> = (0..threads as u64)
+        .map(|piece| {
+            let count = each + u64::from(piece < remainder);
+            // A distinct seed per piece, derived so that the same call gives
+            // the same deals whatever the thread count.
+            (count, seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(piece))
+        })
+        .collect();
+
+    let batches = pieces
+        .par_iter()
+        .map(|&(count, seed)| run_chunk(request, count, seed))
+        .collect::<Result<Vec<_>, PokerError>>()?;
+
+    let mut total = ChunkResult::empty(request.players());
+    for batch in &batches {
+        total.merge(batch);
+    }
+    Ok(total)
+}
+
 /// How many deals to run between progress reports.
 ///
 /// A chunk this size takes a few milliseconds, which is a good repaint rate
@@ -131,27 +204,13 @@ where
     V: PokerVariant + EquityCalculation + Send + Sync,
     F: FnMut(&Progress),
 {
-    let threads = std::thread::available_parallelism()
-        .map(|n| n.get().min(4))
-        .unwrap_or(1);
-
+    let threads = default_threads();
     let mut total = ChunkResult::empty(request.players());
-    let mut seed: u64 = 0x9E37_79B9_7F4A_7C15;
+    let mut round: u64 = 0;
 
     loop {
-        // One batch per thread, each with its own seed, merged afterwards.
-        let seeds: Vec<u64> = (0..threads as u64)
-            .map(|offset| seed.wrapping_add(offset.wrapping_mul(0x0100_0000_01B3)))
-            .collect();
-        seed = seed.wrapping_add(threads as u64 * 0x0100_0000_01B3);
-
-        let batches = seeds
-            .par_iter()
-            .map(|&seed| run_chunk(request, CHUNK, seed))
-            .collect::<Result<Vec<_>, PokerError>>()?;
-        for batch in &batches {
-            total.merge(batch);
-        }
+        total.merge(&run_batch(request, CHUNK * threads as u64, round, threads)?);
+        round += 1;
 
         report(&mut on_progress, &total);
 

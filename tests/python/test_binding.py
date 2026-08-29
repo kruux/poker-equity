@@ -64,6 +64,33 @@ for key, hands, board in [
     total = sum(p["equity"] for p in result["players"])
     close(total, 1.0, 1e-9, f"{key} equities sum")
 
+print("\nbatches spread across threads")
+check(pc.default_thread_count() >= 1, "a default thread count is offered")
+one = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=200_000, seed=5, threads=1)
+many = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=200_000, seed=5, threads=4)
+check(one["samples"] == many["samples"] == 200_000, "both ran every deal asked for")
+close(one["players"][0]["equity"], many["players"][0]["equity"], 0.01,
+      "one thread and four agree")
+
+print("\nthe raw sums cross, so batches can be merged here")
+a = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=100_000, seed=1)
+b = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=100_000, seed=2)
+for field in ("share_sum", "share_square_sum", "low_share_sum",
+              "win_count", "tie_count", "scoop_count"):
+    check(field in a, f"{field} is returned")
+merged = sum(x + y for x, y in zip(a["share_sum"][:1], b["share_sum"][:1]))
+close(merged / (a["samples"] + b["samples"]),
+      a["players"][0]["equity"], 0.01, "hand-merged batches give the same equity")
+
+print("\nexact answers from masks, not only from text")
+hands = [[[1 << pc.card_index("AhKh"[i:i+2]) for i in (0, 2)]],
+         [[1 << pc.card_index("QsQd"[i:i+2]) for i in (0, 2)]]]
+board = [1 << pc.card_index(c) for c in ("2c", "7d", "9h")]
+walked = pc.exact("holdem", hands, board, 0)
+check(walked is not None and walked["exact"], "a river-ish spot comes back exact")
+check(walked["samples"] == 990, f"990 run-outs, got {walked['samples']}")
+check(walked["players"][0]["std_error"] == 0.0, "and carries no error bar")
+
 print("\nthe mask API agrees with the text API")
 masks = [[[1 << pc.card_index("Ah"), 1 << pc.card_index("Kh")]],
          [[1 << pc.card_index("Qs"), 1 << pc.card_index("Qd")]]]

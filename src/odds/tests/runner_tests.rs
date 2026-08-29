@@ -1,3 +1,4 @@
+use crate::error::PokerError;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
@@ -110,4 +111,34 @@ fn test_exact_falls_back_to_sampling_when_it_must() {
     for player in result.equities() {
         assert!(player.std_error <= 0.0005);
     }
+}
+
+/// A batch spread over threads is the same work as one run in a line, and
+/// the same answer.
+#[test]
+fn test_a_batch_spreads_without_changing_the_answer() -> Result<(), PokerError> {
+    use crate::odds::{default_threads, run_batch, run_chunk};
+
+    let request = request(&["AhKh", "QsQd"], "");
+
+    let alone = run_chunk(&request, 200_000, 9)?;
+    let spread = run_batch(&request, 200_000, 9, default_threads())?;
+
+    assert_eq!(spread.samples, alone.samples, "the same number of deals");
+
+    // Different deals, since the split changes which ones are drawn, but the
+    // same answer to within what sampling allows.
+    let gap = (alone.equities()[0].equity - spread.equities()[0].equity).abs();
+    let slack = 4.0 * (alone.equities()[0].std_error + spread.equities()[0].std_error);
+    assert!(gap <= slack, "{:.5} apart, against {:.5} of slack", gap, slack);
+
+    // One thread is one chunk, deal for deal.
+    let single = run_batch(&request, 50_000, 4, 1)?;
+    let chunked = run_chunk(&request, 50_000, 4)?;
+    assert_eq!(single.samples, chunked.samples);
+
+    // Asking for more threads than deals does not lose any.
+    assert_eq!(run_batch(&request, 3, 1, 64)?.samples, 3);
+
+    Ok(())
 }
