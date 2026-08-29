@@ -9,7 +9,6 @@ use poker_calculator::variants::{
 /// Generates a random hand by creating a deck of 52 cards, shuffling it, and drawing the first `num_cards` cards.
 fn random_hand(num_cards: usize) -> Vec<Card> {
     let mut deck = Deck::new();
-    deck.shuffle();
     let mut hand = Vec::with_capacity(num_cards);
     for _ in 0..num_cards {
         if let Some(card) = deck.deal() {

@@ -173,8 +173,6 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
                         deck.remove_card(card)?;
                     }
 
-                    deck.shuffle();
-
                     let sim_results = self.variant.run_single_simulation(deck, self)?;
                     for (name, equity) in sim_results {
                         *local_results.entry(name).or_insert(0.0) += equity;
