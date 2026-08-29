@@ -1,3 +1,4 @@
+mod badugi;
 mod deuce_seven;
 mod equity;
 mod holdem;
@@ -7,9 +8,11 @@ mod omaha_hi_lo;
 mod omaha_fast;
 mod rankings;
 mod razz;
+mod short_deck;
 mod stud;
 mod stud_hi_lo;
 
+pub use badugi::Badugi;
 pub use deuce_seven::DeuceSeven;
 pub(crate) use equity::CommunityCardGame;
 pub use equity::EquityCalculation;
@@ -23,10 +26,11 @@ pub use rankings::fast_to_high;
 pub use rankings::high_to_fast;
 pub use rankings::{
     DeuceSevenRank, FastHandRank, HiLoHandRank, HighHandRank, LowHandRank, OmahaHandRank,
-    OmahaHiLoHandRank,
+    OmahaHiLoHandRank, BadugiHandRank, ShortDeckRank,
     RazzHandRank, StudHandRank, StudHiLoHandRank, FLUSH_KEYS, RANK_KEYS,
 };
 pub use razz::Razz;
+pub use short_deck::ShortDeck;
 pub use stud::SevenCardStud;
 pub use stud_hi_lo::StudHiLo;
 
@@ -52,6 +56,12 @@ pub trait PokerVariant: Clone + Copy {
     /// How this variant deals.
     fn poker_type(&self) -> PokerType;
 
+    /// The cards this game is played with. Every variant but short deck uses
+    /// the full fifty-two.
+    fn deck(&self) -> crate::cards::CardSet {
+        crate::cards::CardSet::FULL_DECK
+    }
+
     /// The largest number of cards a hand can hold, hole cards and board
     /// together. Used to size hands and to reject overfull ones.
     fn max_cards(&self) -> usize;
@@ -71,15 +81,22 @@ pub trait PokerVariant: Clone + Copy {
 
     /// The variant's display name.
     fn to_string(&self) -> String;
+
+    /// The key fpdb stores this game under, so that a category from its
+    /// database picks the right variant with no table in between.
+    fn key(&self) -> &'static str;
 }
 
 #[cfg(test)]
 mod tests {
+    mod badugi_tests;
     mod deuce_seven_tests;
     mod holdem_tests;
     mod omaha_hi_lo_tests;
     mod omaha_tests;
     mod razz_tests;
+    mod short_deck_tests;
     mod stud_hi_lo_tests;
     mod stud_tests;
+    mod variant_table_tests;
 }

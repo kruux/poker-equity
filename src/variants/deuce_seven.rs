@@ -28,6 +28,10 @@ impl PokerVariant for DeuceSeven {
         "2-7 single draw".to_string()
     }
 
+    fn key(&self) -> &'static str {
+        "27_3draw"
+    }
+
     fn evaluate_hand(&self, cards: &[Card]) -> DeuceSevenRank {
         DeuceSevenRank::evaluate(cards)
     }

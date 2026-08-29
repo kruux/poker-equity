@@ -77,6 +77,15 @@ impl LowHandRank {
         }
     }
 
+    /// A low hand from the ranks that are already known to play.
+    ///
+    /// Badugi picks which cards play by a rule of its own -- all ranks and
+    /// all suits distinct -- but ranks them the same way once it has: more
+    /// cards is better, then lower is better.
+    pub fn from_played(ranks: Vec<Rank>) -> Self {
+        Self::Low(Self::worst_first(ranks))
+    }
+
     /// Highest card first, ace last.
     fn worst_first(mut ranks: Vec<Rank>) -> Vec<Rank> {
         ranks.sort_by_key(|rank| std::cmp::Reverse(low_value(*rank)));

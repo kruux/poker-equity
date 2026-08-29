@@ -25,6 +25,10 @@ impl PokerVariant for Razz {
         "Razz".to_string()
     }
 
+    fn key(&self) -> &'static str {
+        "razz"
+    }
+
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
         RazzHandRank::evaluate(cards)
     }

@@ -40,7 +40,7 @@ fn best_hand(hole_count: usize, cards: &[Card]) -> OmahaHandRank {
 /// holds. The two-from-hand rule and the five-card board are the same
 /// throughout.
 macro_rules! omaha_variant {
-    ($name:ident, $hole:expr, $label:expr, $doc:expr) => {
+    ($name:ident, $hole:expr, $label:expr, $key:expr, $doc:expr) => {
         #[doc = $doc]
         #[derive(Debug, Clone, Copy)]
         pub struct $name;
@@ -71,27 +71,40 @@ macro_rules! omaha_variant {
             fn to_string(&self) -> String {
                 $label.to_string()
             }
+
+            fn key(&self) -> &'static str {
+                $key
+            }
         }
     };
 }
 
-omaha_variant!(Omaha, 4, "Omaha", "Four hole cards, two of which play.");
+omaha_variant!(
+    Omaha,
+    4,
+    "Omaha",
+    "omahahi",
+    "Four hole cards, two of which play."
+);
 omaha_variant!(
     OmahaFive,
     5,
     "5-Card Omaha",
+    "5_omahahi",
     "Five hole cards, two of which play."
 );
 omaha_variant!(
     OmahaSix,
     6,
     "6-Card Omaha",
+    "6_omahahi",
     "Six hole cards, two of which play."
 );
 omaha_variant!(
     Courchevel,
     5,
     "Courchevel",
+    "cour_hi",
     "Five-card Omaha where the first board card is dealt face up before the\n\
      betting. Not a variant of its own: the same game, plus a rule that at\n\
      least one board card must be known, which lives in its equity validation."

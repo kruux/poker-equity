@@ -61,10 +61,10 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             return Err(EquityError::InvalidCommunityCards(board.len()).into());
         }
 
-        // Anything not dead is on offer. Known cards are not removed here:
-        // they are slots with exactly one candidate, so the matching handles
-        // them and the sampler cannot draw them twice.
-        let available = CardSet::FULL_DECK.without(dead);
+        // Anything in this game's deck and not dead is on offer. Known cards
+        // are not removed here: they are slots with exactly one candidate, so
+        // the matching handles them and the sampler cannot draw them twice.
+        let available = variant.deck().without(dead);
 
         // Padding the board with wildcards makes a short board the same shape
         // as a full one, which is how a flop and a river spot share a path.

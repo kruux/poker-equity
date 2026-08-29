@@ -4,6 +4,7 @@ use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator};
 
 use super::{LowHandRank, PokerVariant};
 
+mod badugi;
 mod community_base;
 mod deuce_seven;
 mod holdem;
@@ -12,6 +13,7 @@ mod omaha;
 mod omaha_fast;
 mod omaha_hi_lo;
 mod razz;
+mod short_deck;
 mod stud;
 mod stud_base;
 mod stud_hi_lo;
