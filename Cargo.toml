@@ -3,11 +3,25 @@ name = "poker-calculator"
 version = "0.1.0"
 edition = "2021"
 
+# A cdylib so the Python extension can be built, an rlib so the crate stays a
+# normal Rust library. The core never depends on Python: the binding is one
+# module behind a feature, so a standalone binary or a C ABI would be an
+# addition rather than a rewrite.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+python = ["dep:pyo3"]
+
 [dependencies]
 enum-iterator = "2.1.0"
 itertools = "0.14.0"
 rand = "0.8.5"
 rayon = "1.10.0"
+
+# One wheel per platform covering every future CPython. Free-threaded builds
+# are a separate wheel and are out of scope.
+pyo3 = { version = "0.29.2", features = ["abi3-py314", "extension-module"], optional = true }
 
 # The equity tests run a hundred thousand Monte Carlo deals apiece, which is
 # minutes unoptimised and seconds optimised. Debug info is kept, so backtraces

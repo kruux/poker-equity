@@ -4,5 +4,7 @@ pub mod hand;
 pub mod notation;
 pub mod odds;
 pub mod player;
+#[cfg(feature = "python")]
+pub mod py;
 pub mod sampler;
 pub mod variants;
