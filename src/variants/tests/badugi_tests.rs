@@ -1,0 +1,109 @@
+use crate::{
+    cards::{Card, Rank},
+    error::PokerError,
+    hand::Hand,
+    odds::EquityCalculator,
+    variants::{Badugi, BadugiHandRank},
+};
+
+fn badugi(cards: &str) -> Result<Vec<Rank>, PokerError> {
+    let BadugiHandRank::Low(ranks) = Hand::from_str(Badugi, cards)?.evaluate();
+    Ok(ranks)
+}
+
+/// A badugi is the largest set of cards sharing neither a rank nor a suit.
+#[test]
+fn test_a_badugi_repeats_neither_rank_nor_suit() -> Result<(), PokerError> {
+    // Four suits, four ranks: all four cards play.
+    assert_eq!(
+        badugi("Ac 2d 3h 4s")?,
+        vec![Rank::Four, Rank::Three, Rank::Two, Rank::Ace],
+        "the best hand in the game"
+    );
+
+    // Two clubs, so one of them has to go: a three-card badugi.
+    assert_eq!(badugi("Ac 2c 3h 4s")?.len(), 3, "two clubs cannot both play");
+
+    // Two deuces, likewise.
+    assert_eq!(badugi("Ac 2d 2h 4s")?.len(), 3, "two deuces cannot both play");
+
+    // All one suit: only one card plays.
+    assert_eq!(badugi("Ac 2c 3c 4c")?, vec![Rank::Ace], "a one-card badugi");
+
+    Ok(())
+}
+
+/// When several subsets are the same size, the lowest one plays.
+#[test]
+fn test_the_lowest_of_the_largest_subsets_plays() -> Result<(), PokerError> {
+    // Ac and Kc clash. Dropping the king leaves A-2-3, which is lower than
+    // the K-2-3 that dropping the ace would leave.
+    assert_eq!(
+        badugi("Ac Kc 2d 3h")?,
+        vec![Rank::Three, Rank::Two, Rank::Ace],
+        "the king is the card to drop"
+    );
+
+    // Both nines clash with nothing else, so the lower cards are kept.
+    assert_eq!(
+        badugi("9c 9d 2h 3s")?,
+        vec![Rank::Nine, Rank::Three, Rank::Two],
+        "one nine plays alongside the three and deuce"
+    );
+
+    Ok(())
+}
+
+/// More cards beats fewer, however low the shorter hand is, and within a size
+/// the lower hand wins with the ace playing low.
+#[test]
+fn test_badugi_hands_compare_by_size_then_by_height() -> Result<(), PokerError> {
+    let four_card_king = Hand::from_str(Badugi, "Kc Qd Jh Ts")?;
+    let three_card_wheel = Hand::from_str(Badugi, "Ac 2c 3h 4s")?;
+    assert!(
+        four_card_king > three_card_wheel,
+        "any four-card badugi beats any three-card one"
+    );
+
+    let lower = Hand::from_str(Badugi, "Ac 2d 3h 5s")?;
+    let higher = Hand::from_str(Badugi, "Ac 2d 3h 6s")?;
+    assert!(lower > higher, "a five-high badugi beats a six-high one");
+
+    // The ace plays low, so it is the best card to hold, not the worst.
+    let with_ace = Hand::from_str(Badugi, "Ac 2d 3h 4s")?;
+    let with_king = Hand::from_str(Badugi, "Kc 2d 3h 4s")?;
+    assert!(with_ace > with_king, "the ace is the lowest card");
+
+    Ok(())
+}
+
+/// End to end: a pat four-card badugi against a hand drawing one.
+#[test]
+fn test_a_pat_badugi_beats_a_drawing_hand() -> Result<(), PokerError> {
+    let mut calculator = EquityCalculator::new(Badugi, 20_000);
+
+    // Hero stands pat with a near-perfect badugi and discards nothing.
+    let hero = Hand::from_str(Badugi, "Ac 2d 3h 5s")?;
+    // Villain has two spades and throws one away.
+    let villain = Hand::from_str(Badugi, "4s 6s 7d 8h")?;
+
+    calculator.add_draw_player("Hero".to_string(), hero, None)?;
+    calculator.add_draw_player(
+        "Villain".to_string(),
+        villain,
+        Some(Card::from_str("6s")?),
+    )?;
+
+    let results = calculator.calculate(std::mem::drop)?;
+    assert!(
+        (results["Hero"] + results["Villain"] - 100.0).abs() < 0.001,
+        "equities must divide one pot"
+    );
+    assert!(
+        results["Hero"] > 90.0,
+        "a five-high badugi is a long way ahead of a one-card draw, got {:.2}%",
+        results["Hero"]
+    );
+
+    Ok(())
+}

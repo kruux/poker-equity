@@ -4,7 +4,7 @@ use crate::{
     cards::{Card, Rank, Suit},
     error::PokerError,
     hand::Hand,
-    variants::{Omaha, OmahaFast, OmahaHandRank},
+    variants::{Courchevel, Omaha, OmahaFast, OmahaFive, OmahaHandRank, OmahaSix, PokerVariant},
 };
 
 #[test]
@@ -213,5 +213,59 @@ fn test_fast_and_slow_omaha_agree() -> Result<(), PokerError> {
         );
     }
 
+    Ok(())
+}
+
+/// The two-from-hand rule holds however many cards a player is dealt.
+#[test]
+fn test_the_split_holds_at_five_and_six_cards() -> Result<(), PokerError> {
+    // One heart in hand and four on the board is not a flush, whether the
+    // hand holds four cards, five or six.
+    let board = "Kh Qh Jh 9h 2s";
+    let expected = OmahaHandRank::Pair(Rank::Two, [Rank::Ace, Rank::King, Rank::Queen]);
+
+    assert_eq!(
+        Hand::from_str(Omaha, &format!("Ah 2c 3d 4s {}", board))?.evaluate(),
+        expected
+    );
+    assert_eq!(
+        Hand::from_str(OmahaFive, &format!("Ah 2c 3d 4s 5c {}", board))?.evaluate(),
+        expected,
+        "a fifth hole card does not make the flush either"
+    );
+    assert_eq!(
+        Hand::from_str(OmahaSix, &format!("Ah 2c 3d 4s 5c 6d {}", board))?.evaluate(),
+        expected,
+        "nor a sixth"
+    );
+
+    // Two hearts in hand is a flush at every size.
+    assert_eq!(
+        Hand::from_str(OmahaFive, "Ah 5h 3d 4s 6c Kh Qh Jh 9c 2s")?.evaluate(),
+        OmahaHandRank::Flush([Rank::Ace, Rank::King, Rank::Queen, Rank::Jack, Rank::Five])
+    );
+
+    Ok(())
+}
+
+/// The number of cards each variant deals, which is what the sampler and the
+/// notation both key off.
+#[test]
+fn test_the_omaha_family_deals_what_it_should() {
+    assert_eq!((Omaha.hole_cards(), Omaha.board_cards()), (4, 5));
+    assert_eq!((OmahaFive.hole_cards(), OmahaFive.board_cards()), (5, 5));
+    assert_eq!((OmahaSix.hole_cards(), OmahaSix.board_cards()), (6, 5));
+    assert_eq!((Courchevel.hole_cards(), Courchevel.board_cards()), (5, 5));
+}
+
+/// Courchevel is five-card Omaha, so once the board is out they cannot
+/// disagree. The difference is only in when the first card is shown.
+#[test]
+fn test_courchevel_evaluates_as_five_card_omaha() -> Result<(), PokerError> {
+    let cards = "Ah Ad Ks Qc Jh 2c 7d 9d 4s 8h";
+    assert_eq!(
+        Hand::from_str(Courchevel, cards)?.evaluate(),
+        Hand::from_str(OmahaFive, cards)?.evaluate()
+    );
     Ok(())
 }

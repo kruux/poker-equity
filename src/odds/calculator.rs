@@ -139,7 +139,7 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
         for (_, hand, _) in &self.players {
             known = known.union(CardSet::from_cards(hand.cards()));
         }
-        let starting_deck = Deck::from_set(CardSet::FULL_DECK.without(known));
+        let starting_deck = Deck::from_set(self.variant.deck().without(known));
 
         let seats = self.players.len();
         let completed_sims = Arc::new(Mutex::new(0));

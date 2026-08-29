@@ -56,4 +56,8 @@ impl PokerVariant for OmahaFast {
     fn to_string(&self) -> String {
         "Omaha Fast".to_string()
     }
+
+    fn key(&self) -> &'static str {
+        "omahahi"
+    }
 }

@@ -33,6 +33,10 @@ impl PokerVariant for StudHiLo {
         "Stud Hi/Lo".to_string()
     }
 
+    fn key(&self) -> &'static str {
+        "studhilo"
+    }
+
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
         let high = HighHandRank::evaluate(cards);
         let low = self.qualify_for_low(&LowHandRank::evaluate(cards));

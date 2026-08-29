@@ -1,10 +1,11 @@
 use std::mem::drop;
 
 use crate::{
+    cards::Card,
     error::{EquityError, GameError, PokerError},
     hand::Hand,
-    odds::EquityCalculator,
-    variants::Omaha,
+    odds::{run_exact, EquityCalculator, EquityRequest},
+    variants::{Courchevel, Omaha, OmahaFive, OmahaSix},
 };
 
 #[test]
@@ -323,5 +324,92 @@ fn test_one_hole_heart_never_flushes() -> Result<(), PokerError> {
         result["Villain"]
     );
 
+    Ok(())
+}
+
+/// Courchevel deals one board card face up before the betting, so a one-card
+/// board is a real spot and an empty one cannot happen.
+#[test]
+fn test_courchevel_requires_a_board_card() -> Result<(), PokerError> {
+    let hands = ["Ah Ad Ks Qc Jh", "9h 8c 7s 6d 5h"];
+
+    let mut calc = EquityCalculator::new(Courchevel, 1000);
+    for (name, cards) in ["Hero", "Villain"].iter().zip(hands) {
+        calc.add_player(name.to_string(), Hand::from_str(Courchevel, cards)?)?;
+    }
+    assert!(
+        matches!(
+            calc.calculate(drop),
+            Err(PokerError::Equity(EquityError::InvalidCommunityCards(0)))
+        ),
+        "the first board card is face up before the betting"
+    );
+
+    // One card is exactly the Courchevel starting point.
+    let mut calc = EquityCalculator::new(Courchevel, 20000);
+    for (name, cards) in ["Hero", "Villain"].iter().zip(hands) {
+        calc.add_player(name.to_string(), Hand::from_str(Courchevel, cards)?)?;
+    }
+    calc.set_community_cards(Card::from_str("2c")?)?;
+    let result = calc.calculate(drop)?;
+    assert!((result["Hero"] + result["Villain"] - 100.0).abs() < 0.001);
+
+    Ok(())
+}
+
+/// Once the flop is out, Courchevel and five-card Omaha are the same spot and
+/// must give the same answer. Enumerated, so there is no error bar to hide a
+/// difference in.
+#[test]
+fn test_courchevel_and_five_card_omaha_agree_after_the_flop() -> Result<(), PokerError> {
+    let hands = ["AhAdKsQcJh", "9h8c7s6d5h"];
+    let board = "2c 7d 9d";
+
+    let courchevel = run_exact(&EquityRequest::from_text(Courchevel, &hands, board, "")?)?
+        .expect("small enough to enumerate");
+    let omaha = run_exact(&EquityRequest::from_text(OmahaFive, &hands, board, "")?)?
+        .expect("small enough to enumerate");
+
+    assert_eq!(courchevel.samples, omaha.samples);
+    for (seat, (a, b)) in courchevel
+        .equities()
+        .iter()
+        .zip(omaha.equities())
+        .enumerate()
+    {
+        assert!(
+            (a.equity - b.equity).abs() < 1e-12,
+            "seat {} differs: {:.10}% against {:.10}%",
+            seat,
+            a.percent(),
+            b.percent()
+        );
+    }
+    Ok(())
+}
+
+/// Five- and six-card Omaha deal more hole cards but play the same two.
+#[test]
+fn test_bigger_omaha_hands_still_split_the_pot_sensibly() -> Result<(), PokerError> {
+    for (variant, hands) in [
+        ("five", vec!["AhAdKsQcJh", "9h8c7s6d5h"]),
+        ("six", vec!["AhAdKsQcJh2h", "9h8c7s6d5h3c"]),
+    ] {
+        let result = if variant == "five" {
+            run_exact(&EquityRequest::from_text(OmahaFive, &hands, "2c 7d 9d", "")?)?
+        } else {
+            run_exact(&EquityRequest::from_text(OmahaSix, &hands, "2c 7d 9d", "")?)?
+        }
+        .expect("small enough to enumerate");
+
+        let total: f64 = result.equities().iter().map(|player| player.equity).sum();
+        assert!(
+            (total - 1.0).abs() < 1e-9,
+            "{}-card Omaha equities summed to {}",
+            variant,
+            total
+        );
+        assert!(result.samples > 0);
+    }
     Ok(())
 }

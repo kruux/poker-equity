@@ -5,10 +5,13 @@ mod hi_lo;
 mod high;
 mod low;
 mod rank_translation;
+mod short_deck;
 
 pub type StudHandRank = HighHandRank;
 pub type RazzHandRank = LowHandRank;
+pub type BadugiHandRank = LowHandRank;
 pub type StudHiLoHandRank = HiLoHandRank;
+pub type OmahaHiLoHandRank = HiLoHandRank;
 pub type HoldemHandRank = HighHandRank;
 pub type OmahaHandRank = HighHandRank;
 pub use deuce_seven::DeuceSevenRank;
@@ -18,6 +21,7 @@ pub use hi_lo::HiLoHandRank;
 pub use high::HighHandRank;
 pub use low::LowHandRank;
 pub use rank_translation::{fast_to_high, high_to_fast};
+pub use short_deck::ShortDeckRank;
 
 macro_rules! impl_hand_rank_eq {
     ($type:ty) => {

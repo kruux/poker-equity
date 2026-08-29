@@ -19,6 +19,12 @@ pub enum HighHandRank {
     Incomplete(usize),
 }
 
+/// The ace playing low in a full deck: A-5-4-3-2, a five-high straight.
+const WHEEL: [Rank; 5] = [Rank::Ace, Rank::Five, Rank::Four, Rank::Three, Rank::Two];
+
+/// The ace playing low in a short deck: A-9-8-7-6, a nine-high straight.
+const SHORT_WHEEL: [Rank; 5] = [Rank::Ace, Rank::Nine, Rank::Eight, Rank::Seven, Rank::Six];
+
 impl HighHandRank {
     pub fn evaluate(cards: &[Card]) -> Self {
         if cards.len() < 5 {
@@ -43,6 +49,49 @@ impl HighHandRank {
             Self::TwoPair(high_pair, low_pair, kicker)
         } else if let Some((pair_rank, kickers)) = Self::is_pair(&rank_counts) {
             Self::Pair(pair_rank, kickers)
+        } else {
+            let sorted = Self::sorted_ranks(cards);
+            Self::HighCard(Self::first_n_ranks::<5>(&sorted))
+        }
+    }
+
+    /// Scores a hand under short-deck rules.
+    ///
+    /// Two things differ, and both matter. The ace plays low below the six,
+    /// so A-9-8-7-6 is a straight. And the categories are tested in a
+    /// different order, because a seven-card hand can hold both a straight
+    /// and trips -- with trips ranking above a straight here, such a hand has
+    /// to be classed as trips rather than merely re-scored afterwards.
+    pub fn evaluate_short_deck(cards: &[Card]) -> Self {
+        if cards.len() < 5 {
+            return Self::Incomplete(cards.len());
+        }
+
+        let rank_counts = Self::rank_counts(cards);
+        let straight_flush = Self::sorted_suits(cards)
+            .iter()
+            .filter(|(_, suited)| suited.len() >= 5)
+            .find_map(|(_, suited)| Self::is_straight_with_wheel(suited, &SHORT_WHEEL));
+
+        if let Some(rank) = straight_flush {
+            Self::StraightFlush(rank)
+        } else if let Some((quads, kicker)) = Self::is_four_of_kind(&rank_counts) {
+            Self::FourOfAKind(quads, kicker)
+        } else if let Some(ranks) = Self::is_flush(cards) {
+            // A flush outranks a full house on a short deck, so it is tested
+            // first. No hand of seven cards can be both.
+            Self::Flush(ranks)
+        } else if let Some((trips, pair)) = Self::is_full_house(&rank_counts) {
+            Self::FullHouse(trips, pair)
+        } else if let Some((trips, kickers)) = Self::is_three_of_kind(&rank_counts) {
+            // Trips outrank a straight here, and a hand can be both.
+            Self::ThreeOfAKind(trips, kickers)
+        } else if let Some(rank) = Self::is_straight_with_wheel(cards, &SHORT_WHEEL) {
+            Self::Straight(rank)
+        } else if let Some((high, low, kicker)) = Self::is_two_pair(&rank_counts) {
+            Self::TwoPair(high, low, kicker)
+        } else if let Some((pair, kickers)) = Self::is_pair(&rank_counts) {
+            Self::Pair(pair, kickers)
         } else {
             let sorted = Self::sorted_ranks(cards);
             Self::HighCard(Self::first_n_ranks::<5>(&sorted))
@@ -108,6 +157,13 @@ impl HighHandRank {
     /// straight neither makes nor breaks it, but leaving the duplicates in
     /// shifts the position of the run and so misnames the rank that tops it.
     fn is_straight(cards: &[Card]) -> Option<Rank> {
+        Self::is_straight_with_wheel(cards, &WHEEL)
+    }
+
+    /// As [`is_straight`](Self::is_straight), but told which hand the ace
+    /// plays low in. A full deck has A-5-4-3-2; a short deck has A-9-8-7-6,
+    /// since it holds no card below the six.
+    fn is_straight_with_wheel(cards: &[Card], wheel: &[Rank; 5]) -> Option<Rank> {
         let mut distinct = Self::sorted_ranks(cards);
         distinct.dedup();
 
@@ -126,9 +182,8 @@ impl HighHandRank {
 
         // The wheel is the one straight a descending walk cannot see: the ace
         // sits at the top of the list and plays at the bottom of the hand.
-        let wheel = [Rank::Ace, Rank::Five, Rank::Four, Rank::Three, Rank::Two];
         if wheel.iter().all(|rank| distinct.contains(rank)) {
-            return Some(Rank::Five);
+            return Some(wheel[1]);
         }
 
         None

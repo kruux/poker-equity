@@ -24,6 +24,9 @@ impl CardSet {
     /// No cards at all.
     pub const EMPTY: Self = Self(0);
 
+    /// The thirty-six card deck short-deck games use: sixes and up.
+    pub const SHORT_DECK: Self = Self(Self::FULL_DECK.0 & !((1 << (4 * 4)) - 1));
+
     /// Builds a set from the raw bits, keeping only the fifty-two card bits.
     pub fn from_bits(bits: u64) -> Self {
         Self(bits & Self::FULL_DECK.0)

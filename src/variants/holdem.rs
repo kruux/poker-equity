@@ -29,4 +29,8 @@ impl PokerVariant for Holdem {
     fn to_string(&self) -> String {
         "Hold 'em".to_string()
     }
+
+    fn key(&self) -> &'static str {
+        "holdem"
+    }
 }
