@@ -277,3 +277,22 @@ fn test_enumeration_declines_when_the_space_is_too_large() {
         "the caller should be told to sample instead"
     );
 }
+
+/// A draw game cannot be answered by dealing alone, so the chunked API
+/// refuses it rather than quietly answering a different question.
+#[test]
+fn test_draw_games_are_refused_by_the_chunked_api() {
+    use crate::variants::{Badugi, DeuceSeven};
+
+    let badugi = EquityRequest::from_text(Badugi, &["Ac2d3h4s", "KcQdJhTs"], "", "");
+    assert!(
+        matches!(badugi, Err(PokerError::Equity(EquityError::Infeasible(_)))),
+        "badugi needs the draw modelled"
+    );
+
+    let deuce = EquityRequest::from_text(DeuceSeven, &["Th8cKd4s2h", "9d7hKs4h2d"], "", "");
+    assert!(matches!(
+        deuce,
+        Err(PokerError::Equity(EquityError::Infeasible(_)))
+    ));
+}

@@ -6,7 +6,7 @@ use crate::{
     hand::Hand,
     notation::{parse_board, parse_dead, parse_hand, HandSpec},
     sampler::{is_feasible, SlotSampler},
-    variants::{EquityCalculation, PokerVariant},
+    variants::{EquityCalculation, PokerType, PokerVariant},
 };
 
 use super::chunk::ChunkResult;
@@ -42,6 +42,18 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
     ) -> Result<Self, PokerError> {
         if hands.len() < 2 {
             return Err(EquityError::NoPlayers.into());
+        }
+
+        // A draw game is not just a deal: each player discards and draws, and
+        // which cards they throw is an assumption this API has no way to
+        // carry. Dealing them a fresh hand and stopping would answer a
+        // different question, so refuse rather than mislead.
+        if matches!(variant.poker_type(), PokerType::Draw) {
+            return Err(EquityError::Infeasible(format!(
+                "{}, a draw game: use EquityCalculator::add_draw_player, which models the draw",
+                variant.to_string()
+            ))
+            .into());
         }
 
         let hole = variant.hole_cards();
