@@ -3,7 +3,7 @@ use crate::{
     variants::{PokerType, PokerVariant},
 };
 
-use super::StudHandRank;
+use super::{rankings::high_score, StudHandRank};
 
 #[derive(Clone, Copy, Debug)]
 pub struct SevenCardStud;
@@ -29,6 +29,10 @@ impl PokerVariant for SevenCardStud {
 
     fn key(&self) -> &'static str {
         "stud"
+    }
+
+    fn score(&self, cards: &[Card]) -> u32 {
+        high_score(cards) as u32
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {

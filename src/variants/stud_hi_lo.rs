@@ -1,4 +1,7 @@
-use super::{HighHandRank, LowHandRank, StudHiLoHandRank};
+use super::{
+    rankings::{high_score, low_a5_score, EIGHT_OR_BETTER_LIMIT},
+    HighHandRank, LowHandRank, StudHiLoHandRank,
+};
 use crate::{
     cards::Card,
     variants::{PokerType, PokerVariant},
@@ -35,6 +38,15 @@ impl PokerVariant for StudHiLo {
 
     fn key(&self) -> &'static str {
         "stud_hi_lo"
+    }
+
+    fn score(&self, cards: &[Card]) -> u32 {
+        high_score(cards) as u32
+    }
+
+    fn low_score(&self, cards: &[Card]) -> Option<u32> {
+        let best = low_a5_score(cards) as u32;
+        (best < EIGHT_OR_BETTER_LIMIT as u32).then_some(best)
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {

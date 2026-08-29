@@ -1,17 +1,17 @@
 use crate::error::{EquityError, PokerError};
 use crate::odds::{run_chunk, run_exact, ChunkResult, EquityRequest};
-use crate::variants::HoldemFast;
+use crate::variants::Holdem;
 
 /// Enumerates a spot exactly, panicking if it is too large.
 fn exact(hands: &[&str], board: &str, dead: &str) -> ChunkResult {
-    let request = EquityRequest::from_text(HoldemFast, hands, board, dead).unwrap();
+    let request = EquityRequest::from_text(Holdem, hands, board, dead).unwrap();
     run_exact(&request)
         .unwrap()
         .expect("this spot is small enough to enumerate")
 }
 
 fn sampled(hands: &[&str], board: &str, dead: &str, samples: u64, seed: u64) -> ChunkResult {
-    let request = EquityRequest::from_text(HoldemFast, hands, board, dead).unwrap();
+    let request = EquityRequest::from_text(Holdem, hands, board, dead).unwrap();
     run_chunk(&request, samples, seed).unwrap()
 }
 
@@ -186,7 +186,7 @@ fn test_an_irrelevant_dead_card_barely_moves_anything() {
 /// when to stop.
 #[test]
 fn test_chunks_merge_by_addition() {
-    let request = EquityRequest::from_text(HoldemFast, &["AhAd", "KsKc"], "2c 7d", "").unwrap();
+    let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "2c 7d", "").unwrap();
 
     let mut merged = ChunkResult::empty(2);
     for seed in 0..4u64 {
@@ -211,7 +211,7 @@ fn test_chunks_merge_by_addition() {
 /// the answer is enumerated.
 #[test]
 fn test_the_error_bar_behaves() {
-    let request = EquityRequest::from_text(HoldemFast, &["AhAd", "KsKc"], "", "").unwrap();
+    let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "", "").unwrap();
     let few = run_chunk(&request, 10_000, 5).unwrap().equities()[0].std_error;
     let many = run_chunk(&request, 160_000, 5).unwrap().equities()[0].std_error;
 
@@ -234,14 +234,14 @@ fn test_the_error_bar_behaves() {
 #[test]
 fn test_impossible_requests_are_refused() {
     // Both seats named the same card.
-    let clash = EquityRequest::from_text(HoldemFast, &["AhKh", "AhQs"], "", "");
+    let clash = EquityRequest::from_text(Holdem, &["AhKh", "AhQs"], "", "");
     assert!(
         matches!(clash, Err(PokerError::Equity(EquityError::Infeasible(_)))),
         "one ace of hearts cannot sit in two hands"
     );
 
     // The board wants a card that is dead.
-    let dead_board = EquityRequest::from_text(HoldemFast, &["AhKh", "QsJs"], "2c 7d 9h", "2c");
+    let dead_board = EquityRequest::from_text(Holdem, &["AhKh", "QsJs"], "2c 7d 9h", "2c");
     assert!(matches!(
         dead_board,
         Err(PokerError::Equity(EquityError::Infeasible(_)))
@@ -249,7 +249,7 @@ fn test_impossible_requests_are_refused() {
 
     // Five hearts wanted from a deck with only four left.
     let too_few = EquityRequest::from_text(
-        HoldemFast,
+        Holdem,
         &["h h", "h h"],
         "h",
         "2h 3h 4h 5h 6h 7h 8h 9h Th",
@@ -263,15 +263,15 @@ fn test_impossible_requests_are_refused() {
 /// A hand field that does not match the game is caught before sampling.
 #[test]
 fn test_slot_counts_are_checked() {
-    assert!(EquityRequest::from_text(HoldemFast, &["AhKhQh", "QsJs"], "", "").is_err());
-    assert!(EquityRequest::from_text(HoldemFast, &["AhKh"], "", "").is_err());
+    assert!(EquityRequest::from_text(Holdem, &["AhKhQh", "QsJs"], "", "").is_err());
+    assert!(EquityRequest::from_text(Holdem, &["AhKh"], "", "").is_err());
 }
 
 /// A spot too wide to walk says so rather than trying.
 #[test]
 fn test_enumeration_declines_when_the_space_is_too_large() {
     // Two entirely unspecified hands preflop is far past the limit.
-    let request = EquityRequest::from_text(HoldemFast, &["**", "**"], "", "").unwrap();
+    let request = EquityRequest::from_text(Holdem, &["**", "**"], "", "").unwrap();
     assert!(
         run_exact(&request).unwrap().is_none(),
         "the caller should be told to sample instead"
@@ -391,11 +391,11 @@ fn test_a_short_stud_hand_is_dealt_out() -> Result<(), PokerError> {
 #[test]
 fn test_community_games_still_want_every_hole_card() {
     assert!(
-        EquityRequest::from_text(HoldemFast, &["Ah", "QsJs"], "", "").is_err(),
+        EquityRequest::from_text(Holdem, &["Ah", "QsJs"], "", "").is_err(),
         "one hole card is a typo in hold'em, not a hand still being dealt"
     );
     assert!(
-        EquityRequest::from_text(HoldemFast, &["A *", "QsJs"], "", "").is_ok(),
+        EquityRequest::from_text(Holdem, &["A *", "QsJs"], "", "").is_ok(),
         "an unknown hole card is written as a wildcard"
     );
 }

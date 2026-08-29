@@ -21,8 +21,7 @@ use std::path::Path;
 
 use poker_calculator::cards::{Card, CardSet};
 use poker_calculator::variants::{
-    deuce_seven_score, high_score, low_a5_score, short_deck_score, Badugi, OmahaFast,
-    PokerVariant,
+    deuce_seven_score, high_score, low_a5_score, short_deck_score, Badugi, Omaha, PokerVariant,
 };
 
 /// Every combination of `size` cards from `deck`, in ascending order.
@@ -192,7 +191,7 @@ fn main() -> std::io::Result<()> {
     let deals = sample(&full, 9, 200_000, 0x0A_4A_11_5E_ED);
     let scores: Vec<u16> = deals
         .iter()
-        .map(|deal| OmahaFast.evaluate_hand(deal).0)
+        .map(|deal| Omaha.score(deal) as u16)
         .collect();
     write_hands(&out.join("omaha.tsv"), &deals, 4, &scores)?;
     println!("{} Omaha deals", deals.len());

@@ -4,7 +4,7 @@ use crate::{
     cards::{Card, Rank, Suit},
     error::PokerError,
     hand::Hand,
-    variants::{Courchevel, Omaha, OmahaFast, OmahaFive, OmahaHandRank, OmahaSix, PokerVariant},
+    variants::{Courchevel, Omaha, OmahaFive, OmahaHandRank, OmahaSix, PokerVariant},
 };
 
 #[test]
@@ -161,11 +161,12 @@ fn test_the_rule_never_improves_a_hand() -> Result<(), PokerError> {
     Ok(())
 }
 
-/// `OmahaFast` reads the generated table where `Omaha` walks the hand, so the
-/// two must order every pair of holdings the same way. Deals come from a
-/// fixed-seed generator, so a failure reproduces exactly.
+/// Omaha's two answers must agree: `score` reads the lookup table over the
+/// sixty pairings, `evaluate_hand` walks them and names the winner. They are
+/// written separately, so wherever they order two holdings differently one of
+/// them is wrong. Deals come from a fixed seed, so a failure reproduces.
 #[test]
-fn test_fast_and_slow_omaha_agree() -> Result<(), PokerError> {
+fn test_omahas_score_and_name_agree() -> Result<(), PokerError> {
     let mut deck: Vec<Card> = Vec::with_capacity(52);
     for suit in Suit::all() {
         for rank in Rank::all() {
@@ -195,30 +196,28 @@ fn test_fast_and_slow_omaha_agree() -> Result<(), PokerError> {
         let card = |i: usize| deck[chosen[i]];
         let board: Vec<Card> = (8..13).map(card).collect();
 
-        let mut hands = Vec::new();
+        let mut hands: Vec<Vec<Card>> = Vec::new();
         for seat in 0..2 {
             let mut cards: Vec<Card> = (seat * 4..seat * 4 + 4).map(card).collect();
             cards.extend(board.iter().copied());
             hands.push(cards);
         }
 
-        let slow = Hand::new_with_cards(Omaha, hands[0].clone())?
-            .evaluate()
-            .partial_cmp(&Hand::new_with_cards(Omaha, hands[1].clone())?.evaluate());
-        let fast = Hand::new_with_cards(OmahaFast, hands[0].clone())?
-            .evaluate()
-            .partial_cmp(&Hand::new_with_cards(OmahaFast, hands[1].clone())?.evaluate());
+        // The names order greatest-is-best; the scores order lowest-is-best.
+        let named = Omaha
+            .evaluate_hand(&hands[0])
+            .partial_cmp(&Omaha.evaluate_hand(&hands[1]));
+        let scored = Omaha.score(&hands[1]).partial_cmp(&Omaha.score(&hands[0]));
 
         assert_eq!(
-            slow, fast,
-            "deal {} ordered differently by the two evaluators: {:?} against {:?}",
+            named, scored,
+            "deal {} ordered differently by name and by score: {:?} against {:?}",
             deal, hands[0], hands[1]
         );
     }
 
     Ok(())
 }
-
 /// The two-from-hand rule holds however many cards a player is dealt.
 #[test]
 fn test_the_split_holds_at_five_and_six_cards() -> Result<(), PokerError> {
@@ -272,3 +271,4 @@ fn test_courchevel_evaluates_as_five_card_omaha() -> Result<(), PokerError> {
     );
     Ok(())
 }
+

@@ -1,4 +1,6 @@
-use super::{rankings::HoldemHandRank, PokerType, PokerVariant};
+use crate::cards::Card;
+
+use super::{rankings::high_score, rankings::HoldemHandRank, PokerType, PokerVariant};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Holdem;
@@ -20,6 +22,10 @@ impl PokerVariant for Holdem {
 
     fn board_cards(&self) -> usize {
         5
+    }
+
+    fn score(&self, cards: &[Card]) -> u32 {
+        high_score(cards) as u32
     }
 
     fn evaluate_hand(&self, cards: &[crate::cards::Card]) -> Self::HandRank {

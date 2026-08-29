@@ -4,7 +4,10 @@ use itertools::Itertools;
 
 use crate::cards::Card;
 
-use super::{rankings::OmahaHandRank, PokerType, PokerVariant};
+use super::{
+    rankings::{high_score, OmahaHandRank},
+    PokerType, PokerVariant,
+};
 
 /// Scores an Omaha holding: exactly two hole cards with exactly three board
 /// cards, whichever pairing is best.
@@ -34,6 +37,29 @@ fn best_hand(hole_count: usize, cards: &[Card]) -> OmahaHandRank {
             // have held, so incomplete hands still order among themselves.
             OmahaHandRank::Incomplete(min(hole_cards.len(), 2) + min(board_cards.len(), 3))
         })
+}
+
+/// The best score among every pairing of two hole cards with three of the
+/// board.
+///
+/// The same walk as [`best_hand`], but reading a lookup table instead of
+/// naming each candidate, which is what the sampling loop wants. Lower is
+/// better, so the best pairing is the smallest.
+pub(super) fn best_score(hole_count: usize, cards: &[Card], score: impl Fn(&[Card]) -> u16) -> u32 {
+    let split = cards.len().min(hole_count);
+    let (hole_cards, board_cards) = cards.split_at(split);
+
+    let mut best = u32::MAX;
+    let mut five = [hole_cards.first().copied().unwrap_or(Card::from_index(0).unwrap()); 5];
+    for hole in hole_cards.iter().combinations(2) {
+        for board in board_cards.iter().combinations(3) {
+            for (slot, card) in five.iter_mut().zip(hole.iter().chain(board.iter())) {
+                *slot = **card;
+            }
+            best = best.min(score(&five) as u32);
+        }
+    }
+    best
 }
 
 /// Defines an Omaha variant, which differ only in how many cards a player
@@ -66,6 +92,10 @@ macro_rules! omaha_variant {
 
             fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
                 best_hand($hole, cards)
+            }
+
+            fn score(&self, cards: &[Card]) -> u32 {
+                best_score($hole, cards, high_score)
             }
 
             fn to_string(&self) -> String {

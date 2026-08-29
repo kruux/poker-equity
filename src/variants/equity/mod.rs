@@ -1,4 +1,3 @@
-use std::cmp::Ordering;
 
 use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator};
 
@@ -8,9 +7,7 @@ mod badugi;
 mod community_base;
 mod deuce_seven;
 mod holdem;
-mod holdem_fast;
 mod omaha;
-mod omaha_fast;
 mod omaha_hi_lo;
 mod razz;
 mod short_deck;
@@ -93,10 +90,7 @@ where
         hands: &[Hand<Self>],
         shares: &mut [f64],
         low_shares: &mut [f64],
-    ) -> Result<(), PokerError>
-    where
-        Self::HandRank: HasLow,
-    {
+    ) -> Result<(), PokerError> {
         let high_half = match self.rank_low_hands(hands)? {
             Some(low_places) => {
                 let winners = &low_places[0];
@@ -127,22 +121,19 @@ where
     ///
     /// Each hand is scored once and the indices are sorted, rather than
     /// sorting the hands themselves -- comparing two `Hand`s rescores both.
+    /// The score is a lookup for every game but badugi, so this is where the
+    /// tables earn their keep.
     fn rank_hands(&self, hands: &[Hand<Self>]) -> Result<Vec<Vec<usize>>, PokerError> {
         if hands.is_empty() {
             return Ok(vec![]);
         }
 
-        let ranks: Vec<Self::HandRank> = hands.iter().map(|hand| hand.evaluate()).collect();
+        // Lower scores are better hands, so the seats sort ascending.
+        let scores: Vec<u32> = hands.iter().map(|hand| self.score(hand.cards())).collect();
         let mut seats: Vec<usize> = (0..hands.len()).collect();
-        seats.sort_by(|&a, &b| {
-            ranks[b]
-                .partial_cmp(&ranks[a])
-                .unwrap_or(Ordering::Equal)
-        });
+        seats.sort_by_key(|&seat| scores[seat]);
 
-        Ok(group_ties(&seats, |a, b| {
-            ranks[a].partial_cmp(&ranks[b]) == Some(Ordering::Equal)
-        }))
+        Ok(group_ties(&seats, |a, b| scores[a] == scores[b]))
     }
 
     /// Places the players by their low hands, best first, in the same shape
@@ -154,13 +145,10 @@ where
     fn rank_low_hands(
         &self,
         hands: &[Hand<Self>],
-    ) -> Result<Option<Vec<Vec<usize>>>, PokerError>
-    where
-        Self::HandRank: HasLow,
-    {
-        let lows: Vec<Option<LowHandRank>> = hands
+    ) -> Result<Option<Vec<Vec<usize>>>, PokerError> {
+        let lows: Vec<Option<u32>> = hands
             .iter()
-            .map(|hand| hand.evaluate().low().cloned())
+            .map(|hand| self.low_score(hand.cards()))
             .collect();
 
         let mut seats: Vec<usize> = (0..hands.len()).filter(|&i| lows[i].is_some()).collect();
@@ -168,15 +156,8 @@ where
             return Ok(None);
         }
 
-        seats.sort_by(|&a, &b| {
-            lows[b]
-                .partial_cmp(&lows[a])
-                .unwrap_or(Ordering::Equal)
-        });
-
-        Ok(Some(group_ties(&seats, |a, b| {
-            lows[a].partial_cmp(&lows[b]) == Some(Ordering::Equal)
-        })))
+        seats.sort_by_key(|&seat| lows[seat]);
+        Ok(Some(group_ties(&seats, |a, b| lows[a] == lows[b])))
     }
 }
 

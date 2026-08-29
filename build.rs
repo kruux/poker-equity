@@ -486,6 +486,33 @@ fn main() -> std::io::Result<()> {
             write_translation_maps(out_dir, &scored.by_score)?;
         }
 
+        if kernel == Kernel::LowA5 {
+            // A low qualifies for the eight-or-better half when it has five
+            // distinct ranks, none above an eight. Those are the best lows
+            // there are, so they occupy the scores below a threshold rather
+            // than being scattered -- which turns the qualifier into a
+            // comparison instead of a second evaluation.
+            let qualifying = scored
+                .by_score
+                .iter()
+                .filter(|(_, rank)| {
+                    rank.category == 0 && rank.tiebreak.iter().all(|&value| value <= 8)
+                })
+                .count();
+            let mut file = BufWriter::new(File::create(out_dir.join("low_qualifier.rs"))?);
+            writeln!(
+                file,
+                "/// The first score that is *not* an eight-or-better low.\n\
+                 ///\n\
+                 /// Qualifying lows are the best lows there are, so they take\n\
+                 /// the scores below this and the check is one comparison.\n\
+                 pub(crate) const EIGHT_OR_BETTER_LIMIT: u16 = {};",
+                qualifying
+            )?;
+            file.flush()?;
+            println!("cargo:warning=eight-or-better lows: {} of them", qualifying);
+        }
+
         println!(
             "cargo:warning={} kernel: {} distinct hand values",
             kernel.name(),

@@ -5,6 +5,7 @@ mod hi_lo;
 mod high;
 mod low;
 mod rank_translation;
+mod low_qualifier;
 mod short_deck;
 mod table_index;
 
@@ -29,4 +30,5 @@ pub use high::HighHandRank;
 pub use low::LowHandRank;
 pub use rank_translation::{fast_to_high, high_to_fast};
 pub use short_deck::ShortDeckRank;
+pub(crate) use low_qualifier::EIGHT_OR_BETTER_LIMIT;
 

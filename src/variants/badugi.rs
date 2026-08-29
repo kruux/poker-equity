@@ -1,4 +1,4 @@
-use crate::cards::Card;
+use crate::cards::{Card, Rank};
 
 use super::{rankings::LowHandRank, PokerType, PokerVariant};
 
@@ -70,6 +70,25 @@ impl PokerVariant for Badugi {
 
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
         best_badugi(cards)
+    }
+
+    /// Badugi has no lookup table -- it needs suits, so a rank key will not
+    /// do -- so the ordering is packed into a number instead. Fewer cards is
+    /// worse, then a higher card is worse.
+    fn score(&self, cards: &[Card]) -> u32 {
+        let LowHandRank::Low(played) = best_badugi(cards);
+        let mut key = (4 - played.len().min(4)) as u32;
+        for slot in 0..4 {
+            let value = played.get(slot).map_or(0, |rank| {
+                if *rank == Rank::Ace {
+                    1
+                } else {
+                    rank.to_value()
+                }
+            });
+            key = (key << 4) | value as u32;
+        }
+        key
     }
 
     fn to_string(&self) -> String {
