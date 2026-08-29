@@ -1,7 +1,7 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
-use crate::odds::{equity, EquityRequest, Progress, Target};
+use crate::odds::{equity, equity_with_progress, EquityRequest, Progress, Target};
 use crate::variants::Holdem;
 
 fn request(hands: &[&str], board: &str) -> EquityRequest<Holdem> {
@@ -15,8 +15,7 @@ fn request(hands: &[&str], board: &str) -> EquityRequest<Holdem> {
 fn test_small_spots_come_back_exact() {
     let result = equity(
         &request(&["AhAd", "KsKc"], "2c 7d 9h"),
-        Target::Samples(1_000_000),
-        |_| {},
+        Target::Samples(1_000_000)
     )
     .unwrap();
 
@@ -34,8 +33,7 @@ fn test_a_sample_target_is_met() {
     let wanted = 120_000;
     let result = equity(
         &request(&["A K", "Q J"], ""),
-        Target::Samples(wanted),
-        |_| {},
+        Target::Samples(wanted)
     )
     .unwrap();
 
@@ -55,8 +53,7 @@ fn test_a_precision_target_is_met() {
     let wanted = 0.0008;
     let result = equity(
         &request(&["AhKh", "22"], ""),
-        Target::StandardError(wanted),
-        |_| {},
+        Target::StandardError(wanted)
     )
     .unwrap();
 
@@ -77,7 +74,7 @@ fn test_progress_is_reported_as_it_goes() {
     let calls = AtomicUsize::new(0);
     let last: Mutex<Option<Progress>> = Mutex::new(None);
 
-    let result = equity(
+    let result = equity_with_progress(
         &request(&["A K", "Q J"], ""),
         // Enough deals to need several batches, so that progress really is
         // reported as the run goes rather than only at the end.
@@ -108,7 +105,7 @@ fn test_progress_is_reported_as_it_goes() {
 /// than refusing.
 #[test]
 fn test_exact_falls_back_to_sampling_when_it_must() {
-    let result = equity(&request(&["**", "**"], ""), Target::Exact, |_| {}).unwrap();
+    let result = equity(&request(&["**", "**"], ""), Target::Exact).unwrap();
     assert!(!result.exact, "the space is too large to have been walked");
     for player in result.equities() {
         assert!(player.std_error <= 0.0005);

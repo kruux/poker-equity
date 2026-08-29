@@ -21,7 +21,7 @@ let request = EquityRequest::from_text(
     "",                  // dead cards
 )?;
 
-let result = equity(&request, Target::Exact, |_| {})?;
+let result = equity(&request, Target::Exact)?;
 for (seat, player) in result.equities().iter().enumerate() {
     println!("seat {}: {:.2}%", seat, player.percent());
 }
@@ -104,62 +104,105 @@ short field there is a miscount, and an unknown card is a wildcard.
 
 ## Getting an answer
 
-Two layers. The lower one runs a batch and returns sums:
+The simple way. Say how good an answer you want, and get one:
+
+```rust
+use poker_calculator::odds::{equity, Target};
+
+// half a million deals
+let result = equity(&request, Target::Samples(500_000))?;
+
+for (seat, player) in result.equities().iter().enumerate() {
+    println!("seat {}: {:.2}% ± {:.2}", seat, player.percent(), player.margin_percent());
+}
+```
+
+| Target | Runs until |
+|---|---|
+| `Target::Samples(500_000)` | half a million deals are done |
+| `Target::StandardError(0.001)` | the answer is that precise — "make this good enough to trust" |
+| `Target::Exact` | every possible deal has been walked, falling back to tight sampling when there are too many |
+
+`StandardError` is usually the one you want. A sample count is a guess at how
+long precision takes; a precision target just asks for the precision.
+
+If a spot has fewer possible deals than you asked to sample, it is walked
+instead of sampled — `AhAd` against `KsKc` on a flop has only 990 run-outs, so
+asking for half a million deals gets all 990 and a `std_error` of exactly
+zero. You are never given more work than you asked for: a spot with two
+million possible deals is sampled, not walked, when you asked for five
+hundred thousand.
+
+`StandardError` and `Exact` put no cap on the work, so they walk whatever can
+be walked — an exact answer beats any error bar.
+
+### Watching a long run
+
+A run of millions of deals takes long enough that you will want to repaint a
+table while it goes, and to notice if the user cancelled. Pass a function to
+be called after each batch:
+
+```rust
+use poker_calculator::odds::equity_with_progress;
+
+let result = equity_with_progress(&request, Target::Samples(5_000_000), |progress| {
+    println!("{} deals: {:.2}% (± {:.2}), keeping {:.0}% of deals",
+        progress.samples,
+        progress.equities[0].percent(),
+        progress.equities[0].margin_percent(),
+        progress.acceptance * 100.0);
+})?;
+```
+
+`|progress| { ... }` is Rust's syntax for a function written inline — the
+names between the bars are its arguments, and the braces are its body. So
+that one takes a `Progress` and prints from it. A batch is a few milliseconds,
+which is a good rate to repaint at and a fine granularity to cancel at.
+
+`progress.acceptance` is the share of attempted deals that could be used. It
+is 1.0 unless hands are competing for the same cards — several seats all
+wanting a five when only two are left — and a low figure is the difference
+between an answer that is slow and one that looks stuck.
+
+### Driving the loop yourself
+
+If you want to own the loop — because cancelling, or threading, or merging
+results across machines is your business rather than the library's — the layer
+underneath is a single batch that returns sums:
 
 ```rust
 use poker_calculator::odds::{run_chunk, ChunkResult};
 
 let mut total = ChunkResult::empty(2);
-for seed in 0..8 {
+for seed in 0..10 {
     total.merge(&run_chunk(&request, 50_000, seed)?);
-    // repaint a table, check whether the user cancelled, decide whether to stop
+    if user_cancelled() { break; }
 }
+// 500,000 deals, or fewer if the user stopped it
 ```
 
-`run_chunk` is pure and stateless — no callbacks, no cancellation token. The
-caller loops and decides when to stop, so cancelling is instant at chunk
-granularity. Everything in `ChunkResult` is a **sum**, so chunks merge by
-addition, and the sums of squares are carried too, which is what makes the
-confidence interval free.
+`run_chunk` is pure and stateless: no callbacks, no cancellation token, no
+shared state. Everything in `ChunkResult` is a **sum**, so batches merge by
+addition, and the sums of squares are carried too — which is what makes the
+error bar free rather than something to compute separately.
 
-The upper layer runs to a target and reports progress:
-
-```rust
-use poker_calculator::odds::{equity, Target};
-
-let result = equity(&request, Target::StandardError(0.001), |progress| {
-    println!("{} deals, {:.2}% ± {:.2}",
-        progress.samples,
-        progress.equities[0].percent(),
-        progress.equities[0].margin_percent());
-})?;
-```
-
-| Target | Runs until |
-|---|---|
-| `Samples(n)` | `n` deals are done |
-| `StandardError(e)` | the interval is that tight — answers "make this good enough to trust" |
-| `Exact` | every deal has been walked, falling back to tight sampling when the space is too large |
-
-A spot small enough to enumerate is enumerated even when a sample count was
-asked for: walking 990 boards beats sampling a million, and comes back with no
-error bar.
-
-Each seat's result:
+### What comes back
 
 ```rust
 pub struct PlayerEquity {
     pub equity: f64,      // share of the pot — the number that matters
     pub win: f64,         // taken outright
     pub tie: f64,         // shared
-    pub low_equity: f64,  // the low half alone
+    pub low_equity: f64,  // the low half alone, in split games
     pub scoop: f64,       // both halves
-    pub std_error: f64,   // zero when exact
+    pub std_error: f64,   // zero when the answer was enumerated
 }
 ```
 
-Equity leads because it is the answer — it is what the money does. Wins and
-ties are colour.
+Equity leads because it is the answer — it is what the money does over time.
+Wins and ties are colour. `percent()` and `margin_percent()` give the two
+numbers a table usually shows: the equity, and the half-width of a 95%
+interval around it.
 
 ## The mask API
 

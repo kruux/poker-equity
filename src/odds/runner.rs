@@ -7,7 +7,7 @@ use crate::{
 
 use super::{
     chunk::{ChunkResult, PlayerEquity},
-    request::{run_chunk, run_exact, EquityRequest},
+    request::{run_chunk, run_exact, run_exact_within, EquityRequest, EXACT_DEAL_LIMIT},
 };
 
 /// How long to keep sampling.
@@ -51,32 +51,70 @@ const CHUNK: u64 = 50_000;
 /// reach, so that an early lucky chunk cannot stop the run.
 const MINIMUM_SAMPLES: u64 = CHUNK * 4;
 
-/// Runs a request to a target, reporting progress between chunks.
+/// Runs a request until the target is met, and returns the answer.
+///
+/// ```no_run
+/// # use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
+/// # let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "", "")?;
+/// let result = equity(&request, Target::Samples(500_000))?;
+/// println!("{:.2}%", result.equities()[0].percent());
+/// # Ok::<(), poker_calculator::error::PokerError>(())
+/// ```
+///
+/// Use [`equity_with_progress`] to watch a long run as it goes, or
+/// [`run_chunk`](crate::odds::run_chunk) to drive the loop yourself.
+pub fn equity<V>(request: &EquityRequest<V>, target: Target) -> Result<ChunkResult, PokerError>
+where
+    V: PokerVariant + EquityCalculation + Send + Sync,
+{
+    equity_with_progress(request, target, |_progress| {})
+}
+
+/// Runs a request to a target, handing `on_progress` the results so far after
+/// every batch of deals.
+///
+/// That is where a caller repaints its table and decides whether the user has
+/// cancelled. A batch is a few milliseconds, so it is a fine rate for both.
+///
+/// ```no_run
+/// # use poker_calculator::{odds::{equity_with_progress, EquityRequest, Target}, variants::Holdem};
+/// # let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "", "")?;
+/// let result = equity_with_progress(&request, Target::Samples(500_000), |progress| {
+///     println!("{} deals so far: {:.2}%", progress.samples, progress.equities[0].percent());
+/// })?;
+/// # Ok::<(), poker_calculator::error::PokerError>(())
+/// ```
 ///
 /// Threads default to something polite: several calculators may be open at
 /// once and one must not starve the others.
-pub fn equity<V, F>(
+pub fn equity_with_progress<V, F>(
     request: &EquityRequest<V>,
     target: Target,
-    on_progress: F,
+    mut on_progress: F,
 ) -> Result<ChunkResult, PokerError>
 where
     V: PokerVariant + EquityCalculation + Send + Sync,
-    F: Fn(&Progress) + Send + Sync,
+    F: FnMut(&Progress),
 {
     if target == Target::Exact {
         if let Some(result) = run_exact(request)? {
-            report(&on_progress, &result);
+            report(&mut on_progress, &result);
             return Ok(result);
         }
         // Too large to walk, so sample instead, tightly.
         return sample_until(request, Target::StandardError(0.0005), on_progress);
     }
 
-    // Small spots are cheaper to enumerate than to sample, and come back
-    // without an error bar.
-    if let Some(result) = run_exact(request)? {
-        report(&on_progress, &result);
+    // A spot with fewer deals than the caller was going to sample is cheaper
+    // to walk than to sample, and comes back without an error bar. Asking for
+    // a precision rather than a count says nothing about how much work is
+    // acceptable, so there the only limit is what can be walked at all.
+    let budget = match target {
+        Target::Samples(wanted) => wanted as usize,
+        _ => EXACT_DEAL_LIMIT,
+    };
+    if let Some(result) = run_exact_within(request, budget)? {
+        report(&mut on_progress, &result);
         return Ok(result);
     }
 
@@ -87,11 +125,11 @@ where
 fn sample_until<V, F>(
     request: &EquityRequest<V>,
     target: Target,
-    on_progress: F,
+    mut on_progress: F,
 ) -> Result<ChunkResult, PokerError>
 where
     V: PokerVariant + EquityCalculation + Send + Sync,
-    F: Fn(&Progress) + Send + Sync,
+    F: FnMut(&Progress),
 {
     let threads = std::thread::available_parallelism()
         .map(|n| n.get().min(4))
@@ -115,7 +153,7 @@ where
             total.merge(batch);
         }
 
-        report(&on_progress, &total);
+        report(&mut on_progress, &total);
 
         match target {
             Target::Samples(wanted) if total.samples >= wanted => return Ok(total),
@@ -139,7 +177,8 @@ fn worst_error(result: &ChunkResult) -> f64 {
         .fold(0.0, f64::max)
 }
 
-fn report<F: Fn(&Progress)>(on_progress: &F, result: &ChunkResult) {
+/// Hands the caller the results as they stand.
+fn report<F: FnMut(&Progress)>(on_progress: &mut F, result: &ChunkResult) {
     on_progress(&Progress {
         samples: result.samples,
         equities: result.equities(),

@@ -7,7 +7,7 @@
 //! use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
 //!
 //! let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "2c 7d 9h", "")?;
-//! let result = equity(&request, Target::Exact, |_| {})?;
+//! let result = equity(&request, Target::Exact)?;
 //! assert_eq!(format!("{:.2}%", result.equities()[0].percent()), "91.62%");
 //! # Ok::<(), poker_calculator::error::PokerError>(())
 //! ```

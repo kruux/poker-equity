@@ -289,6 +289,21 @@ pub fn run_exact<V>(request: &EquityRequest<V>) -> Result<Option<ChunkResult>, P
 where
     V: PokerVariant + EquityCalculation,
 {
+    run_exact_within(request, EXACT_DEAL_LIMIT)
+}
+
+/// Enumerates every deal, so long as there are no more than `limit` of them.
+///
+/// The limit is how much work the caller is willing to do. Asking for half a
+/// million sampled deals and being handed an exact answer that took two
+/// million is a worse deal than it looks, however good the answer.
+pub fn run_exact_within<V>(
+    request: &EquityRequest<V>,
+    limit: usize,
+) -> Result<Option<ChunkResult>, PokerError>
+where
+    V: PokerVariant + EquityCalculation,
+{
     let seats = request.players();
     let mut result = ChunkResult::empty(seats);
     result.exact = true;
@@ -299,7 +314,7 @@ where
     for alternatives in &request.seats {
         let mut sets = Vec::new();
         for sampler in alternatives {
-            match sampler.all_sets(request.available, EXACT_DEAL_LIMIT) {
+            match sampler.all_sets(request.available, limit) {
                 Some(found) => sets.extend(found),
                 None => return Ok(None),
             }
@@ -313,7 +328,7 @@ where
     let mut holes: Vec<Vec<Card>> = vec![Vec::new(); seats];
     let mut shares = vec![0.0f64; seats];
     let mut low_shares = vec![0.0f64; seats];
-    let mut budget = EXACT_DEAL_LIMIT;
+    let mut budget = limit;
 
     let walked = walk_seats(
         request,
