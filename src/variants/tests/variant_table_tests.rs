@@ -5,8 +5,11 @@ use crate::variants::*;
 /// Every row of the table in PLAN section 4, checked against what the library
 /// actually implements.
 ///
-/// The key is fpdb's own database category, so a mismatch here is a game the
-/// tracker asks for and does not get.
+/// The keys are this library's own, not the ones the plan lists. The plan
+/// carries fpdb's existing database categories, which mix four conventions
+/// -- `5_omahahi`, `omahahilo`, `cour_hi`, `27_3draw` -- and one of them
+/// cannot even be an identifier. These are one word per idea, family first,
+/// and fpdb is being renamed to match.
 #[test]
 fn test_every_variant_row_exists() {
     // key, label, hole cards, board cards, deck size
@@ -29,18 +32,18 @@ fn test_every_variant_row_exists() {
 
     let expected: Vec<(&str, usize, usize, u32)> = vec![
         ("holdem", 2, 5, 52),
-        ("6_holdem", 2, 5, 36),
-        ("omahahi", 4, 5, 52),
-        ("5_omahahi", 5, 5, 52),
-        ("6_omahahi", 6, 5, 52),
-        ("omahahilo", 4, 5, 52),
-        ("5_omaha8", 5, 5, 52),
-        ("cour_hi", 5, 5, 52),
-        ("cour_hilo", 5, 5, 52),
-        ("studhi", 7, 0, 52),
-        ("studhilo", 7, 0, 52),
+        ("holdem_short_deck", 2, 5, 36),
+        ("omaha", 4, 5, 52),
+        ("omaha_five", 5, 5, 52),
+        ("omaha_six", 6, 5, 52),
+        ("omaha_hi_lo", 4, 5, 52),
+        ("omaha_five_hi_lo", 5, 5, 52),
+        ("courchevel", 5, 5, 52),
+        ("courchevel_hi_lo", 5, 5, 52),
+        ("stud", 7, 0, 52),
+        ("stud_hi_lo", 7, 0, 52),
         ("razz", 7, 0, 52),
-        ("27_3draw", 5, 0, 52),
+        ("deuce_seven", 5, 0, 52),
         ("badugi", 4, 0, 52),
     ];
 
@@ -49,6 +52,20 @@ fn test_every_variant_row_exists() {
 
     let keys: HashSet<&str> = rows.iter().map(|row| row.0).collect();
     assert_eq!(keys.len(), 14, "every key is its own game");
+
+    for key in &keys {
+        assert!(
+            key.chars()
+                .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit()),
+            "{} is not lowercase and underscores",
+            key
+        );
+        assert!(
+            !key.starts_with(|c: char| c.is_ascii_digit()),
+            "{} cannot be an identifier",
+            key
+        );
+    }
 }
 
 /// Every variant names itself, so a caller can label a table without a

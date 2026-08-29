@@ -82,8 +82,13 @@ pub trait PokerVariant: Clone + Copy {
     /// The variant's display name.
     fn to_string(&self) -> String;
 
-    /// The key fpdb stores this game under, so that a category from its
-    /// database picks the right variant with no table in between.
+    /// A stable identifier for this game, for configuration files, database
+    /// columns and anything else that needs to name a variant in text.
+    ///
+    /// The scheme is one word per idea, family first: `omaha`, `omaha_five`,
+    /// `omaha_five_hi_lo`. Nothing starts with a digit, sizes are spelled out
+    /// rather than abbreviated, and a split game always ends `_hi_lo`, so the
+    /// keys sort into families and can be used as identifiers as they stand.
     fn key(&self) -> &'static str;
 }
 

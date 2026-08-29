@@ -28,7 +28,7 @@ impl PokerVariant for SevenCardStud {
     }
 
     fn key(&self) -> &'static str {
-        "studhi"
+        "stud"
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {

@@ -5,8 +5,11 @@
 # cannot drift apart unnoticed.
 #
 # Columns, tab separated:
-#   field    hand | board | dead
+#   field    hand | hand_up_to | board | dead
 #   arg      hand: how many cards the game deals a player
+#            hand_up_to: as hand, but a short field is allowed -- the rest of
+#            the cards are still to come (stud dealt street by street, a draw
+#            game where cards are exchanged)
 #            board: the most cards the board can hold
 #            dead: unused, written as -
 #   input    the text to read
@@ -102,3 +105,13 @@ dead	-	c	err	DeadCardNotExact
 dead	-	A	err	DeadCardNotExact
 dead	-	*	err	DeadCardNotExact
 dead	-	Ah A	err	DeadCardNotExact
+
+# --- a stud or draw field may name fewer cards than the game deals ---------
+hand_up_to	7	Ah Kh Qh	ok	Ah Kh Qh
+hand_up_to	7	Ah Kh Qh Jh Th 9h 8h	ok	Ah Kh Qh Jh Th 9h 8h
+hand_up_to	5	7h5c4d3s2h	ok	7h 5c 4d 3s 2h
+hand_up_to	5	7h5c4d3s	ok	7h 5c 4d 3s
+hand_up_to	5	7h 5c c	ok	7h 5c c
+hand_up_to	5		err	Empty
+hand_up_to	5	7h5c4d3s2h9c	err	WrongSlotCount
+hand_up_to	7	AhXh	err	UnknownGlyph

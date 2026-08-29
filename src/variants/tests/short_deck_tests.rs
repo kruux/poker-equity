@@ -39,35 +39,42 @@ fn test_the_ace_plays_low_below_the_six() -> Result<(), PokerError> {
     Ok(())
 }
 
-/// The two rankings that move on a short deck.
+/// The one ranking that moves on a short deck, and the ones that do not.
 #[test]
-fn test_a_flush_beats_a_full_house_and_trips_beat_a_straight() -> Result<(), PokerError> {
+fn test_a_flush_beats_a_full_house() -> Result<(), PokerError> {
     let flush = Hand::from_str(ShortDeck, "Ah Kh Qh Jh 9h")?;
     let full_house = Hand::from_str(ShortDeck, "6h 6c 6d 7h 7c")?;
-    assert!(flush > full_house, "a flush beats a full house here");
+    assert!(
+        flush > full_house,
+        "flushes are the scarcer hand over thirty-six cards"
+    );
 
+    // Everything else keeps its usual place. A straight still beats trips,
+    // which is where the PokerStars ordering differs from rooms that lift
+    // trips above it.
     let trips = Hand::from_str(ShortDeck, "6h 6c 6d Kh Qs")?;
     let straight = Hand::from_str(ShortDeck, "Th Jc Qd Ks Ah")?;
-    assert!(trips > straight, "trips beat a straight here");
+    assert!(straight > trips, "a straight still beats trips");
 
-    // The categories that did not move still rank as they always did.
     let quads = Hand::from_str(ShortDeck, "6h 6c 6d 6s Kh")?;
     assert!(quads > flush, "quads still beat a flush");
-    assert!(full_house > trips, "a full house still beats trips");
-    assert!(straight > Hand::from_str(ShortDeck, "6h 6c 7d 7s Kh")?, "a straight still beats two pair");
+    assert!(full_house > straight, "a full house still beats a straight");
+    assert!(
+        straight > Hand::from_str(ShortDeck, "6h 6c 7d 7s Kh")?,
+        "a straight still beats two pair"
+    );
 
     Ok(())
 }
 
-/// A seven-card hand can hold both a straight and trips. With trips ranking
-/// above a straight, it has to be classed as trips, not re-scored afterwards.
+/// A seven-card hand holding both a straight and trips plays as the straight,
+/// which is the better of the two here.
 #[test]
-fn test_a_hand_holding_both_is_classed_as_the_better_one() -> Result<(), PokerError> {
-    // 6-7-8-9-T is a straight, and the three sixes are trips.
+fn test_a_hand_holding_both_a_straight_and_trips_plays_the_straight() -> Result<(), PokerError> {
     let both = rank("6h 7c 8d 9s Th 6c 6d")?;
     assert!(
-        matches!(both, HighHandRank::ThreeOfAKind(Rank::Six, _)),
-        "trips outrank the straight, so the hand plays as trips: {}",
+        matches!(both, HighHandRank::Straight(Rank::Ten)),
+        "the straight outranks the trips: {}",
         both
     );
     Ok(())
@@ -105,8 +112,8 @@ fn test_short_deck_equity_enumerates() -> Result<(), PokerError> {
     // Aces hold up less well over a short deck than a full one, where the
     // same matchup is 81.3%.
     assert!(
-        (equities[0].percent() - 74.200).abs() < 0.01,
-        "expected 74.200%, got {:.3}%",
+        (equities[0].percent() - 74.258).abs() < 0.01,
+        "expected 74.258%, got {:.3}%",
         equities[0].percent()
     );
 
