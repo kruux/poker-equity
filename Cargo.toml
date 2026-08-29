@@ -10,6 +10,15 @@ phf = { version = "0.11.3", features = ["macros"] }
 rand = "0.8.5"
 rayon = "1.10.0"
 
+# The equity tests run a hundred thousand Monte Carlo deals apiece, which is
+# minutes unoptimised and seconds optimised. Debug info is kept, so backtraces
+# and the debugger still work.
+[profile.test]
+opt-level = 2
+
+[profile.dev.package."*"]
+opt-level = 2
+
 [build-dependencies]
 phf_codegen = "0.11.3"
 
