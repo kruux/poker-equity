@@ -4,6 +4,11 @@ use crate::cards::{Card, Rank};
 
 use super::HighHandRank;
 
+/// A deuce-to-seven hand: the high ranking read upside down.
+///
+/// The worst high hand wins, the ace is always high, and straights and
+/// flushes count against you -- so `A5432` is a bad high-card hand rather
+/// than a straight, and suited it is a flush rather than a straight flush.
 #[derive(Debug, PartialEq)]
 pub enum DeuceSevenRank {
     StraightFlush(Rank),           // Rank of highest card
@@ -19,6 +24,7 @@ pub enum DeuceSevenRank {
 }
 
 impl DeuceSevenRank {
+    /// Names the best deuce-to-seven hand in `cards`.
     pub fn evaluate(cards: &[Card]) -> Self {
         // Use HighHandRank evaluation and handle the special cases
         match HighHandRank::evaluate(cards) {
@@ -48,6 +54,7 @@ impl DeuceSevenRank {
             HighHandRank::Incomplete(n) => Self::Incomplete(n),
         }
     }
+    /// The ranks held, highest first.
     pub fn sorted_ranks(cards: &[Card]) -> Vec<Rank> {
         let mut ranks: Vec<Rank> = cards.iter().map(|card| card.rank()).collect();
         ranks.sort_by(|a, b| b.cmp(a)); // Sorts descending

@@ -8,6 +8,11 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy)]
+/// Seven-card stud split between the best high hand and the best
+/// eight-or-better low.
+///
+/// The two halves are found over the same seven cards but need not use the
+/// same five. When nobody qualifies for the low, the high hand takes it all.
 pub struct StudHiLo;
 impl StudHiLo {
     /// Returns the low hand if it qualifies under the eight-or-better rule,

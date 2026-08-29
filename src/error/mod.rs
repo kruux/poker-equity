@@ -1,5 +1,6 @@
 use crate::cards::Card;
 
+/// Anything that can go wrong, whatever part it came from.
 #[derive(Debug)]
 pub enum PokerError {
     Card(CardError),
@@ -23,6 +24,7 @@ impl From<EquityError> for PokerError {
     }
 }
 
+/// A move or a deal that the rules do not allow.
 #[derive(Debug)]
 pub enum GameError {
     PlayerNotFound(String),
@@ -33,6 +35,7 @@ pub enum GameError {
 }
 
 impl GameError {
+    /// What went wrong, in a sentence.
     pub fn description(&self) -> String {
         match self {
             GameError::PlayerNotFound(name) => format!("Player '{}' not found", name),
@@ -44,6 +47,7 @@ impl GameError {
     }
 }
 
+/// A card, or a group of cards, that could not be read or used.
 #[derive(Debug)]
 pub enum CardError {
     IncompleteHand(usize),
@@ -57,6 +61,7 @@ pub enum CardError {
 }
 
 impl CardError {
+    /// What went wrong, in a sentence.
     pub fn description(&self) -> String {
         match self {
             CardError::IncompleteHand(n) => format!("All hands not dealt yet: {}", n),
@@ -71,6 +76,7 @@ impl CardError {
     }
 }
 
+/// A request the engine cannot answer as asked.
 #[derive(Debug)]
 pub enum EquityError {
     NoPlayers,
@@ -85,6 +91,7 @@ pub enum EquityError {
 }
 
 impl EquityError {
+    /// What went wrong, in a sentence.
     pub fn description(&self) -> String {
         match self {
             EquityError::NoPlayers => "Need atleast 2 players for a simulation".to_string(),

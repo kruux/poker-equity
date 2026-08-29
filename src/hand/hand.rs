@@ -7,6 +7,11 @@ use crate::{
     error::{CardError, PokerError},
 };
 
+/// The cards a player holds, together with the game they are playing.
+///
+/// A hand carries its variant, so it knows how to score itself and how many
+/// cards it may hold. Community cards are added to a copy of each player's
+/// hand at showdown rather than stored separately.
 #[derive(Clone, Debug)]
 pub struct Hand<V: PokerVariant> {
     cards: Vec<Card>,
@@ -14,6 +19,7 @@ pub struct Hand<V: PokerVariant> {
 }
 
 impl<V: PokerVariant> Hand<V> {
+    /// An empty hand.
     pub fn new(variant: V) -> Self {
         Self {
             cards: Vec::<Card>::with_capacity(variant.max_cards()),
@@ -21,6 +27,8 @@ impl<V: PokerVariant> Hand<V> {
         }
     }
 
+    /// A hand holding `cards`, or an error if that is more than the game
+    /// deals.
     pub fn new_with_cards(variant: V, cards: Vec<Card>) -> Result<Self, CardError> {
         if cards.len() > variant.max_cards() {
             return Err(CardError::TooManyCards(cards.len()));
@@ -60,6 +68,7 @@ impl<V: PokerVariant> Hand<V> {
         Ok(Self { cards, variant })
     }
 
+    /// Adds one card, or errors if the hand is already full.
     pub fn add_card(&mut self, card: Card) -> Result<(), CardError> {
         let n = self.num_cards() + 1;
         if n > self.variant.max_cards() {
@@ -70,6 +79,7 @@ impl<V: PokerVariant> Hand<V> {
         }
     }
 
+    /// Adds several cards, stopping at the first that will not fit.
     pub fn add_cards(&mut self, cards: Vec<Card>) -> Result<(), CardError> {
         for card in cards {
             self.add_card(card)?;
@@ -77,10 +87,13 @@ impl<V: PokerVariant> Hand<V> {
         Ok(())
     }
 
+    /// The cards held, in the order they were added: private cards first,
+    /// then any shared board.
     pub fn cards(&self) -> &[Card] {
         &self.cards
     }
 
+    /// Throws cards away, erroring if the hand does not hold one of them.
     pub fn discard(&mut self, cards_to_discard: &Vec<Card>) -> Result<(), CardError> {
         // Check we don't discard too many cards
         let discard_len = cards_to_discard.len();

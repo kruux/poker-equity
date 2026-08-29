@@ -4,6 +4,11 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy)]
+/// Seven-card stud played for low, ace to five, with no qualifier.
+///
+/// Straights and flushes do not count and the ace is the lowest card, so the
+/// best hand is `5-4-3-2-A`. Pairing hurts categorically: any hand with no
+/// pair beats any hand with one.
 pub struct Razz;
 
 impl PokerVariant for Razz {

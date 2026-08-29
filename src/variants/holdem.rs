@@ -3,6 +3,7 @@ use crate::cards::Card;
 use super::{rankings::high_score, rankings::HoldemHandRank, PokerType, PokerVariant};
 
 #[derive(Debug, Clone, Copy)]
+/// Two hole cards and a five-card board, any five of the seven playing.
 pub struct Holdem;
 
 impl PokerVariant for Holdem {

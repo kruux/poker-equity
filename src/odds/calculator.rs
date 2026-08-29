@@ -11,6 +11,14 @@ use crate::{
     variants::{CommunityCardGame, EquityCalculation, PokerVariant},
 };
 
+/// The older equity API, which owns its players and runs to a fixed count.
+///
+/// [`EquityRequest`](crate::odds::EquityRequest) and
+/// [`run_chunk`](crate::odds::run_chunk) are the newer pair, and are what a
+/// caller driving the loop itself should use. This one remains because it
+/// models the draw games directly -- a player hands over a whole hand and the
+/// cards it means to throw -- and because its tests encode a lot of what each
+/// game's rules actually are.
 pub struct EquityCalculator<V: PokerVariant + EquityCalculation> {
     players: Vec<(String, Hand<V>, Vec<Card>)>, // (name, current_hand, cards_to_discard)
     dead_cards: Vec<Card>,
@@ -20,6 +28,7 @@ pub struct EquityCalculator<V: PokerVariant + EquityCalculation> {
 }
 
 impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
+    /// A calculator for `variant` that will run `num_simulations` deals.
     pub fn new(variant: V, num_simulations: usize) -> Self {
         EquityCalculator {
             players: Vec::new(),
@@ -30,11 +39,16 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
         }
     }
 
+    /// Seats a player with the cards they hold.
     pub fn add_player(&mut self, name: String, hand: Hand<V>) -> Result<(), PokerError> {
         self.players.push((name, hand, vec![]));
         Ok(())
     }
 
+    /// Seats a player in a draw game, with the cards they mean to throw.
+    ///
+    /// Passing `None` stands pat. The discards leave the deck along with the
+    /// rest of the hand, so a thrown card cannot come back.
     pub fn add_draw_player(
         &mut self,
         name: String,
@@ -46,11 +60,16 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
         Ok(())
     }
 
+    /// The seated players, as name, hand, and cards to discard.
     pub fn players(&self) -> &[(String, Hand<V>, Vec<Card>)] {
         &self.players
     }
 
     /// Removes the cards from the deck
+    /// Takes cards out of the deck without giving them to anyone.
+    ///
+    /// Errors if one is already in a hand or already dead, since that would
+    /// be the same card twice.
     pub fn add_dead_cards(&mut self, cards: Vec<Card>) -> Result<(), PokerError> {
         // Check if any card is already in hands or dead_cards
         for card in &cards {
@@ -73,6 +92,8 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
     /// Validation that will be checked for every poker variant
     /// - At least 2 players
     /// - No duplicated cards
+    /// The checks every game shares: at least two players, and no card in
+    /// two places at once.
     pub fn validate_base(&self) -> Result<(), PokerError> {
         if self.players.len() < 2 {
             return Err(EquityError::NoPlayers.into());
@@ -104,16 +125,19 @@ impl<V: PokerVariant + EquityCalculation> EquityCalculator<V> {
         Ok(())
     }
 
+    /// The cards taken out of the deck.
     pub fn dead_cards(&self) -> &[Card] {
         &self.dead_cards
     }
 
+    /// The board so far, which may be short.
     pub fn community_cards(&self) -> &[Card] {
         &self.community_cards
     }
 }
 
 impl<V: PokerVariant + CommunityCardGame + EquityCalculation> EquityCalculator<V> {
+    /// Sets the board. Only community games have one.
     pub fn set_community_cards(&mut self, cards: Vec<Card>) -> Result<(), PokerError> {
         self.community_cards = cards;
         Ok(())
@@ -121,6 +145,11 @@ impl<V: PokerVariant + CommunityCardGame + EquityCalculation> EquityCalculator<V
 }
 
 impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
+    /// Runs every deal and returns each player's equity as a percentage.
+    ///
+    /// `callback` is handed the running totals after each chunk. Work is
+    /// spread across rayon, and the deck each deal starts from is worked out
+    /// once rather than rebuilt per deal.
     pub fn calculate<F>(&self, callback: F) -> Result<HashMap<String, f64>, PokerError>
     where
         F: Fn(SimulationProgress) + Send + Sync,
@@ -207,6 +236,7 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
     }
 }
 // Large number of simulations might take some time so continously update with the latest results
+/// The running totals, handed to the callback between chunks.
 pub struct SimulationProgress {
     pub completed_simulations: usize,
     pub total_simulations: usize,

@@ -9,12 +9,19 @@ mod low_qualifier;
 mod short_deck;
 mod table_index;
 
+/// Seven-card stud is scored as an ordinary high hand.
 pub type StudHandRank = HighHandRank;
+/// Razz is scored as an ace-to-five low, with no qualifier.
 pub type RazzHandRank = LowHandRank;
+/// A badugi is compared the same way a low is: more cards first, then lower.
 pub type BadugiHandRank = LowHandRank;
+/// Stud hi/lo carries a high hand and, when one qualifies, a low.
 pub type StudHiLoHandRank = HiLoHandRank;
+/// Omaha hi/lo carries both halves, each found over its own pairings.
 pub type OmahaHiLoHandRank = HiLoHandRank;
+/// Hold'em is scored as an ordinary high hand.
 pub type HoldemHandRank = HighHandRank;
+/// Omaha names its hand the same way, once the best pairing is found.
 pub type OmahaHandRank = HighHandRank;
 pub use deuce_seven::DeuceSevenRank;
 pub use fast::{

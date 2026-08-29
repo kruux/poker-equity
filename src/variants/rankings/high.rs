@@ -26,6 +26,11 @@ const WHEEL: [Rank; 5] = [Rank::Ace, Rank::Five, Rank::Four, Rank::Three, Rank::
 const SHORT_WHEEL: [Rank; 5] = [Rank::Ace, Rank::Nine, Rank::Eight, Rank::Seven, Rank::Six];
 
 impl HighHandRank {
+    /// Names the best five-card high hand in `cards`.
+    ///
+    /// Fewer than five cards gives an incomplete rank, which loses to any
+    /// complete hand and orders among other incomplete ones by size. This is
+    /// the slow, readable answer; the lookup tables are checked against it.
     pub fn evaluate(cards: &[Card]) -> Self {
         if cards.len() < 5 {
             return Self::Incomplete(cards.len());
