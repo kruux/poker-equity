@@ -257,6 +257,41 @@ fn card_name(index: u8) -> PyResult<String> {
         .ok_or_else(|| PyValueError::new_err(format!("{} is not a card index", index)))
 }
 
+/// Scores a batch of hands against one of the ranking kernels.
+///
+/// Lower is better. This exists for `validation/`, which asks an outside
+/// evaluator whether it agrees; it takes whole batches because crossing this
+/// boundary a hundred million times, one hand at a time, would cost more than
+/// the comparison itself.
+///
+/// `kernel` is one of `high`, `deuce_seven`, `low_a5`, `short_deck` or
+/// `badugi`. Cards are written as usual: `"AhKhQsQd2c7d9s"`.
+#[pyfunction]
+fn score_batch(py: Python<'_>, kernel: &str, hands: Vec<String>) -> PyResult<Vec<u32>> {
+    let score: fn(&[Card]) -> u32 = match kernel {
+        "high" => |cards| crate::variants::high_score(cards) as u32,
+        "deuce_seven" => |cards| crate::variants::deuce_seven_score(cards) as u32,
+        "low_a5" => |cards| crate::variants::low_a5_score(cards) as u32,
+        "short_deck" => |cards| crate::variants::short_deck_score(cards) as u32,
+        "badugi" => |cards| Badugi.score(cards),
+        "omaha" => |cards| Omaha.score(cards),
+        other => {
+            return Err(PyValueError::new_err(format!(
+                "no kernel called {:?}",
+                other
+            )))
+        }
+    };
+
+    // Parsing and scoring are pure arithmetic, so the GIL is not needed.
+    let parsed = hands
+        .iter()
+        .map(|hand| Card::from_str(hand).map_err(|error| PyValueError::new_err(error.to_string())))
+        .collect::<PyResult<Vec<_>>>()?;
+
+    Ok(py.detach(|| parsed.iter().map(|cards| score(cards)).collect()))
+}
+
 /// A mask holding every card in a standard deck.
 #[pyfunction]
 fn full_deck() -> u64 {
@@ -273,6 +308,7 @@ fn poker_calculator(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(parse_dead_cards, module)?)?;
     module.add_function(wrap_pyfunction!(card_index, module)?)?;
     module.add_function(wrap_pyfunction!(card_name, module)?)?;
+    module.add_function(wrap_pyfunction!(score_batch, module)?)?;
     module.add_function(wrap_pyfunction!(full_deck, module)?)?;
     Ok(())
 }
