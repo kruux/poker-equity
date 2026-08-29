@@ -49,16 +49,32 @@ pub(super) fn best_score(hole_count: usize, cards: &[Card], score: impl Fn(&[Car
     let split = cards.len().min(hole_count);
     let (hole_cards, board_cards) = cards.split_at(split);
 
+    // The pairings are walked by index rather than through a combinations
+    // iterator, which hands back a freshly allocated vector for every one of
+    // them -- sixty per player per deal, and the board's ten rebuilt for each
+    // of the six hole pairs. The hand itself is one array, written over in
+    // place.
     let mut best = u32::MAX;
-    let mut five = [hole_cards.first().copied().unwrap_or(Card::from_index(0).unwrap()); 5];
-    for hole in hole_cards.iter().combinations(2) {
-        for board in board_cards.iter().combinations(3) {
-            for (slot, card) in five.iter_mut().zip(hole.iter().chain(board.iter())) {
-                *slot = **card;
+    let mut five = [Card::from_index(0).expect("zero is a card"); 5];
+
+    for first in 0..hole_cards.len() {
+        for second in (first + 1)..hole_cards.len() {
+            five[0] = hole_cards[first];
+            five[1] = hole_cards[second];
+
+            for a in 0..board_cards.len() {
+                five[2] = board_cards[a];
+                for b in (a + 1)..board_cards.len() {
+                    five[3] = board_cards[b];
+                    for c in (b + 1)..board_cards.len() {
+                        five[4] = board_cards[c];
+                        best = best.min(score(&five) as u32);
+                    }
+                }
             }
-            best = best.min(score(&five) as u32);
         }
     }
+
     best
 }
 
