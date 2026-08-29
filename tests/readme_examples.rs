@@ -16,8 +16,17 @@ fn test_the_readme_still_works() {
     let result = equity(&request, Target::Exact).unwrap();
     println!("opening: {:.2}% / {:.2}%", result.equities()[0].percent(), result.equities()[1].percent());
 
-    // a plain sample count, and a precision target
+    // the short version at the top of the README
     let wide = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "").unwrap();
+    let short = equity(&wide, Target::Samples(500_000)).unwrap();
+    let seats = short.equities();
+    println!("short:   {:.2}% +/- {:.2}  /  {:.2}% +/- {:.2}",
+        seats[0].percent(), seats[0].margin_percent(),
+        seats[1].percent(), seats[1].margin_percent());
+    assert!((seats[0].percent() - 46.20).abs() < 0.5, "the README quotes 46.20%");
+    assert!((seats[1].percent() - 53.80).abs() < 0.5, "the README quotes 53.80%");
+
+    // a plain sample count, and a precision target
     let counted = equity(&wide, Target::Samples(500_000)).unwrap();
     assert!(counted.samples >= 500_000);
     println!("500k:    {:.2}% +/- {:.2}",

@@ -66,12 +66,26 @@ fn hand_spec(alternatives: Vec<Vec<u64>>) -> HandSpec {
 
 /// Renders a result as a plain dictionary, so the caller needs no class from
 /// this module to read it.
+///
+/// Both the worked-out figures and the raw sums cross. The sums are what let
+/// a caller merge batches on the Python side -- they add, which averages do
+/// not -- and `share_square_sum` in particular is what a standard error is
+/// computed from, so dropping it would mean a caller that merges its own
+/// batches could not put an error bar on the result.
 fn to_dict(py: Python<'_>, result: &ChunkResult) -> PyResult<Py<PyDict>> {
     let out = PyDict::new(py);
     out.set_item("samples", result.samples)?;
     out.set_item("exact", result.exact)?;
     out.set_item("attempts", result.attempts)?;
     out.set_item("acceptance", result.acceptance())?;
+
+    // The raw sums, one entry per seat. These add across batches.
+    out.set_item("share_sum", result.share_sum.clone())?;
+    out.set_item("share_square_sum", result.share_square_sum.clone())?;
+    out.set_item("low_share_sum", result.low_share_sum.clone())?;
+    out.set_item("win_count", result.win_count.clone())?;
+    out.set_item("tie_count", result.tie_count.clone())?;
+    out.set_item("scoop_count", result.scoop_count.clone())?;
 
     let players = PyList::empty(py);
     for player in result.equities() {

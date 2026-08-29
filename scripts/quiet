@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Runs a cargo command without taking the machine over.
+#
+# The equity tests spread across every core through rayon, which is what you
+# want on a build server and not what you want while a game is running. This
+# pins the work to a few cores, drops its scheduling priority below anything
+# interactive, and tells rayon to match.
+#
+#   scripts/quiet test
+#   scripts/quiet run --release --bin benchmark
+#
+# Set QUIET_CORES to change how many cores it may use (default 4 of 16).
+set -euo pipefail
+
+cores=${QUIET_CORES:-4}
+total=$(nproc)
+last=$((cores - 1))
+
+if [ "$cores" -ge "$total" ]; then
+  echo "quiet: asked for $cores of $total cores, which is not quiet" >&2
+fi
+
+# Rayon spreads the sampling loop; the test harness spreads the tests. Both
+# have to be told, or one undoes the other.
+export RAYON_NUM_THREADS="$cores"
+export RUST_TEST_THREADS="$cores"
+
+echo "quiet: cores 0-$last of $total, lowest priority" >&2
+
+exec taskset -c "0-$last" nice -n 19 cargo "$@"
