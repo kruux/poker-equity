@@ -38,7 +38,7 @@ impl PokerVariant for StudHiLo {
     }
 
     fn to_string(&self) -> String {
-        "Stud Hi/Lo".to_string()
+        "Seven-Card Stud Hi/Lo".to_string()
     }
 
     fn key(&self) -> &'static str {

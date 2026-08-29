@@ -56,7 +56,7 @@ fn main() {
     time_variant!(OmahaSix, &["AhKh7c2d3c5s", "QsQdJsTd4h6h"], "", 20_000);
     time_variant!(OmahaHiLo, &["Ah2c3d4s", "QsQdJsTd"], "", 20_000);
     println!();
-    time_variant!(SevenCardStud, &["AhKh7c", "QsQdJs"], "", 200_000);
+    time_variant!(Stud, &["AhKh7c", "QsQdJs"], "", 200_000);
     time_variant!(StudHiLo, &["Ah2c3d", "QsQdJs"], "", 100_000);
     time_variant!(Razz, &["Ah2c3d", "4s5h7c"], "", 100_000);
     println!();

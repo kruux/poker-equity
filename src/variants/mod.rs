@@ -28,7 +28,7 @@ pub use rankings::{
 };
 pub use razz::Razz;
 pub use short_deck::ShortDeck;
-pub use stud::SevenCardStud;
+pub use stud::Stud;
 pub use stud_hi_lo::StudHiLo;
 
 use crate::cards::Card;

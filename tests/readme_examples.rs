@@ -6,7 +6,7 @@
 
 use poker_calculator::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
                        odds::{equity, run_chunk, ChunkResult, EquityRequest, Target},
-                       variants::{DeuceSeven, Holdem, SevenCardStud}};
+                       variants::{DeuceSeven, Holdem, Stud}};
 
 #[test]
 fn test_the_readme_still_works() {
@@ -21,7 +21,7 @@ fn test_the_readme_still_works() {
     println!("merged:  {} deals", total.samples);
 
     // stud and draw
-    EquityRequest::from_text(SevenCardStud, &["Ah2c3d", "QsQdJs"], "", "").unwrap();
+    EquityRequest::from_text(Stud, &["Ah2c3d", "QsQdJs"], "", "").unwrap();
     EquityRequest::from_text(DeuceSeven, &["7h5c4d3s", "9h8c6d5h2c"], "", "Kd").unwrap();
 
     // mask API

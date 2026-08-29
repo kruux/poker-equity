@@ -3,13 +3,13 @@ use crate::{
     error::PokerError,
     hand::Hand,
     odds::EquityCalculator,
-    variants::SevenCardStud,
+    variants::Stud,
 };
 
 use super::{EquityCalculation, StudCardGame};
 
-impl StudCardGame for SevenCardStud {}
-impl EquityCalculation for SevenCardStud {
+impl StudCardGame for Stud {}
+impl EquityCalculation for Stud {
     fn validate(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         self.validate_stud(calculator)
     }
@@ -23,7 +23,7 @@ impl EquityCalculation for SevenCardStud {
         let final_players = self.deal_cards(deck, calculator)?;
         let final_hands = final_players
             .into_iter()
-            .map(|cards| Hand::new_with_cards(SevenCardStud, cards))
+            .map(|cards| Hand::new_with_cards(Stud, cards))
             .collect::<Result<Vec<_>, _>>()?;
         self.award(&final_hands, shares)
     }

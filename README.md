@@ -211,7 +211,7 @@ same seed and compares the raw sums.
 | Key | Game | Hole | Board |
 |---|---|---|---|
 | `holdem` | Hold'em | 2 | 5 |
-| `holdem_short_deck` | Short deck — 36 cards, a flush beats a full house | 2 | 5 |
+| `short_deck` | Short deck — 36 cards, a flush beats a full house | 2 | 5 |
 | `omaha` | Omaha | 4 | 5 |
 | `omaha_five` | Five-card Omaha | 5 | 5 |
 | `omaha_six` | Six-card Omaha | 6 | 5 |
