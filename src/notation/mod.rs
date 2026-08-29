@@ -14,7 +14,7 @@ mod range;
 
 pub use error::{NotationError, NotationErrorKind};
 pub use hand_spec::HandSpec;
-pub use parser::{parse_board, parse_dead, parse_hand};
+pub use parser::{parse_board, parse_dead, parse_hand, parse_hand_up_to};
 
 #[cfg(test)]
 mod tests {

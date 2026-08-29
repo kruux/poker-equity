@@ -278,21 +278,124 @@ fn test_enumeration_declines_when_the_space_is_too_large() {
     );
 }
 
-/// A draw game cannot be answered by dealing alone, so the chunked API
-/// refuses it rather than quietly answering a different question.
+/// A hand shorter than the game deals means the rest are still to come: a
+/// five-card draw hand stands pat, a three-card one draws two.
 #[test]
-fn test_draw_games_are_refused_by_the_chunked_api() {
-    use crate::variants::{Badugi, DeuceSeven};
+fn test_a_short_draw_hand_draws_the_difference() -> Result<(), PokerError> {
+    use crate::variants::DeuceSeven;
 
-    let badugi = EquityRequest::from_text(Badugi, &["Ac2d3h4s", "KcQdJhTs"], "", "");
-    assert!(
-        matches!(badugi, Err(PokerError::Equity(EquityError::Infeasible(_)))),
-        "badugi needs the draw modelled"
+    // Both stand pat, so there is nothing left to deal and one deal settles
+    // it. 7-5-4-3-2 is the best hand in the game.
+    let pat = EquityRequest::from_text(
+        DeuceSeven,
+        &["7h5c4d3s2h", "8h6c5d3h2c"],
+        "",
+        "",
+    )?;
+    let settled = run_exact(&pat)?.expect("two pat hands need no deal");
+    assert_eq!(settled.samples, 1, "nothing is drawn");
+    assert_eq!(
+        settled.equities()[0].percent(),
+        100.0,
+        "seven-five is the nuts"
     );
 
-    let deuce = EquityRequest::from_text(DeuceSeven, &["Th8cKd4s2h", "9d7hKs4h2d"], "", "");
-    assert!(matches!(
-        deuce,
-        Err(PokerError::Equity(EquityError::Infeasible(_)))
-    ));
+    // Hero keeps four and draws one; villain stands pat with a nine low.
+    let drawing = EquityRequest::from_text(DeuceSeven, &["7h5c4d3s", "9h8c6d5h2c"], "", "")?;
+    let result = run_exact(&drawing)?.expect("one card to come is a small space");
+    let equities = result.equities();
+    assert!(
+        (equities[0].equity + equities[1].equity - 1.0).abs() < 1e-9,
+        "equities divide one pot"
+    );
+    assert!(
+        equities[0].percent() > 0.0 && equities[0].percent() < 100.0,
+        "a one-card draw is neither dead nor certain, got {:.2}%",
+        equities[0].percent()
+    );
+
+    Ok(())
+}
+
+/// The two APIs describe the draw differently and must agree.
+///
+/// The old one takes a whole hand plus the cards to throw; the new one takes
+/// what is kept, with the thrown cards named as dead. Both leave the same
+/// deck to draw from, so the answers have to match.
+#[test]
+fn test_the_two_ways_of_writing_a_draw_agree() -> Result<(), PokerError> {
+    use crate::cards::Card;
+    use crate::hand::Hand;
+    use crate::odds::EquityCalculator;
+    use crate::variants::DeuceSeven;
+
+    // Hero throws the king; villain throws the king.
+    let mut old = EquityCalculator::new(DeuceSeven, 200_000);
+    old.add_draw_player(
+        "Hero".to_string(),
+        Hand::from_str(DeuceSeven, "Th 8c Kd 4s 2h")?,
+        Some(Card::from_str("Kd")?),
+    )?;
+    old.add_draw_player(
+        "Villain".to_string(),
+        Hand::from_str(DeuceSeven, "9d 7h Ks 4h 2d")?,
+        Some(Card::from_str("Ks")?),
+    )?;
+    let old_result = old.calculate(drop)?;
+
+    // The same spot: what each keeps, with the discards dead.
+    let new = EquityRequest::from_text(
+        DeuceSeven,
+        &["Th8c4s2h", "9d7h4h2d"],
+        "",
+        "Kd Ks",
+    )?;
+    let new_result = run_exact(&new)?.expect("one card each is a small space");
+    let equities = new_result.equities();
+
+    assert!(
+        (old_result["Hero"] - equities[0].percent()).abs() < 0.5,
+        "the old API gave Hero {:.3}% and the new one {:.3}%",
+        old_result["Hero"],
+        equities[0].percent()
+    );
+
+    Ok(())
+}
+
+/// Stud works the same way: three cards known, four still to come.
+#[test]
+fn test_a_short_stud_hand_is_dealt_out() -> Result<(), PokerError> {
+    use crate::variants::SevenCardStud;
+
+    let short = EquityRequest::from_text(SevenCardStud, &["AhKhQh", "2c3d4s"], "", "")?;
+    let spelled_out = EquityRequest::from_text(
+        SevenCardStud,
+        &["Ah Kh Qh * * * *", "2c 3d 4s * * * *"],
+        "",
+        "",
+    )?;
+
+    let short = run_chunk(&short, 60_000, 21)?.equities();
+    let spelled = run_chunk(&spelled_out, 60_000, 21)?.equities();
+    assert!(
+        (short[0].equity - spelled[0].equity).abs() < 1e-12,
+        "a short field and one written out with wildcards are the same request"
+    );
+
+    Ok(())
+}
+
+/// A community game deals every hole card at once, so a short field there is
+/// a miscount rather than a hand in progress.
+#[test]
+fn test_community_games_still_want_every_hole_card() {
+    assert!(
+        EquityRequest::from_text(HoldemFast, &["Ah", "QsJs"], "", "").is_err(),
+        "one hole card is a typo in hold'em, not a hand still being dealt"
+    );
+    assert!(
+        EquityRequest::from_text(HoldemFast, &["A *", "QsJs"], "", "").is_ok(),
+        "an unknown hole card is written as a wildcard"
+    );
 }

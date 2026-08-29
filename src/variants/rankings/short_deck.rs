@@ -5,9 +5,15 @@ use super::HighHandRank;
 /// A short-deck hand, which is a normal high hand with the categories in a
 /// different order.
 ///
-/// Two of them move, both because a thirty-six card deck changes how often
-/// each comes up: a flush beats a full house, and trips beat a straight.
-/// Rooms differ on this, so the ruleset is named in the variant's label.
+/// One category moves, because a thirty-six card deck makes flushes scarce
+/// enough to outrank a full house. Everything else keeps its usual place, so
+/// a straight still beats trips.
+///
+/// This is the PokerStars ordering. Rooms differ -- some also lift trips
+/// above a straight -- so the ruleset is named in the variant's label rather
+/// than assumed. Moving trips would mean changing both this order and the
+/// order the categories are tested in, since a seven-card hand can hold a
+/// straight and trips at once.
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub struct ShortDeckRank(pub HighHandRank);
 
@@ -19,8 +25,8 @@ impl ShortDeckRank {
             HighHandRank::FourOfAKind(_, _) => 8,
             HighHandRank::Flush(_) => 7,
             HighHandRank::FullHouse(_, _) => 6,
-            HighHandRank::ThreeOfAKind(_, _) => 5,
-            HighHandRank::Straight(_) => 4,
+            HighHandRank::Straight(_) => 5,
+            HighHandRank::ThreeOfAKind(_, _) => 4,
             HighHandRank::TwoPair(_, _, _) => 3,
             HighHandRank::Pair(_, _) => 2,
             HighHandRank::HighCard(_) => 1,

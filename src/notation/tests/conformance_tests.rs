@@ -4,7 +4,7 @@
 //! same file, so a change to the grammar that only lands on one side shows up
 //! here as a failure rather than as a disagreement in the field months later.
 
-use crate::notation::{parse_board, parse_dead, parse_hand};
+use crate::notation::{parse_board, parse_dead, parse_hand, parse_hand_up_to};
 
 /// The fixture, compiled in so the test needs no working directory.
 const FIXTURE: &str = include_str!("../../../tests/fixtures/notation.tsv");
@@ -54,6 +54,12 @@ fn run(row: &Row) -> Result<String, String> {
         "hand" => {
             let slots: usize = row.arg.parse().expect("hand rows carry a slot count");
             parse_hand(row.input, slots)
+                .map(|spec| spec.to_string())
+                .map_err(|error| error.kind.name().to_string())
+        }
+        "hand_up_to" => {
+            let slots: usize = row.arg.parse().expect("hand_up_to rows carry a slot count");
+            parse_hand_up_to(row.input, slots)
                 .map(|spec| spec.to_string())
                 .map_err(|error| error.kind.name().to_string())
         }

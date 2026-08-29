@@ -4,12 +4,13 @@ use super::{rankings::{HighHandRank, ShortDeckRank}, PokerType, PokerVariant};
 
 /// Hold'em over thirty-six cards, sixes and up.
 ///
-/// Two rankings move, because the shorter deck changes how often each hand
-/// comes up: a flush beats a full house, and trips beat a straight. The ace
-/// plays low below the six, so `A-6-7-8-9` is the low straight.
+/// A flush beats a full house, because a thirty-six card deck makes flushes
+/// the scarcer hand. The ace plays low below the six, so `A-6-7-8-9` is the
+/// low straight and the lowest straight flush is nine high. Everything else
+/// keeps its usual place.
 ///
-/// Rooms differ on the details, which is why the ruleset is named here rather
-/// than assumed.
+/// This is the PokerStars ordering. Rooms differ, which is why the ruleset is
+/// named in the label rather than assumed.
 #[derive(Debug, Clone, Copy)]
 pub struct ShortDeck;
 
@@ -41,7 +42,7 @@ impl PokerVariant for ShortDeck {
     }
 
     fn to_string(&self) -> String {
-        "Short Deck (PokerStars/GG: flush over full house, trips over straight)".to_string()
+        "Short Deck (PokerStars: flush over full house)".to_string()
     }
 
     fn key(&self) -> &'static str {

@@ -4,7 +4,7 @@ use crate::{
     cards::{Card, CardSet},
     error::{EquityError, PokerError},
     hand::Hand,
-    notation::{parse_board, parse_dead, parse_hand, HandSpec},
+    notation::{parse_board, parse_dead, parse_hand, parse_hand_up_to, HandSpec},
     sampler::{is_feasible, SlotSampler},
     variants::{EquityCalculation, PokerType, PokerVariant},
 };
@@ -44,25 +44,47 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             return Err(EquityError::NoPlayers.into());
         }
 
-        // A draw game is not just a deal: each player discards and draws, and
-        // which cards they throw is an assumption this API has no way to
-        // carry. Dealing them a fresh hand and stopping would answer a
-        // different question, so refuse rather than mislead.
-        if matches!(variant.poker_type(), PokerType::Draw) {
-            return Err(EquityError::Infeasible(format!(
-                "{}, a draw game: use EquityCalculator::add_draw_player, which models the draw",
-                variant.to_string()
-            ))
-            .into());
-        }
-
+        // Where a player's cards arrive over time -- stud dealt street by
+        // street, a draw game where cards are exchanged -- a field names what
+        // the player holds now, and whatever is missing is still to come. A
+        // five-card draw hand stands pat; a three-card one draws two. Cards
+        // thrown away are named as dead, which is what keeps them out of the
+        // deck without pretending they were never seen.
+        //
+        // Community games deal every hole card at once, so a short field
+        // there is a miscount rather than a hand in progress. Name an unknown
+        // card with a wildcard instead.
         let hole = variant.hole_cards();
+        let cards_arrive_over_time = matches!(
+            variant.poker_type(),
+            PokerType::Draw | PokerType::Stud
+        );
+
+        let hands: Vec<HandSpec> = hands
+            .iter()
+            .map(|spec| {
+                let count = spec.slot_count().ok_or(EquityError::UnequalHandSizes)?;
+                if count == hole {
+                    return Ok(spec.clone());
+                }
+                if count > hole || !cards_arrive_over_time {
+                    return Err(EquityError::NotEnoughCards(count));
+                }
+                Ok(HandSpec::from_alternatives(
+                    spec.alternatives
+                        .iter()
+                        .map(|alternative| {
+                            let mut slots = alternative.clone();
+                            slots.resize(hole, CardSet::FULL_DECK);
+                            slots
+                        })
+                        .collect(),
+                ))
+            })
+            .collect::<Result<Vec<_>, EquityError>>()?;
+        let hands = &hands[..];
+
         for spec in hands {
-            match spec.slot_count() {
-                Some(count) if count == hole => {}
-                Some(count) => return Err(EquityError::NotEnoughCards(count).into()),
-                None => return Err(EquityError::UnequalHandSizes.into()),
-            }
             if !spec.is_satisfiable() {
                 return Err(EquityError::Infeasible("a hand".to_string()).into());
             }
@@ -115,9 +137,16 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         board: &str,
         dead: &str,
     ) -> Result<Self, PokerError> {
+        // Stud and draw fields may name fewer cards than the game deals; a
+        // community field may not. See `from_masks`.
+        let read = if matches!(variant.poker_type(), PokerType::Draw | PokerType::Stud) {
+            parse_hand_up_to
+        } else {
+            parse_hand
+        };
         let specs = hands
             .iter()
-            .map(|text| parse_hand(text, variant.hole_cards()))
+            .map(|text| read(text, variant.hole_cards()))
             .collect::<Result<Vec<_>, _>>()?;
         let board = parse_board(board, variant.board_cards())?;
         Self::from_masks(variant, &specs, &board, parse_dead(dead)?)

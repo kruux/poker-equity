@@ -98,6 +98,7 @@ fn parse_alternative(
     term: &str,
     offset: usize,
     slots: usize,
+    exact: bool,
 ) -> Result<Vec<Vec<CardSet>>, NotationError> {
     if term.is_empty() {
         return Err(NotationError::new(NotationErrorKind::Empty, offset, 0));
@@ -121,7 +122,12 @@ fn parse_alternative(
     }
 
     let parsed = parse_slots(term, offset)?;
-    if parsed.len() != slots {
+    let miscounted = if exact {
+        parsed.len() != slots
+    } else {
+        parsed.is_empty() || parsed.len() > slots
+    };
+    if miscounted {
         // A miscount around a `*` almost always means the writer expected it
         // to bind, so say so rather than only reporting the number.
         let kind = if term.contains('*') {
@@ -146,9 +152,23 @@ fn parse_alternative(
 /// which is what makes the collision between `AKs` the range and `A` `Ks` the
 /// two slots impossible in Omaha and stud rather than merely unlikely.
 pub fn parse_hand(text: &str, slots: usize) -> Result<HandSpec, NotationError> {
+    parse_field(text, slots, true)
+}
+
+/// Reads a hand field that may name fewer cards than the game deals.
+///
+/// Where a player's cards arrive over time -- stud dealt street by street, a
+/// draw game where cards are exchanged -- the field says what is held now and
+/// the rest are still to come. A five-card draw hand stands pat; a three-card
+/// one draws two.
+pub fn parse_hand_up_to(text: &str, slots: usize) -> Result<HandSpec, NotationError> {
+    parse_field(text, slots, false)
+}
+
+fn parse_field(text: &str, slots: usize, exact: bool) -> Result<HandSpec, NotationError> {
     let mut alternatives = Vec::new();
     for (term, offset) in split_terms(text) {
-        alternatives.extend(parse_alternative(term, offset, slots)?);
+        alternatives.extend(parse_alternative(term, offset, slots, exact)?);
     }
     Ok(HandSpec::from_alternatives(alternatives))
 }

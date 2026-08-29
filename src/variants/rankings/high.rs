@@ -57,11 +57,11 @@ impl HighHandRank {
 
     /// Scores a hand under short-deck rules.
     ///
-    /// Two things differ, and both matter. The ace plays low below the six,
-    /// so A-9-8-7-6 is a straight. And the categories are tested in a
-    /// different order, because a seven-card hand can hold both a straight
-    /// and trips -- with trips ranking above a straight here, such a hand has
-    /// to be classed as trips rather than merely re-scored afterwards.
+    /// The classification is the ordinary one -- no hand of seven cards can
+    /// be both a flush and a full house, so the fact that a flush outranks
+    /// one here changes only the comparison, not which category a hand falls
+    /// into. What does change is the ace: it plays low below the six, so
+    /// A-9-8-7-6 is a straight and the lowest straight flush is nine high.
     pub fn evaluate_short_deck(cards: &[Card]) -> Self {
         if cards.len() < 5 {
             return Self::Incomplete(cards.len());
@@ -77,17 +77,14 @@ impl HighHandRank {
             Self::StraightFlush(rank)
         } else if let Some((quads, kicker)) = Self::is_four_of_kind(&rank_counts) {
             Self::FourOfAKind(quads, kicker)
-        } else if let Some(ranks) = Self::is_flush(cards) {
-            // A flush outranks a full house on a short deck, so it is tested
-            // first. No hand of seven cards can be both.
-            Self::Flush(ranks)
         } else if let Some((trips, pair)) = Self::is_full_house(&rank_counts) {
             Self::FullHouse(trips, pair)
-        } else if let Some((trips, kickers)) = Self::is_three_of_kind(&rank_counts) {
-            // Trips outrank a straight here, and a hand can be both.
-            Self::ThreeOfAKind(trips, kickers)
+        } else if let Some(ranks) = Self::is_flush(cards) {
+            Self::Flush(ranks)
         } else if let Some(rank) = Self::is_straight_with_wheel(cards, &SHORT_WHEEL) {
             Self::Straight(rank)
+        } else if let Some((trips, kickers)) = Self::is_three_of_kind(&rank_counts) {
+            Self::ThreeOfAKind(trips, kickers)
         } else if let Some((high, low, kicker)) = Self::is_two_pair(&rank_counts) {
             Self::TwoPair(high, low, kicker)
         } else if let Some((pair, kickers)) = Self::is_pair(&rank_counts) {
