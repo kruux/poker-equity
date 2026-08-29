@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, fmt, mem::discriminant};
+use std::{cmp::Ordering, collections::HashMap, fmt};
 
 use crate::cards::{Card, Rank, Suit};
 
@@ -226,96 +226,64 @@ impl HighHandRank {
 
 impl PartialOrd for HighHandRank {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
-            // Non matching hands. E.g. pair vs trips
-            (x, y) if discriminant(x) != discriminant(y) => {
-                // Standard order (higher hand types are better)
-                Some(self.hand_type_value().cmp(&other.hand_type_value()))
-            }
-
-            // Matching hand types
-            (HighHandRank::StraightFlush(r1), HighHandRank::StraightFlush(r2)) => {
-                r2.partial_cmp(r1)
-            }
-            (HighHandRank::FourOfAKind(r1, k1), HighHandRank::FourOfAKind(r2, k2)) => {
-                match r2.partial_cmp(r1) {
-                    Some(Ordering::Equal) => k2.partial_cmp(k1),
-                    ord => ord,
-                }
-            }
-            (HighHandRank::FullHouse(t1, p1), HighHandRank::FullHouse(t2, p2)) => {
-                match t2.partial_cmp(t1) {
-                    Some(Ordering::Equal) => p2.partial_cmp(p1),
-                    ord => ord,
-                }
-            }
-            (HighHandRank::Flush(ranks1), HighHandRank::Flush(ranks2)) => {
-                for (a, b) in ranks1.iter().zip(ranks2.iter()) {
-                    match b.partial_cmp(a) {
-                        Some(Ordering::Equal) => continue,
-                        ord => return ord,
-                    }
-                }
-                Some(Ordering::Equal)
-            }
-            (HighHandRank::Straight(r1), HighHandRank::Straight(r2)) => r2.partial_cmp(r1),
-            (HighHandRank::ThreeOfAKind(t1, k1), HighHandRank::ThreeOfAKind(t2, k2)) => {
-                match t2.partial_cmp(t1) {
-                    Some(Ordering::Equal) => {
-                        for (r1, r2) in k1.iter().zip(k2.iter()) {
-                            match r2.partial_cmp(r1) {
-                                Some(Ordering::Equal) => continue,
-                                ord => return ord,
-                            }
-                        }
-                        Some(Ordering::Equal)
-                    }
-                    ord => ord,
-                }
-            }
-            (HighHandRank::TwoPair(h1, l1, k1), HighHandRank::TwoPair(h2, l2, k2)) => {
-                match h2.partial_cmp(h1) {
-                    Some(Ordering::Equal) => match l2.partial_cmp(l1) {
-                        Some(Ordering::Equal) => k2.partial_cmp(k1),
-                        ord => ord,
-                    },
-                    ord => ord,
-                }
-            }
-            (HighHandRank::Pair(r1, k1), HighHandRank::Pair(r2, k2)) => match r2.partial_cmp(r1) {
-                Some(Ordering::Equal) => {
-                    for (a, b) in k1.iter().zip(k2.iter()) {
-                        match b.partial_cmp(a) {
-                            Some(Ordering::Equal) => continue,
-                            ord => return ord,
-                        }
-                    }
-                    Some(Ordering::Equal)
-                }
-                ord => ord,
-            },
-            (HighHandRank::HighCard(ranks1), HighHandRank::HighCard(ranks2)) => {
-                for (a, b) in ranks1.iter().zip(ranks2.iter()) {
-                    match b.partial_cmp(a) {
-                        Some(Ordering::Equal) => continue,
-                        ord => return ord,
-                    }
-                }
-                Some(Ordering::Equal)
-            }
-            (HighHandRank::Incomplete(n1), HighHandRank::Incomplete(n2)) => n1.partial_cmp(n2),
-            _ => None, // Should never occur since all cases are covered
-        }
+        Some(self.cmp(other))
     }
 }
 
 impl Ord for HighHandRank {
+    /// Better hands compare greater. The category decides first; hands of the
+    /// same category are separated by their tiebreak ranks, high card first.
     fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap_or(Ordering::Equal)
+        match (self, other) {
+            // An incomplete hand is ordered by how many cards it holds, which
+            // no tiebreak can express.
+            (Self::Incomplete(mine), Self::Incomplete(theirs)) => mine.cmp(theirs),
+            _ => self
+                .hand_type_value()
+                .cmp(&other.hand_type_value())
+                .then_with(|| self.tiebreak().cmp(&other.tiebreak())),
+        }
     }
 }
 
 impl HighHandRank {
+    /// The ranks that separate hands of the same category, most significant
+    /// first, as rank values with unused slots left at zero.
+    ///
+    /// Comparing two of these arrays compares the ranks in order, which is
+    /// exactly how hands of one category are ranked against each other.
+    fn tiebreak(&self) -> [u8; 5] {
+        let value = |rank: &Rank| rank.to_value();
+        match self {
+            Self::StraightFlush(rank) | Self::Straight(rank) => [value(rank), 0, 0, 0, 0],
+            Self::FourOfAKind(quads, kicker) => [value(quads), value(kicker), 0, 0, 0],
+            Self::FullHouse(trips, pair) => [value(trips), value(pair), 0, 0, 0],
+            Self::Flush(ranks) | Self::HighCard(ranks) => [
+                value(&ranks[0]),
+                value(&ranks[1]),
+                value(&ranks[2]),
+                value(&ranks[3]),
+                value(&ranks[4]),
+            ],
+            Self::ThreeOfAKind(trips, kickers) => {
+                [value(trips), value(&kickers[0]), value(&kickers[1]), 0, 0]
+            }
+            Self::TwoPair(high, low, kicker) => [value(high), value(low), value(kicker), 0, 0],
+            Self::Pair(pair, kickers) => [
+                value(pair),
+                value(&kickers[0]),
+                value(&kickers[1]),
+                value(&kickers[2]),
+                0,
+            ],
+            Self::Incomplete(_) => [0; 5],
+        }
+    }
+}
+
+impl HighHandRank {
+    /// The category's place in the standard ranking, where a higher value is
+    /// a better class of hand.
     fn hand_type_value(&self) -> u8 {
         match self {
             HighHandRank::StraightFlush(_) => 9,

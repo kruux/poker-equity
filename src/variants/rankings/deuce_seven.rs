@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, fmt, mem::discriminant};
+use std::{cmp::Ordering, fmt};
 
 use crate::cards::{Card, Rank};
 
@@ -56,95 +56,59 @@ impl DeuceSevenRank {
 }
 
 impl PartialOrd for DeuceSevenRank {
+    /// Deuce-to-seven is the high ranking upside down: the *worst* high hand
+    /// wins, so both the category and the tiebreak ranks compare in reverse.
+    /// The ace is forced high, and straights and flushes count against you --
+    /// both handled in `evaluate` rather than here.
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
-            // Non matching hands. E.g. pair vs trips
-            (x, y) if discriminant(x) != discriminant(y) => {
-                // Reverse order of hands in 2-7
-                Some(other.hand_type_value().cmp(&self.hand_type_value()))
-            }
-
-            // Matching hand types
-            (DeuceSevenRank::StraightFlush(r1), DeuceSevenRank::StraightFlush(r2)) => {
-                r1.partial_cmp(r2)
-            }
-            (DeuceSevenRank::FourOfAKind(r1, k1), DeuceSevenRank::FourOfAKind(r2, k2)) => {
-                match r1.partial_cmp(r2) {
-                    Some(Ordering::Equal) => k1.partial_cmp(k2),
-                    ord => ord,
-                }
-            }
-            (DeuceSevenRank::FullHouse(t1, p1), DeuceSevenRank::FullHouse(t2, p2)) => {
-                match t1.partial_cmp(t2) {
-                    Some(Ordering::Equal) => p1.partial_cmp(p2),
-                    ord => ord,
-                }
-            }
-            (DeuceSevenRank::Flush(ranks1), DeuceSevenRank::Flush(ranks2)) => {
-                // Compare cards one by one
-                for (a, b) in ranks1.iter().zip(ranks2.iter()) {
-                    match a.partial_cmp(b) {
-                        Some(Ordering::Equal) => continue,
-                        ord => return ord,
-                    }
-                }
-                Some(Ordering::Equal)
-            }
-            (DeuceSevenRank::Straight(r1), DeuceSevenRank::Straight(r2)) => r1.partial_cmp(r2),
-            (DeuceSevenRank::ThreeOfAKind(t1, k1), DeuceSevenRank::ThreeOfAKind(t2, k2)) => {
-                match t1.partial_cmp(t2) {
-                    Some(Ordering::Equal) => {
-                        for (r1, r2) in k1.iter().zip(k2.iter()) {
-                            match r1.partial_cmp(r2) {
-                                Some(Ordering::Equal) => continue,
-                                ord => return ord,
-                            }
-                        }
-                        Some(Ordering::Equal)
-                    }
-                    ord => ord,
-                }
-            }
-            (DeuceSevenRank::TwoPair(h1, l1, k1), DeuceSevenRank::TwoPair(h2, l2, k2)) => {
-                // h = higher pair, l = lower pair, k = kicker
-                match h1.partial_cmp(h2) {
-                    Some(Ordering::Equal) => match l1.partial_cmp(l2) {
-                        Some(Ordering::Equal) => k1.partial_cmp(k2),
-                        ord => ord,
-                    },
-                    ord => ord,
-                }
-            }
-            (DeuceSevenRank::Pair(r1, k1), DeuceSevenRank::Pair(r2, k2)) => {
-                match r1.partial_cmp(r2) {
-                    Some(Ordering::Equal) => {
-                        for (a, b) in k1.iter().zip(k2.iter()) {
-                            match a.partial_cmp(b) {
-                                Some(Ordering::Equal) => continue,
-                                ord => return ord,
-                            }
-                        }
-                        Some(Ordering::Equal)
-                    }
-                    ord => ord,
-                }
-            }
-            (DeuceSevenRank::HighCard(ranks1), DeuceSevenRank::HighCard(ranks2)) => {
-                for (a, b) in ranks1.iter().zip(ranks2.iter()) {
-                    match a.partial_cmp(b) {
-                        Some(Ordering::Equal) => continue,
-                        ord => return ord,
-                    }
-                }
-                Some(Ordering::Equal)
-            }
-            (DeuceSevenRank::Incomplete(n1), DeuceSevenRank::Incomplete(n2)) => n1.partial_cmp(n2),
-            _ => None, // Should never occur since all scenarios are tested above
+            // An incomplete hand is ordered by how many cards it holds.
+            (Self::Incomplete(mine), Self::Incomplete(theirs)) => mine.partial_cmp(theirs),
+            _ => Some(
+                other
+                    .hand_type_value()
+                    .cmp(&self.hand_type_value())
+                    .then_with(|| other.tiebreak().cmp(&self.tiebreak())),
+            ),
         }
     }
 }
 
 impl DeuceSevenRank {
+    /// The ranks that separate hands of the same category, most significant
+    /// first, as rank values with unused slots left at zero.
+    fn tiebreak(&self) -> [u8; 5] {
+        let value = |rank: &Rank| rank.to_value();
+        match self {
+            Self::StraightFlush(rank) | Self::Straight(rank) => [value(rank), 0, 0, 0, 0],
+            Self::FourOfAKind(quads, kicker) => [value(quads), value(kicker), 0, 0, 0],
+            Self::FullHouse(trips, pair) => [value(trips), value(pair), 0, 0, 0],
+            Self::Flush(ranks) | Self::HighCard(ranks) => [
+                value(&ranks[0]),
+                value(&ranks[1]),
+                value(&ranks[2]),
+                value(&ranks[3]),
+                value(&ranks[4]),
+            ],
+            Self::ThreeOfAKind(trips, kickers) => {
+                [value(trips), value(&kickers[0]), value(&kickers[1]), 0, 0]
+            }
+            Self::TwoPair(high, low, kicker) => [value(high), value(low), value(kicker), 0, 0],
+            Self::Pair(pair, kickers) => [
+                value(pair),
+                value(&kickers[0]),
+                value(&kickers[1]),
+                value(&kickers[2]),
+                0,
+            ],
+            Self::Incomplete(_) => [0; 5],
+        }
+    }
+}
+
+impl DeuceSevenRank {
+    /// The category's place in the standard high ranking. Deuce-to-seven
+    /// compares these in reverse, so a *lower* value is the better hand.
     fn hand_type_value(&self) -> u8 {
         match self {
             DeuceSevenRank::StraightFlush(_) => 9,

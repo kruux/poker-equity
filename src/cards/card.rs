@@ -1,5 +1,5 @@
 use enum_iterator::Sequence;
-use std::{cmp::Ordering, fmt};
+use std::fmt;
 
 use crate::error::CardError;
 
@@ -100,7 +100,12 @@ impl Suit {
         [Suit::Club, Suit::Diamond, Suit::Heart, Suit::Spade]
     }
 }
-#[derive(Clone, Copy, Debug, Eq, Hash, Ord, Sequence)]
+/// A card's rank. The discriminant is the rank's value, so the derived
+/// ordering is the natural one: `Two` is lowest and `Ace` is highest.
+///
+/// Games that rank low hands invert this at the point of comparison rather
+/// than here, so that one rank type serves every variant.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Sequence)]
 pub enum Rank {
     Two = 2,
     Three,
@@ -115,19 +120,6 @@ pub enum Rank {
     Queen,
     King,
     Ace,
-}
-
-impl PartialEq for Rank {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_value() == other.to_value()
-    }
-}
-
-impl PartialOrd for Rank {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        // Reverse order of strength for 2-7
-        Some(other.to_value().cmp(&self.to_value()))
-    }
 }
 
 impl Rank {
