@@ -107,3 +107,50 @@ impl From<crate::notation::NotationError> for PokerError {
         PokerError::Equity(EquityError::Notation(error))
     }
 }
+
+// Each error type already knows how to describe itself; these make that
+// description the standard one, so the errors print through `{}`, work with
+// `?` into a `Box<dyn Error>`, and can be handed to any library that expects
+// an ordinary Rust error.
+
+impl std::fmt::Display for GameError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl std::fmt::Display for CardError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl std::fmt::Display for EquityError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "{}", self.description())
+    }
+}
+
+impl std::fmt::Display for PokerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            PokerError::Card(error) => write!(f, "{}", error),
+            PokerError::Game(error) => write!(f, "{}", error),
+            PokerError::Equity(error) => write!(f, "{}", error),
+        }
+    }
+}
+
+impl std::error::Error for GameError {}
+impl std::error::Error for CardError {}
+impl std::error::Error for EquityError {}
+
+impl std::error::Error for PokerError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            PokerError::Card(error) => Some(error),
+            PokerError::Game(error) => Some(error),
+            PokerError::Equity(error) => Some(error),
+        }
+    }
+}
