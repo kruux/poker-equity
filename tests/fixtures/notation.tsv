@@ -1,0 +1,104 @@
+# Conformance fixture for the notation grammar in PLAN section 3.
+#
+# This file is the grammar's only source of truth. Both this library and
+# fpdb's Python parser read it, so that two implementations of one grammar
+# cannot drift apart unnoticed.
+#
+# Columns, tab separated:
+#   field    hand | board | dead
+#   arg      hand: how many cards the game deals a player
+#            board: the most cards the board can hold
+#            dead: unused, written as -
+#   input    the text to read
+#   expect   ok | err
+#   result   ok: the canonical rendering; err: the error's stable name
+#
+# Blank lines and lines starting with # are ignored.
+
+# --- 3.1 card patterns ------------------------------------------------------
+hand	1	Ah	ok	Ah
+hand	1	A	ok	A
+hand	1	c	ok	c
+hand	1	*	ok	*
+
+# --- 3.1 case is folded, output is canonical --------------------------------
+hand	2	ahkh	ok	Ah Kh
+hand	2	AHKH	ok	Ah Kh
+hand	2	aHkH	ok	Ah Kh
+hand	1	t	ok	T
+hand	1	C	ok	c
+
+# --- 3.2 a rank binds to a suit that immediately follows it -----------------
+hand	2	AhKh	ok	Ah Kh
+hand	1	2c	ok	2c
+hand	2	2 c	ok	2 c
+hand	2	cc	ok	c c
+hand	3	AhKh2	ok	Ah Kh 2
+hand	4	AA**	ok	A A * *
+hand	2	A c	ok	A c
+hand	2	Ac K	ok	Ac K
+
+# --- 3.2 * never binds ------------------------------------------------------
+hand	2	A*	ok	A *
+hand	1	A*	err	WildcardSlotCount
+hand	2	**	ok	* *
+
+# --- 3.3 ranges, only where a hand holds two cards --------------------------
+hand	2	AKs	ok	Ac Kc, Ad Kd, Ah Kh, As Ks
+hand	2	22	ok	2c 2d, 2c 2h, 2c 2s, 2d 2h, 2d 2s, 2h 2s
+hand	2	KTs+	ok	Kc Tc, Kd Td, Kh Th, Ks Ts, Kc Jc, Kd Jd, Kh Jh, Ks Js, Kc Qc, Kd Qd, Kh Qh, Ks Qs
+hand	2	AKo	ok	Ac Kd, Ac Kh, Ac Ks, Ad Kc, Ad Kh, Ad Ks, Ah Kc, Ah Kd, Ah Ks, As Kc, As Kd, As Kh
+
+# --- 3.3 either end may be written first, and ranges normalise --------------
+hand	2	KAs	ok	Ac Kc, Ad Kd, Ah Kh, As Ks
+hand	2	TJs-67s	ok	7c 6c, 7d 6d, 7h 6h, 7s 6s, 8c 7c, 8d 7d, 8h 7h, 8s 7s, 9c 8c, 9d 8d, 9h 8h, 9s 8s, Tc 9c, Td 9d, Th 9h, Ts 9s, Jc Tc, Jd Td, Jh Th, Js Ts
+
+# --- 3.3 a term is a range only if it matches the grammar exactly -----------
+hand	1	Ts	ok	Ts
+hand	1	As	ok	As
+hand	2	Ah Ks	ok	Ah Ks
+
+# --- 3.3 malformed ranges ---------------------------------------------------
+hand	2	22s	err	PairWithSuitedness
+hand	2	22o	err	PairWithSuitedness
+hand	2	JTs-75s	err	MismatchedRangeEnds
+hand	2	JTs-76o	err	MismatchedRangeEnds
+hand	2	top 15%	err	PercentageRange
+
+# --- 3.3 ranges do not exist in Omaha or stud -------------------------------
+hand	4	22+	err	RangesNotAllowed
+hand	4	AKs	err	WrongSlotCount
+hand	4	AhKhAsKs	ok	Ah Kh As Ks
+
+# --- 3.4 alternatives are comma separated -----------------------------------
+hand	2	AKs, 22	ok	Ac Kc, Ad Kd, Ah Kh, As Ks, 2c 2d, 2c 2h, 2c 2s, 2d 2h, 2d 2s, 2h 2s
+hand	2	AhKh, QsQd	ok	Ah Kh, Qs Qd
+hand	2	AhKh,QsQd	ok	Ah Kh, Qs Qd
+hand	2	 AhKh , QsQd 	ok	Ah Kh, Qs Qd
+hand	2	AhKh,	err	Empty
+hand	2	,AhKh	err	Empty
+
+# --- errors carry a span, and bad glyphs are named --------------------------
+hand	2	AhXh	err	UnknownGlyph
+hand	2	Ah!h	err	UnknownGlyph
+hand	2	AhAh	err	DuplicateCard
+hand	3	AhKh	err	WrongSlotCount
+hand	2	AhKhQh	err	WrongSlotCount
+
+# --- 3.5 a board may be short and may hold wildcards ------------------------
+board	5		ok	
+board	5	Kh Qh Jh	ok	Kh Qh Jh
+board	5	Kh Qh Jh 9h 2s	ok	Kh Qh Jh 9h 2s
+board	5	Kh Qh h	ok	Kh Qh h
+board	5	KhQhJh	ok	Kh Qh Jh
+board	5	Kh Qh Jh 9h 2s 3c	err	TooManySlots
+board	5	Kh, Qh	err	UnknownGlyph
+
+# --- 3.5 dead cards must be exact -------------------------------------------
+dead	-		ok	
+dead	-	Ah	ok	Ah
+dead	-	Ah Kd	ok	Kd Ah
+dead	-	c	err	DeadCardNotExact
+dead	-	A	err	DeadCardNotExact
+dead	-	*	err	DeadCardNotExact
+dead	-	Ah A	err	DeadCardNotExact
