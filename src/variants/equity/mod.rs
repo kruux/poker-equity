@@ -48,6 +48,35 @@ where
         shares: &mut [f64],
     ) -> Result<(), PokerError>;
 
+    /// Adds each player's share of one deal's pot to `shares`, by seat.
+    ///
+    /// The default gives the whole pot to the best hand, split evenly among
+    /// ties. A split game overrides this to divide the halves, and must
+    /// compute the shares directly: quartering -- two players splitting the
+    /// high while one of them also takes the low, for 75% and 25% -- is
+    /// neither a win nor a tie in any countable sense.
+    fn award(&self, hands: &[Hand<Self>], shares: &mut [f64]) -> Result<(), PokerError> {
+        let winners = &self.rank_hands(hands)?[0];
+        let share = 1.0 / winners.len() as f64;
+        for &seat in winners {
+            shares[seat] += share;
+        }
+        Ok(())
+    }
+
+    /// As [`award`](Self::award), and separately reports the low half alone.
+    ///
+    /// Only split games have a low half, so the default leaves `low_shares`
+    /// untouched.
+    fn award_detailed(
+        &self,
+        hands: &[Hand<Self>],
+        shares: &mut [f64],
+        _low_shares: &mut [f64],
+    ) -> Result<(), PokerError> {
+        self.award(hands, shares)
+    }
+
     /// Places the players by hand strength, best first, as seat indices.
     ///
     /// Two dimensional so that ties are representable at any position:

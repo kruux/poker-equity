@@ -78,6 +78,10 @@ pub enum EquityError {
     InvalidSimulationCount(usize),
     UnequalHandSizes,
     InvalidCommunityCards(usize),
+    /// No deal satisfies the request, with the field at fault named.
+    Infeasible(String),
+    /// A notation field could not be read.
+    Notation(crate::notation::NotationError),
 }
 
 impl EquityError {
@@ -87,9 +91,19 @@ impl EquityError {
             EquityError::NotEnoughCards(n) => format!("Not enough cards in hand: {}", n),
             EquityError::InvalidSimulationCount(n) => format!("Invalid number of simulations: {n}"),
             EquityError::UnequalHandSizes => format!("Starting hands with different sizes"),
+            EquityError::Infeasible(field) => {
+                format!("No deal can satisfy {}", field)
+            }
+            EquityError::Notation(error) => format!("{}", error),
             EquityError::InvalidCommunityCards(n) => {
                 format!("Invalid number of community cards: {n}")
             }
         }
+    }
+}
+
+impl From<crate::notation::NotationError> for PokerError {
+    fn from(error: crate::notation::NotationError) -> Self {
+        PokerError::Equity(EquityError::Notation(error))
     }
 }

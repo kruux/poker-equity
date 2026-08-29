@@ -31,13 +31,6 @@ impl EquityCalculation for OmahaFast {
     ) -> Result<(), PokerError> {
         let community_cards = self.deal_community_cards(calculator, deck)?;
         let final_hands = self.build_final_hands(calculator, community_cards)?;
-
-        let winners = &self.rank_hands(&final_hands)?[0];
-        let share = 1.0 / winners.len() as f64;
-        for &seat in winners {
-            shares[seat] += share;
-        }
-
-        Ok(())
+        self.award(&final_hands, shares)
     }
 }

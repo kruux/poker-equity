@@ -14,6 +14,14 @@ impl PokerVariant for Holdem {
         7
     }
 
+    fn hole_cards(&self) -> usize {
+        2
+    }
+
+    fn board_cards(&self) -> usize {
+        5
+    }
+
     fn evaluate_hand(&self, cards: &[crate::cards::Card]) -> Self::HandRank {
         HoldemHandRank::evaluate(cards)
     }

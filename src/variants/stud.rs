@@ -19,6 +19,10 @@ impl PokerVariant for SevenCardStud {
         7
     }
 
+    fn hole_cards(&self) -> usize {
+        7
+    }
+
     fn to_string(&self) -> String {
         "Stud".to_string()
     }

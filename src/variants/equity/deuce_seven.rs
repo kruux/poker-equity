@@ -40,13 +40,7 @@ impl EquityCalculation for DeuceSeven {
             final_hands.push(Hand::new_with_cards(DeuceSeven, current_cards)?);
         }
 
-        let winners = &self.rank_hands(&final_hands)?[0];
-        let share = 1.0 / winners.len() as f64;
-        for &seat in winners {
-            shares[seat] += share;
-        }
-
-        Ok(())
+        self.award(&final_hands, shares)
     }
 }
 

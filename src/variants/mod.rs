@@ -53,6 +53,14 @@ pub trait PokerVariant: Clone + Copy {
     /// together. Used to size hands and to reject overfull ones.
     fn max_cards(&self) -> usize;
 
+    /// How many cards a player holds privately.
+    fn hole_cards(&self) -> usize;
+
+    /// How many cards the shared board holds, or zero where there is none.
+    fn board_cards(&self) -> usize {
+        0
+    }
+
     /// Scores a hand. `cards` holds the private cards first and any shared
     /// board after them, and may be short, in which case the result is an
     /// incomplete rank that loses to any complete hand.
