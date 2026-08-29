@@ -33,6 +33,12 @@ pub struct Progress {
     /// The widest standard error across the seats, which is what
     /// `Target::StandardError` is waiting on.
     pub worst_std_error: f64,
+    /// The share of attempted deals that could be used.
+    ///
+    /// One in the ordinary case. It falls when hands compete for scarce
+    /// cards, and a low figure is worth showing: it is the difference between
+    /// a slow answer and one that looks stuck.
+    pub acceptance: f64,
 }
 
 /// How many deals to run between progress reports.
@@ -138,5 +144,6 @@ fn report<F: Fn(&Progress)>(on_progress: &F, result: &ChunkResult) {
         samples: result.samples,
         equities: result.equities(),
         worst_std_error: worst_error(result),
+        acceptance: result.acceptance(),
     });
 }

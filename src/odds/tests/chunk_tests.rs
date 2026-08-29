@@ -600,3 +600,69 @@ fn test_a_wildcard_needs_something_left_to_fill_it() {
         "the board and the dead cards together take every deuce"
     );
 }
+
+/// A deal that cannot fill every slot is thrown away entire and drawn again.
+///
+/// That happens when hands compete for the same cards -- a seat that will
+/// take anything taking the last five another seat named. Dealing the
+/// fussiest hands first, the board among them, keeps it rare, and rejecting
+/// the *whole* deal rather than redrawing one seat is what keeps the result
+/// uniform.
+#[test]
+fn test_a_deal_that_cannot_be_filled_is_drawn_again() -> Result<(), PokerError> {
+    // Nothing competes, so nothing is thrown away.
+    let plain = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?;
+    assert_eq!(run_chunk(&plain, 20_000, 1)?.acceptance(), 1.0);
+
+    // A seat taking any card alongside one that wants a five: dealing the
+    // fussier seat first means the wildcard cannot take its card first.
+    for hands in [["* *", "5 *"], ["5 *", "* *"]] {
+        let request = EquityRequest::from_text(Holdem, &hands, "", "")?;
+        let kept = run_chunk(&request, 20_000, 2)?.acceptance();
+        assert!(
+            kept > 0.99,
+            "{:?} kept only {:.1}% of deals; the fussier seat should be dealt first",
+            hands,
+            kept * 100.0
+        );
+    }
+
+    // Where every seat is equally fussy there is nothing to reorder, so
+    // deals really are thrown away -- but the answer still arrives.
+    let contended = EquityRequest::from_text(Holdem, &["5 *", "5 *", "5 *", "5 *"], "", "")?;
+    let result = run_chunk(&contended, 20_000, 3)?;
+    assert_eq!(result.samples, 20_000, "the answer still arrives");
+    assert!(result.attempts > result.samples, "and deals were thrown away");
+
+    Ok(())
+}
+
+/// Dealing order changes how often a deal is thrown away, and nothing else.
+///
+/// Checked against enumeration, which builds holdings directly and never
+/// touches the dealing path at all.
+#[test]
+fn test_dealing_order_does_not_move_the_answer() -> Result<(), PokerError> {
+    let board = "Kh Qd 9c 3s 2h";
+    for hands in [
+        vec!["* *", "5 *"],
+        vec!["5 *", "* *"],
+        vec!["A c", "* *"],
+    ] {
+        let request = EquityRequest::from_text(Holdem, &hands, board, "")?;
+        let exact = run_exact(&request)?.expect("a full board leaves little to walk");
+        let sampled = run_chunk(&request, 300_000, 17)?;
+
+        for (seat, (walked, drawn)) in exact.equities().iter().zip(sampled.equities()).enumerate() {
+            assert!(
+                (walked.equity - drawn.equity).abs() <= 4.0 * drawn.std_error,
+                "{:?} seat {}: enumerating gives {:.4}% and dealing gives {:.4}%",
+                hands,
+                seat,
+                walked.percent(),
+                drawn.percent()
+            );
+        }
+    }
+    Ok(())
+}

@@ -9,6 +9,12 @@
 pub struct ChunkResult {
     /// How many deals went into these sums.
     pub samples: u64,
+    /// How many deals were attempted to get them.
+    ///
+    /// A deal is thrown away when the cards drawn cannot fill every slot --
+    /// one seat's wildcard taking the last card another seat needed by name.
+    /// Equal to `samples` when nothing was thrown away.
+    pub attempts: u64,
     /// Each seat's share of the pot, summed over the deals.
     pub share_sum: Vec<f64>,
     /// The same shares squared, for the standard error.
@@ -32,6 +38,7 @@ impl ChunkResult {
     pub fn empty(seats: usize) -> Self {
         Self {
             samples: 0,
+            attempts: 0,
             share_sum: vec![0.0; seats],
             share_square_sum: vec![0.0; seats],
             win_count: vec![0; seats],
@@ -47,6 +54,20 @@ impl ChunkResult {
         self.share_sum.len()
     }
 
+    /// The share of attempted deals that could be used, in `0..=1`.
+    ///
+    /// One when every draw worked, which is the ordinary case. It falls when
+    /// seats compete for scarce cards -- several hands all wanting a five
+    /// with only two left -- and a low figure is worth showing a caller,
+    /// because it is the difference between an answer arriving and a
+    /// calculator that appears to have stopped.
+    pub fn acceptance(&self) -> f64 {
+        if self.attempts == 0 {
+            return 1.0;
+        }
+        self.samples as f64 / self.attempts as f64
+    }
+
     /// Folds `other` into this one.
     ///
     /// The merged result is exact only when both parts were, since mixing a
@@ -54,6 +75,7 @@ impl ChunkResult {
     pub fn merge(&mut self, other: &ChunkResult) {
         debug_assert_eq!(self.seats(), other.seats(), "chunks must cover the same seats");
         self.samples += other.samples;
+        self.attempts += other.attempts;
         self.exact = self.exact && other.exact;
         for seat in 0..self.seats() {
             self.share_sum[seat] += other.share_sum[seat];

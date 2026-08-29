@@ -70,6 +70,8 @@ fn to_dict(py: Python<'_>, result: &ChunkResult) -> PyResult<Py<PyDict>> {
     let out = PyDict::new(py);
     out.set_item("samples", result.samples)?;
     out.set_item("exact", result.exact)?;
+    out.set_item("attempts", result.attempts)?;
+    out.set_item("acceptance", result.acceptance())?;
 
     let players = PyList::empty(py);
     for player in result.equities() {
