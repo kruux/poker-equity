@@ -3,15 +3,39 @@ use std::fmt;
 
 use crate::error::CardError;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct Card {
-    suit: Suit,
-    rank: Rank,
-}
+/// A single card, stored as an index in `0..52`.
+///
+/// The layout is `rank * 4 + suit`, with ranks `0..13` running `23456789TJQKA`
+/// and suits `0..4` running `cdhs`. That is the encoding fpdb's Python side
+/// already produces, so the two sides need no translation, and it is what lets
+/// a set of cards be a single `u64` -- see [`CardSet`].
+///
+/// The index is an implementation detail everywhere except that boundary:
+/// construct with [`Card::new`] and read with [`Card::rank`] and
+/// [`Card::suit`], which cost an arithmetic operation each.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct Card(u8);
 
 impl Card {
+    /// The number of cards in a full deck.
+    pub const COUNT: u8 = 52;
+
+    /// Builds a card from its suit and rank.
     pub fn new(suit: Suit, rank: Rank) -> Self {
-        Self { suit, rank }
+        Self((rank.to_value() - 2) * 4 + suit as u8)
+    }
+
+    /// Builds a card from its index, or `None` if the index is not a card.
+    ///
+    /// Use this at the fpdb boundary, where indices arrive from outside.
+    pub fn from_index(index: u8) -> Option<Self> {
+        (index < Self::COUNT).then_some(Self(index))
+    }
+
+    /// This card's index in `0..52`, as `rank * 4 + suit`.
+    pub fn index(self) -> u8 {
+        self.0
     }
 
     /// Takes a string e.g. "AdKc" and returns a vec of Cards
@@ -33,36 +57,36 @@ impl Card {
             let rank = Rank::from_char(rank_char)?;
             let suit_char = cards_chars[i + 1];
             let suit = Suit::from_char(suit_char)?;
-            let card = Card { suit, rank };
-            cards.push(card);
+            cards.push(Card::new(suit, rank));
         }
 
         Ok(cards)
     }
 
-    // Check if two Cards are the same
+    /// Whether this is the same card as `other`.
     pub fn matches(&self, other: &Card) -> bool {
-        self.rank == other.rank && self.suit == other.suit
+        self == other
     }
 
     /// Get rank of card
     pub fn rank(&self) -> Rank {
-        return self.rank;
+        Rank::from_index(self.0 / 4)
     }
 
     /// Get suit of card
     pub fn suit(&self) -> Suit {
-        return self.suit;
+        Suit::from_index(self.0 % 4)
     }
 }
 
 impl fmt::Display for Card {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let suit = self.suit;
-        let rank = self.rank;
-        let suit_char = Suit::to_char(suit);
-        let rank_char = Rank::to_char(rank);
-        write!(f, "{}{}", rank_char, suit_char)
+        write!(
+            f,
+            "{}{}",
+            Rank::to_char(self.rank()),
+            Suit::to_char(self.suit())
+        )
     }
 }
 
@@ -96,6 +120,14 @@ impl Suit {
         }
     }
 
+    /// The suit at `index` in `0..4`, ordered `cdhs`.
+    ///
+    /// Panics above three, which [`Card`] cannot produce.
+    pub fn from_index(index: u8) -> Suit {
+        Suit::all()[index as usize]
+    }
+
+    /// Every suit, in the `cdhs` order the card index uses.
     pub fn all() -> [Suit; 4] {
         [Suit::Club, Suit::Diamond, Suit::Heart, Suit::Spade]
     }
@@ -166,6 +198,14 @@ impl Rank {
         }
     }
 
+    /// The rank at `index` in `0..13`, where zero is the deuce.
+    ///
+    /// Panics above twelve, which [`Card`] cannot produce.
+    pub fn from_index(index: u8) -> Rank {
+        Rank::all()[index as usize]
+    }
+
+    /// Every rank, lowest first.
     pub fn all() -> [Rank; 13] {
         [
             Rank::Two,
