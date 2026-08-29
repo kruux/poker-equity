@@ -1,7 +1,10 @@
 use std::cmp::Ordering;
 
 use super::table_index::{bucket_of, slot_of, BUCKET_COUNT, SLOT_COUNT};
-use super::{FLUSH_SCORES, HAND_DISPLACEMENTS, HAND_SCORES};
+use super::{
+    DEUCE_SEVEN_FLUSH_SCORES, DEUCE_SEVEN_HAND_SCORES, HAND_DISPLACEMENTS, HIGH_FLUSH_SCORES,
+    HIGH_HAND_SCORES, LOW_A5_HAND_SCORES, SHORT_DECK_FLUSH_SCORES, SHORT_DECK_HAND_SCORES,
+};
 use crate::cards::Card;
 
 /// A hand's strength as a single number, read from a lookup table.
@@ -18,9 +21,12 @@ const NOTHING: u16 = u16::MAX;
 // build.rs sizes the tables from the same constants the lookups use, so this
 // only fires if the two ever stop agreeing -- and it fires at compile time
 // rather than as a wrong answer.
-const _: () = assert!(HAND_SCORES.len() == SLOT_COUNT * 2);
+const _: () = assert!(HIGH_HAND_SCORES.len() == SLOT_COUNT * 2);
+const _: () = assert!(DEUCE_SEVEN_HAND_SCORES.len() == SLOT_COUNT * 2);
+const _: () = assert!(SHORT_DECK_HAND_SCORES.len() == SLOT_COUNT * 2);
+const _: () = assert!(LOW_A5_HAND_SCORES.len() == SLOT_COUNT * 2);
 const _: () = assert!(HAND_DISPLACEMENTS.len() == BUCKET_COUNT * 2);
-const _: () = assert!(FLUSH_SCORES.len() == (1 << 13) * 2);
+const _: () = assert!(HIGH_FLUSH_SCORES.len() == (1 << 13) * 2);
 
 /// Base-five place values, one per rank.
 ///
@@ -55,42 +61,74 @@ fn score_at(table: &[u8], index: usize) -> u16 {
     u16::from_le_bytes([table[at], table[at + 1]])
 }
 
-impl FastHandRank {
-    /// Scores a hand of five to seven cards.
-    ///
-    /// Shorter or longer hands cannot be scored and come back as `NOTHING`.
-    /// The guard is not just tidiness: the rank table holds nothing but
-    /// scores, so a key that is not a hand would land on some other hand's
-    /// slot and read it as its own.
-    pub fn evaluate(cards: &[Card]) -> Self {
-        if !(5..=7).contains(&cards.len()) {
-            return Self(NOTHING);
-        }
+/// Scores a hand against one kernel's tables.
+///
+/// `flushes` is `None` for a ranking where suits do not matter, which is the
+/// ace-to-five low: there is no flush to look for and no table to look in.
+///
+/// Lower is better throughout. Hands of fewer than five or more than seven
+/// cards come back as `NOTHING`, and the guard is not tidiness: the tables
+/// hold nothing but scores, so a key that is not a hand would land on some
+/// other hand's slot and be read as its own.
+fn score(cards: &[Card], hands: &[u8], flushes: Option<&[u8]>) -> u16 {
+    if !(5..=7).contains(&cards.len()) {
+        return NOTHING;
+    }
 
-        // A flush needs five cards of one suit, so each suit's ranks are
-        // gathered into a thirteen-bit mask. Masks with fewer than five bits
-        // are marked as nothing in the table, so the miss costs one read.
+    if let Some(flushes) = flushes {
+        // Each suit's ranks gathered into a thirteen-bit mask. Masks of fewer
+        // than five bits are marked empty, so a miss costs one read.
         let mut suits = [0u32; 4];
         for card in cards {
             let rank = (card.rank().to_value() - 2) as usize;
             suits[card.suit() as usize] |= FLUSH_KEYS[rank];
         }
         for suit in suits {
-            let score = score_at(FLUSH_SCORES, suit as usize);
-            if score != NOTHING {
-                return Self(score);
+            let found = score_at(flushes, suit as usize);
+            if found != NOTHING {
+                return found;
             }
         }
+    }
 
-        // No flush, so the hand is worth whatever its ranks are worth. The
-        // key is far too sparse to index directly, so it goes through the
-        // displacement in `table_index`.
-        let key: u32 = cards
-            .iter()
-            .map(|card| RANK_KEYS[(card.rank().to_value() - 2) as usize])
-            .sum();
-        let displacement = score_at(HAND_DISPLACEMENTS, bucket_of(key));
-        Self(score_at(HAND_SCORES, slot_of(key, displacement)))
+    // No flush, so the hand is worth whatever its ranks are worth. The key is
+    // far too sparse to index directly, so it goes through the displacement
+    // in `table_index`.
+    let key: u32 = cards
+        .iter()
+        .map(|card| RANK_KEYS[(card.rank().to_value() - 2) as usize])
+        .sum();
+    let displacement = score_at(HAND_DISPLACEMENTS, bucket_of(key));
+    score_at(hands, slot_of(key, displacement))
+}
+
+/// The five-card high hand: hold'em, Omaha, stud.
+pub fn high_score(cards: &[Card]) -> u16 {
+    score(cards, HIGH_HAND_SCORES, Some(HIGH_FLUSH_SCORES))
+}
+
+/// The high hand read upside down, for deuce-to-seven. The ace is always
+/// high, so `A5432` is a bad high-card hand rather than a straight, and
+/// straights and flushes count against you.
+pub fn deuce_seven_score(cards: &[Card]) -> u16 {
+    score(cards, DEUCE_SEVEN_HAND_SCORES, Some(DEUCE_SEVEN_FLUSH_SCORES))
+}
+
+/// The high hand over thirty-six cards: a flush beats a full house, and the
+/// ace plays low below the six.
+pub fn short_deck_score(cards: &[Card]) -> u16 {
+    score(cards, SHORT_DECK_HAND_SCORES, Some(SHORT_DECK_FLUSH_SCORES))
+}
+
+/// The ace-to-five low. Suits never matter, so there is no flush to check.
+pub fn low_a5_score(cards: &[Card]) -> u16 {
+    score(cards, LOW_A5_HAND_SCORES, None)
+}
+
+impl FastHandRank {
+    /// Scores a hand of five to seven cards against the high kernel.
+    pub fn evaluate(cards: &[Card]) -> Self {
+        Self(high_score(cards))
     }
 }
 
