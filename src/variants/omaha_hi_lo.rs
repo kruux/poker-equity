@@ -4,7 +4,9 @@ use crate::cards::Card;
 
 use super::{
     omaha::best_score,
-    rankings::{high_score, low_a5_score, HighHandRank, HiLoHandRank, LowHandRank},
+    rankings::{
+        high_score_from_parts, low_a5_score_from_parts, HighHandRank, HiLoHandRank, LowHandRank,
+    },
     rankings::EIGHT_OR_BETTER_LIMIT,
     PokerType, PokerVariant,
 };
@@ -80,11 +82,12 @@ macro_rules! omaha_hi_lo_variant {
             }
 
             fn score(&self, cards: &[Card]) -> u32 {
-                best_score($hole, cards, high_score)
+                best_score($hole, cards, high_score_from_parts)
             }
 
             fn low_score(&self, cards: &[Card]) -> Option<u32> {
-                let best = best_score($hole, cards, low_a5_score);
+                // Suits never matter to a low, so the flush half is ignored.
+                let best = best_score($hole, cards, |key, _| low_a5_score_from_parts(key));
                 // Qualifying lows are the best lows there are, so they sit
                 // below a threshold and the check is one comparison.
                 (best < EIGHT_OR_BETTER_LIMIT as u32).then_some(best)

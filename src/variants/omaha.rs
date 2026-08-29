@@ -2,10 +2,10 @@ use std::cmp::{min, Ordering};
 
 use itertools::Itertools;
 
-use crate::cards::Card;
+use crate::cards::{Card, Suit};
 
 use super::{
-    rankings::{high_score, OmahaHandRank},
+    rankings::{high_score_from_parts, rank_key, shared_suit, OmahaHandRank},
     PokerType, PokerVariant,
 };
 
@@ -45,20 +45,88 @@ fn best_hand(hole_count: usize, cards: &[Card]) -> OmahaHandRank {
 /// The same walk as [`best_hand`], but reading a lookup table instead of
 /// naming each candidate, which is what the sampling loop wants. Lower is
 /// better, so the best pairing is the smallest.
-pub(super) fn best_score(hole_count: usize, cards: &[Card], score: impl Fn(&[Card]) -> u16) -> u32 {
-    let split = cards.len().min(hole_count);
-    let (hole_cards, board_cards) = cards.split_at(split);
+/// One half of a pairing, worked out once and reused.
+///
+/// A key is the base-five rank key of those cards, and `suited` is the suit
+/// they share with their rank mask, when they share one.
+#[derive(Clone, Copy)]
+struct Part {
+    key: u32,
+    suited: Option<(Suit, u16)>,
+}
 
-    let mut best = u32::MAX;
-    let mut five = [hole_cards.first().copied().unwrap_or(Card::from_index(0).unwrap()); 5];
-    for hole in hole_cards.iter().combinations(2) {
-        for board in board_cards.iter().combinations(3) {
-            for (slot, card) in five.iter_mut().zip(hole.iter().chain(board.iter())) {
-                *slot = **card;
-            }
-            best = best.min(score(&five) as u32);
+impl Part {
+    fn of(cards: &[Card]) -> Self {
+        Self {
+            key: rank_key(cards),
+            suited: shared_suit(cards),
         }
     }
+}
+
+/// The best score among every pairing of two hole cards with three of the
+/// board.
+///
+/// The same walk as [`best_hand`], but reading a lookup table instead of
+/// naming each candidate. Lower is better, so the best pairing is the
+/// smallest.
+///
+/// Each half of a pairing is worked out once. Rank keys add, so a pairing's
+/// key is one addition rather than five cards walked again; and a five-card
+/// flush needs all five of one suit, so it is exactly the case where both
+/// halves are of the same single suit. That turns sixty five-card
+/// evaluations into sixty additions and sixty lookups, over ten board parts
+/// and six hole parts worked out beforehand -- and the board's parts are the
+/// same for every seat at the table.
+pub(super) fn best_score(
+    hole_count: usize,
+    cards: &[Card],
+    from_parts: impl Fn(u32, Option<u16>) -> u16,
+) -> u32 {
+    let split = cards.len().min(hole_count);
+    let (hole_cards, board_cards) = cards.split_at(split);
+    if hole_cards.len() < 2 || board_cards.len() < 3 {
+        return u32::MAX;
+    }
+
+    // At most C(5,3) board triples and C(6,2) hole pairs.
+    let mut board_parts = [Part { key: 0, suited: None }; 10];
+    let mut boards = 0;
+    for a in 0..board_cards.len() {
+        for b in (a + 1)..board_cards.len() {
+            for c in (b + 1)..board_cards.len() {
+                board_parts[boards] = Part::of(&[board_cards[a], board_cards[b], board_cards[c]]);
+                boards += 1;
+            }
+        }
+    }
+
+    let mut hole_parts = [Part { key: 0, suited: None }; 15];
+    let mut holes = 0;
+    for first in 0..hole_cards.len() {
+        for second in (first + 1)..hole_cards.len() {
+            hole_parts[holes] = Part::of(&[hole_cards[first], hole_cards[second]]);
+            holes += 1;
+        }
+    }
+
+    let mut best = u32::MAX;
+    for hole in &hole_parts[..holes] {
+        for board in &board_parts[..boards] {
+            // Five of one suit means both halves of one suit, and the same
+            // one. Anything else goes to the rank table.
+            let flush = match (hole.suited, board.suited) {
+                (Some((hole_suit, hole_mask)), Some((board_suit, board_mask)))
+                    if hole_suit == board_suit =>
+                {
+                    Some(hole_mask | board_mask)
+                }
+                _ => None,
+            };
+            best = best.min(from_parts(hole.key + board.key, flush) as u32);
+        }
+    }
+
     best
 }
 
@@ -95,7 +163,7 @@ macro_rules! omaha_variant {
             }
 
             fn score(&self, cards: &[Card]) -> u32 {
-                best_score($hole, cards, high_score)
+                best_score($hole, cards, high_score_from_parts)
             }
 
             fn to_string(&self) -> String {

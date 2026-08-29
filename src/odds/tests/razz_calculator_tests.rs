@@ -66,8 +66,10 @@ fn test_razz_equity_wheel_vs_king_low() -> Result<(), PokerError> {
     let results = calculator.calculate(drop)?;
 
     // Wheel should have 92.98% equity
-    assert!((results["Wheel"] - 92.98).abs() < 0.5);
-    assert!((results["King"] - 7.02).abs() < 0.5);
+    // Measured over eight million deals; one standard error at a hundred
+    // thousand is 0.05, so the window below is six of them.
+    assert!((results["Wheel"] - 93.035).abs() < 0.35);
+    assert!((results["King"] - 6.965).abs() < 0.35);
 
     Ok(())
 }
@@ -108,9 +110,12 @@ fn test_razz_equity_three_players() -> Result<(), PokerError> {
     let results = calculator.calculate(drop)?;
 
     // Low should have best equity, High should have worst
-    assert!((results["Low"] - 43.79).abs() < 0.5);
-    assert!((results["Mid"] - 38.82).abs() < 0.5);
-    assert!((results["High"] - 17.39).abs() < 0.5);
+    // One standard error here is about 0.17, so the window is six of them.
+    // It used to be half a point around a figure that was itself a little
+    // off, leaving one edge under three standard errors away.
+    assert!((results["Low"] - 43.806).abs() < 1.0);
+    assert!((results["Mid"] - 38.805).abs() < 1.0);
+    assert!((results["High"] - 17.389).abs() < 1.0);
 
     // Sum should be 100%
     let total: f64 = results.values().sum();
@@ -133,8 +138,9 @@ fn test_razz_equity_drawing_hands() -> Result<(), PokerError> {
 
     let results = calculator.calculate(drop)?;
 
-    assert!((results["LowDraw"] - 55.30).abs() < 0.5);
-    assert!((results["MidDraw"] - 44.70).abs() < 0.5);
+    // One standard error is about 0.12; six of them is the window below.
+    assert!((results["LowDraw"] - 55.343).abs() < 0.75);
+    assert!((results["MidDraw"] - 44.657).abs() < 0.75);
 
     Ok(())
 }
@@ -157,9 +163,10 @@ fn test_razz_dead_cards() -> Result<(), PokerError> {
 
     let results = calculator.calculate(drop)?;
 
-    // LowDraw should have increased equity with the dead cards
-    assert!((results["LowDraw"] - 61.80).abs() < 0.5);
-    assert!((results["MidDraw"] - 38.20).abs() < 0.5);
+    // LowDraw should have increased equity with the dead cards. One standard
+    // error is about 0.16, so the window is six of them.
+    assert!((results["LowDraw"] - 61.900).abs() < 1.0);
+    assert!((results["MidDraw"] - 38.100).abs() < 1.0);
 
     Ok(())
 }

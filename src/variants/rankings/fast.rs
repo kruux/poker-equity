@@ -5,7 +5,7 @@ use super::{
     DEUCE_SEVEN_FLUSH_SCORES, DEUCE_SEVEN_HAND_SCORES, HAND_DISPLACEMENTS, HIGH_FLUSH_SCORES,
     HIGH_HAND_SCORES, LOW_A5_HAND_SCORES, SHORT_DECK_FLUSH_SCORES, SHORT_DECK_HAND_SCORES,
 };
-use crate::cards::Card;
+use crate::cards::{Card, Suit};
 
 /// A hand's strength as a single number, read from a lookup table.
 ///
@@ -100,6 +100,60 @@ fn score(cards: &[Card], hands: &[u8], flushes: Option<&[u8]>) -> u16 {
         .sum();
     let displacement = score_at(HAND_DISPLACEMENTS, bucket_of(key));
     score_at(hands, slot_of(key, displacement))
+}
+
+/// The base-five rank key of some cards.
+///
+/// Keys **add**: the key of a hand is the sum of the keys of any way of
+/// splitting it. That is what lets Omaha score sixty hands from ten board
+/// keys and six hole keys, rather than walking five cards sixty times.
+pub fn rank_key(cards: &[Card]) -> u32 {
+    cards
+        .iter()
+        .map(|card| RANK_KEYS[(card.rank().to_value() - 2) as usize])
+        .sum()
+}
+
+/// The suit these cards share and their thirteen-bit rank mask, or `None`
+/// when they are not all of one suit.
+///
+/// A five-card flush is five cards of one suit, so in Omaha it needs both
+/// hole cards and all three board cards to share a suit -- which means the
+/// question can be asked of each half separately and the answers combined.
+pub fn shared_suit(cards: &[Card]) -> Option<(Suit, u16)> {
+    let first = cards.first()?.suit();
+    let mut mask = 0u16;
+    for card in cards {
+        if card.suit() != first {
+            return None;
+        }
+        mask |= 1 << (card.rank().to_value() - 2);
+    }
+    Some((first, mask))
+}
+
+/// A high score from a rank key that has already been summed, and a flush
+/// mask when the hand is five cards of one suit.
+///
+/// The caller has to know the hand is a flush, which in Omaha it does: only
+/// two hole cards and three board cards play, so a flush is exactly the case
+/// where both halves are of the same one suit.
+pub fn high_score_from_parts(rank_key: u32, flush: Option<u16>) -> u16 {
+    if let Some(mask) = flush {
+        let found = score_at(HIGH_FLUSH_SCORES, mask as usize);
+        if found != NOTHING {
+            return found;
+        }
+    }
+    let displacement = score_at(HAND_DISPLACEMENTS, bucket_of(rank_key));
+    score_at(HIGH_HAND_SCORES, slot_of(rank_key, displacement))
+}
+
+/// An ace-to-five low score from a rank key. Suits never matter to this
+/// ranking, so there is no flush to consider.
+pub fn low_a5_score_from_parts(rank_key: u32) -> u16 {
+    let displacement = score_at(HAND_DISPLACEMENTS, bucket_of(rank_key));
+    score_at(LOW_A5_HAND_SCORES, slot_of(rank_key, displacement))
 }
 
 /// The five-card high hand: hold'em, Omaha, stud.
