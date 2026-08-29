@@ -1,6 +1,6 @@
 use crate::{
     cards::Card,
-    variants::{PokerType, PokerVariant, RazzHandRank},
+    variants::{rankings::low_a5_score, PokerType, PokerVariant, RazzHandRank},
 };
 
 #[derive(Debug, Clone, Copy)]
@@ -27,6 +27,10 @@ impl PokerVariant for Razz {
 
     fn key(&self) -> &'static str {
         "razz"
+    }
+
+    fn score(&self, cards: &[Card]) -> u32 {
+        low_a5_score(cards) as u32
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {

@@ -1,7 +1,7 @@
 use crate::{
     cards::Card,
     variants::DeuceSevenRank,
-    variants::{PokerType, PokerVariant},
+    variants::{rankings::deuce_seven_score, PokerType, PokerVariant},
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -30,6 +30,10 @@ impl PokerVariant for DeuceSeven {
 
     fn key(&self) -> &'static str {
         "deuce_seven"
+    }
+
+    fn score(&self, cards: &[Card]) -> u32 {
+        deuce_seven_score(cards) as u32
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> DeuceSevenRank {

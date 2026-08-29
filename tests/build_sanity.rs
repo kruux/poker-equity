@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use poker_calculator::{
     cards::Card,
-    variants::{HoldemFast, PokerVariant},
+    variants::{Holdem, PokerVariant},
 };
 
 /// Hands a second below which the build cannot plausibly be optimised.
@@ -27,13 +27,13 @@ fn test_the_build_was_optimised() {
     // Warm the tables so the measurement is of evaluation, not of the first
     // page faults.
     for _ in 0..10_000 {
-        std::hint::black_box(HoldemFast.evaluate_hand(&seven));
+        std::hint::black_box(Holdem.evaluate_hand(&seven));
     }
 
     let rounds = 500_000;
     let started = Instant::now();
     for _ in 0..rounds {
-        std::hint::black_box(HoldemFast.evaluate_hand(&seven));
+        std::hint::black_box(Holdem.evaluate_hand(&seven));
     }
     let per_second = rounds as f64 / started.elapsed().as_secs_f64();
 

@@ -45,13 +45,13 @@ fn report(label: &str, seats: usize, per_second: f64) {
 fn main() {
     println!("One core. Deals a second, including evaluation and pot splitting.\n");
 
-    time_variant!(HoldemFast, &["AhKh", "QsQd"], "", 400_000);
+    time_variant!(Holdem, &["AhKh", "QsQd"], "", 400_000);
     time_variant!(Holdem, &["AhKh", "QsQd"], "", 200_000);
     time_variant!(ShortDeck, &["AhKh", "QsQd"], "", 200_000);
-    time_variant!(HoldemFast, &["AhKh", "QsQd", "7c2d", "JsTs", "9h9c", "4s4d"], "", 200_000);
+    time_variant!(Holdem, &["AhKh", "QsQd", "7c2d", "JsTs", "9h9c", "4s4d"], "", 200_000);
     println!();
     time_variant!(Omaha, &["AhKh7c2d", "QsQdJsTd"], "", 40_000);
-    time_variant!(OmahaFast, &["AhKh7c2d", "QsQdJsTd"], "", 100_000);
+    time_variant!(Omaha, &["AhKh7c2d", "QsQdJsTd"], "", 100_000);
     time_variant!(OmahaFive, &["AhKh7c2d3c", "QsQdJsTd4h"], "", 30_000);
     time_variant!(OmahaSix, &["AhKh7c2d3c5s", "QsQdJsTd4h6h"], "", 20_000);
     time_variant!(OmahaHiLo, &["Ah2c3d4s", "QsQdJsTd"], "", 20_000);
@@ -63,37 +63,43 @@ fn main() {
     time_variant!(DeuceSeven, &["Th8c4s2h", "9d7h4h2d"], "", 100_000);
     time_variant!(Badugi, &["Ac2d3h", "4s6s7d"], "", 200_000);
 
-    println!("\nThe raw evaluator, without dealing or pot splitting:");
+    // The two answers a variant gives: `score` orders a hand by reading a
+    // table, `evaluate_hand` names it by walking the cards. The loop uses the
+    // first; the second is what a person reads and what the tables are
+    // checked against.
+    println!("\nThe two answers, without dealing or pot splitting:");
     let seven = Card::from_str("Ah Kh Qs Qd 2c 7d 9s").expect("valid cards");
-    for (label, evaluate) in [
-        ("table lookup", 0),
-        ("reference evaluator", 1),
-    ] {
-        let rounds = 2_000_000;
-        let started = Instant::now();
-        for _ in 0..rounds {
-            if evaluate == 0 {
-                std::hint::black_box(HoldemFast.evaluate_hand(&seven));
-            } else {
-                std::hint::black_box(Holdem.evaluate_hand(&seven));
-            }
-        }
-        println!(
-            "{:28}          {:>13.0} hands/s",
-            label,
-            rounds as f64 / started.elapsed().as_secs_f64()
-        );
+
+    let rounds = 2_000_000;
+    let started = Instant::now();
+    for _ in 0..rounds {
+        std::hint::black_box(Holdem.score(&seven));
     }
+    println!(
+        "{:28}          {:>13.0} hands/s",
+        "score (table lookup)",
+        rounds as f64 / started.elapsed().as_secs_f64()
+    );
+
+    let started = Instant::now();
+    for _ in 0..rounds {
+        std::hint::black_box(Holdem.evaluate_hand(&seven));
+    }
+    println!(
+        "{:28}          {:>13.0} hands/s",
+        "evaluate_hand (names it)",
+        rounds as f64 / started.elapsed().as_secs_f64()
+    );
 
     println!("\nThe old calculator, across every core:");
     let started = Instant::now();
     let deals = 1_000_000;
-    let mut calculator = EquityCalculator::new(HoldemFast, deals);
+    let mut calculator = EquityCalculator::new(Holdem, deals);
     calculator
-        .add_player("Hero".into(), Hand::from_str(HoldemFast, "AhKh").unwrap())
+        .add_player("Hero".into(), Hand::from_str(Holdem, "AhKh").unwrap())
         .unwrap();
     calculator
-        .add_player("Villain".into(), Hand::from_str(HoldemFast, "QsQd").unwrap())
+        .add_player("Villain".into(), Hand::from_str(Holdem, "QsQd").unwrap())
         .unwrap();
     calculator.calculate(drop).unwrap();
     println!(

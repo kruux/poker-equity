@@ -1,6 +1,9 @@
 use crate::cards::{Card, CardSet};
 
-use super::{rankings::{HighHandRank, ShortDeckRank}, PokerType, PokerVariant};
+use super::{
+    rankings::{short_deck_score, HighHandRank, ShortDeckRank},
+    PokerType, PokerVariant,
+};
 
 /// Hold'em over thirty-six cards, sixes and up.
 ///
@@ -35,6 +38,10 @@ impl PokerVariant for ShortDeck {
 
     fn board_cards(&self) -> usize {
         5
+    }
+
+    fn score(&self, cards: &[Card]) -> u32 {
+        short_deck_score(cards) as u32
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {

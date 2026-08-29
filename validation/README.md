@@ -56,6 +56,57 @@ The seven-card checks matter more than their sampling suggests: the straight
 bug this library once carried lived only in hands of more than five cards,
 where a duplicate rank could sit above a straight.
 
+## Going exhaustive on the rest
+
+`cross_check.py` sorts every hand it looks at, so it needs them all in memory.
+That caps it at five-card hands. `exhaustive.py` walks the same ground in
+chunks and keeps only the *mapping* — which of our scores goes with which of
+pokerkit's ranks — which is a few thousand entries however many hands pass
+through. Hands are checked and discarded, so memory is flat.
+
+```sh
+cargo build --release --features python
+cp target/release/libpoker_calculator.so /tmp/pymod/poker_calculator.so
+
+PYTHONPATH=/tmp/pymod .venv/bin/python validation/exhaustive.py seven_high
+```
+
+Add `--limit N` for a trial run. Disagreements go to a file rather than the
+screen, so a run that finds a systematic fault does not bury the summary.
+
+The wall clock is set entirely by pokerkit, which evaluates about eight
+thousand seven-card hands a second; our side scores seven million, so it never
+waits. Measured at about 45,000 hands a second across sixteen cores:
+
+| Check | Hands | Roughly |
+|---|---|---|
+| `badugi` | 270,725 | seconds |
+| `high`, `deuce_seven`, `low_a5` | 2,598,960 each | a minute each |
+| `short_deck` | 376,992 | seconds |
+| `seven_short_deck` | 8,347,680 | 3 minutes |
+| `seven_high` | 133,784,560 | ~50 minutes |
+| `seven_low` | 133,784,560 | ~50 minutes |
+
+So every game can be checked exhaustively in about two hours, once.
+
+## Omaha is the exception
+
+Omaha cannot be walked. A deal is four hole cards and five board cards, so
+there are `C(52,4) × C(48,5)` = **4.6 × 10¹¹** of them. At the rate above that
+is a hundred and forty years, and no amount of chunking changes it — the
+problem is the size of the space, not the memory.
+
+What can be said instead is that Omaha adds very little to what is already
+proved. Its score is the best of the sixty ways to pair two hole cards with
+three of the board, and each of those sixty is an ordinary five-card
+evaluation that the exhaustive `high` check already covers. The only untested
+part is the pairing itself, which is a fixed enumeration that does not depend
+on which cards arrive: it produces the same sixty subsets whatever the deal.
+A sample tests that, and a small one suffices, because a fault in a fixed
+enumeration shows up on nearly every hand rather than hiding in a corner of
+the space. The same argument covers five- and six-card Omaha and the split-pot
+variants.
+
 ## Reading a disagreement
 
 The two libraries number hands differently — pokerkit counts upwards from the

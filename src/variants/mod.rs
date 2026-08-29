@@ -2,10 +2,8 @@ mod badugi;
 mod deuce_seven;
 mod equity;
 mod holdem;
-mod holdem_fast;
 mod omaha;
 mod omaha_hi_lo;
-mod omaha_fast;
 mod rankings;
 mod razz;
 mod short_deck;
@@ -16,12 +14,10 @@ pub use badugi::Badugi;
 pub use deuce_seven::DeuceSeven;
 pub(crate) use equity::CommunityCardGame;
 pub use equity::EquityCalculation;
-pub(crate) use equity::HasLow;
+pub use equity::HasLow;
 pub use holdem::Holdem;
-pub use holdem_fast::HoldemFast;
 pub use omaha::{Courchevel, Omaha, OmahaFive, OmahaSix};
 pub use omaha_hi_lo::{CourchevelHiLo, OmahaFiveHiLo, OmahaHiLo};
-pub use omaha_fast::OmahaFast;
 pub use rankings::{deuce_seven_score, high_score, low_a5_score, short_deck_score};
 pub use rankings::fast_to_high;
 pub use rankings::high_to_fast;
@@ -75,10 +71,30 @@ pub trait PokerVariant: Clone + Copy {
         0
     }
 
-    /// Scores a hand. `cards` holds the private cards first and any shared
+    /// Names a hand. `cards` holds the private cards first and any shared
     /// board after them, and may be short, in which case the result is an
     /// incomplete rank that loses to any complete hand.
+    ///
+    /// This is the readable answer, for showing a player what they have. The
+    /// sampling loop uses [`score`](Self::score) instead.
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank;
+
+    /// Where a hand stands against others, as a single number, **lower being
+    /// better**.
+    ///
+    /// This is what the sampling loop compares, and for most games it is a
+    /// lookup rather than a walk through the hand. Keeping it apart from
+    /// [`evaluate_hand`](Self::evaluate_hand) is what lets the loop read a
+    /// table while the readable form stays available -- and stays the
+    /// independent thing the tables are checked against.
+    fn score(&self, cards: &[Card]) -> u32;
+
+    /// The low half's score, or `None` when the hand has no qualifying low.
+    ///
+    /// Only split games have a low half, so the default is `None`.
+    fn low_score(&self, _cards: &[Card]) -> Option<u32> {
+        None
+    }
 
     /// The variant's display name.
     fn to_string(&self) -> String;

@@ -2,10 +2,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Mutex;
 
 use crate::odds::{equity, EquityRequest, Progress, Target};
-use crate::variants::HoldemFast;
+use crate::variants::Holdem;
 
-fn request(hands: &[&str], board: &str) -> EquityRequest<HoldemFast> {
-    EquityRequest::from_text(HoldemFast, hands, board, "").unwrap()
+fn request(hands: &[&str], board: &str) -> EquityRequest<Holdem> {
+    EquityRequest::from_text(Holdem, hands, board, "").unwrap()
 }
 
 /// A spot small enough to walk comes back exact, without an error bar, even
