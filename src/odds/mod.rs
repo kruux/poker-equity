@@ -10,6 +10,7 @@ pub use runner::{equity, equity_with_progress, Progress, Target};
 
 #[cfg(test)]
 mod tests {
+    mod calibration;
     mod chunk_tests;
     mod runner_tests;
     mod deuce_calculator_tests;
