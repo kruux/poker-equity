@@ -25,6 +25,12 @@ pub trait HasLow {
     fn low(&self) -> Option<&LowHandRank>;
 }
 
+/// What the equity engine needs from a game beyond how to score a hand:
+/// how to check a request makes sense, how to deal one hand, and how to split
+/// the pot afterwards.
+///
+/// Most of it has a default that suits every game that awards the whole pot
+/// to one hand; a split game overrides the awarding.
 pub trait EquityCalculation: PokerVariant
 where
     Self: Sized,

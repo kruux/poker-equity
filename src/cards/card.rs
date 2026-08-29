@@ -91,6 +91,8 @@ impl fmt::Display for Card {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Sequence)]
+/// A card's suit. Suit order is arbitrary and carries no meaning: it exists
+/// so that a card has an index, and must never decide which hand wins.
 pub enum Suit {
     Club,
     Diamond,
@@ -155,6 +157,7 @@ pub enum Rank {
 }
 
 impl Rank {
+    /// The rank's value, `2` for the deuce through `14` for the ace.
     pub fn to_value(&self) -> u8 {
         *self as u8
     }

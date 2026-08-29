@@ -7,6 +7,9 @@ use crate::{
 
 use super::EquityCalculation;
 
+/// Shared by the games that deal a board: hold'em, the Omaha family, short
+/// deck. They differ only in how many cards a player holds, so the dealing
+/// and the validation live here once.
 pub trait CommunityCardGame: EquityCalculation {
     /// The checks every community game shares: enough players, equal hand
     /// sizes, and a board that still has something to deal.

@@ -5,6 +5,11 @@ use crate::{
 };
 
 #[derive(Clone, Copy, Debug)]
+/// Five cards, drawing once, where the worst high hand wins.
+///
+/// The ace is always high and straights and flushes count against you, so the
+/// best hand is `7-5-4-3-2` of mixed suits. Only a single draw is modelled:
+/// equity in triple draw is undefined without saying how each draw resolves.
 pub struct DeuceSeven;
 
 impl DeuceSeven {}

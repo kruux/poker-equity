@@ -6,6 +6,7 @@ use crate::{
 use super::{rankings::high_score, StudHandRank};
 
 #[derive(Clone, Copy, Debug)]
+/// Seven private cards, no board, the best five playing.
 pub struct SevenCardStud;
 
 impl PokerVariant for SevenCardStud {

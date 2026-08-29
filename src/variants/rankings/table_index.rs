@@ -20,7 +20,9 @@ pub const BUCKET_BITS: u32 = 14;
 /// displacement search terminate quickly.
 pub const SLOT_BITS: u32 = 17;
 
+/// How many buckets the keys are scattered into.
 pub const BUCKET_COUNT: usize = 1 << BUCKET_BITS;
+/// How many slots each kernel's score table holds.
 pub const SLOT_COUNT: usize = 1 << SLOT_BITS;
 
 /// Golden-ratio and splitmix constants: any odd multiplier spreads the high

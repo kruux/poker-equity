@@ -127,6 +127,7 @@ pub struct NotationError {
 }
 
 impl NotationError {
+    /// An error of `kind`, covering `len` bytes from `offset`.
     pub fn new(kind: NotationErrorKind, offset: usize, len: usize) -> Self {
         Self { kind, offset, len }
     }
