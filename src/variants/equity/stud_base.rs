@@ -8,6 +8,8 @@ use super::EquityCalculation;
 
 /// Has code that will be reused when simulating all stud based games
 pub(crate) trait StudCardGame: EquityCalculation {
+    /// The checks every stud game shares: enough players, all with the same
+    /// number of cards, and at least the three they start with.
     fn validate_stud(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         // At least 2 players for a meaningful simulation
         let players = calculator.players();
@@ -31,22 +33,22 @@ pub(crate) trait StudCardGame: EquityCalculation {
         Ok(())
     }
 
+    /// Deals every player out to seven cards, a round at a time, and returns
+    /// their holdings in seat order.
     fn deal_cards(
         &self,
         mut deck: crate::cards::Deck,
         calculator: &EquityCalculator<Self>,
-    ) -> Result<Vec<(String, Vec<Card>)>, PokerError> {
-        // Create a new player vec with cloned values
-        let mut players = calculator
+    ) -> Result<Vec<Vec<Card>>, PokerError> {
+        let mut players: Vec<Vec<Card>> = calculator
             .players()
             .iter()
-            .map(|(name, hand, _)| (name.clone(), hand.cards().to_vec()))
-            .collect::<Vec<_>>();
+            .map(|(_, hand, _)| hand.cards().to_vec())
+            .collect();
 
-        // Deal the remaining cards to reach 7
-        let rounds_left = 7 - players[0].1.len();
+        let rounds_left = 7 - players[0].len();
         for _ in 0..rounds_left {
-            for (_, cards) in players.iter_mut() {
+            for cards in players.iter_mut() {
                 if let Some(card) = deck.deal() {
                     cards.push(card);
                 } else {

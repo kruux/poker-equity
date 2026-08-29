@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::EquityCalculation;
 use crate::{
     cards::Deck,
@@ -26,43 +24,29 @@ impl EquityCalculation for DeuceSeven {
         &self,
         mut deck: Deck,
         calculator: &EquityCalculator<Self>,
-    ) -> Result<std::collections::HashMap<String, f64>, PokerError> {
-        // For each player, remove their cards and deal new ones
-        let mut final_hands: Vec<(String, Hand<DeuceSeven>)> = Vec::new();
+        shares: &mut [f64],
+    ) -> Result<(), PokerError> {
+        let mut final_hands: Vec<Hand<DeuceSeven>> = Vec::with_capacity(shares.len());
 
-        for (name, initial_hand, cards_to_discard) in calculator.players() {
-            // Create new hand by discarding specified cards
+        for (_, initial_hand, cards_to_discard) in calculator.players() {
             let mut current_cards = initial_hand.cards().to_vec();
             current_cards.retain(|card| !cards_to_discard.contains(card));
 
-            // Check how many cards are needed
-            let cards_needed = 5 - current_cards.len();
-
-            // Draw new cards
-            for _ in 0..cards_needed {
-                if let Some(card) = deck.deal() {
-                    current_cards.push(card);
-                } else {
-                    return Err(GameError::NotEnoughCards.into());
-                }
+            for _ in current_cards.len()..5 {
+                let card = deck.deal().ok_or(GameError::NotEnoughCards)?;
+                current_cards.push(card);
             }
 
-            let final_hand = Hand::new_with_cards(DeuceSeven, current_cards)?;
-            final_hands.push((name.clone(), final_hand));
+            final_hands.push(Hand::new_with_cards(DeuceSeven, current_cards)?);
         }
 
-        // Compare hands to find winner
-        let rankings = self.rank_hands(&final_hands)?;
-        let winners = &rankings[0];
-
-        // Calculate equity
-        let equity_share = 1.0 / (winners.len() as f64); // Important to split up the equity in ties
-        let mut equity: HashMap<String, f64> = HashMap::new();
-        for winner in winners {
-            equity.insert(winner.clone(), equity_share);
+        let winners = &self.rank_hands(&final_hands)?[0];
+        let share = 1.0 / winners.len() as f64;
+        for &seat in winners {
+            shares[seat] += share;
         }
 
-        Ok(equity)
+        Ok(())
     }
 }
 
