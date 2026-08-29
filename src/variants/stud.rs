@@ -7,9 +7,9 @@ use super::{rankings::high_score, StudHandRank};
 
 #[derive(Clone, Copy, Debug)]
 /// Seven private cards, no board, the best five playing.
-pub struct SevenCardStud;
+pub struct Stud;
 
-impl PokerVariant for SevenCardStud {
+impl PokerVariant for Stud {
     type HandRank = StudHandRank;
 
     fn poker_type(&self) -> PokerType {
@@ -25,7 +25,7 @@ impl PokerVariant for SevenCardStud {
     }
 
     fn to_string(&self) -> String {
-        "Stud".to_string()
+        "Seven-Card Stud".to_string()
     }
 
     fn key(&self) -> &'static str {

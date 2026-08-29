@@ -4,12 +4,12 @@ use crate::{
     error::{EquityError, PokerError},
     hand::Hand,
     odds::EquityCalculator,
-    variants::SevenCardStud,
+    variants::Stud,
 };
 
 #[test]
 fn test_stud_validation_errors() -> Result<(), PokerError> {
-    let stud = SevenCardStud;
+    let stud = Stud;
 
     // Less than 2 players
     let mut calc = EquityCalculator::new(stud, 100);
@@ -47,7 +47,7 @@ fn test_stud_validation_errors() -> Result<(), PokerError> {
 
 #[test]
 fn test_stud_100_percent() -> Result<(), PokerError> {
-    let stud = SevenCardStud;
+    let stud = Stud;
     let mut calc = EquityCalculator::new(stud, 1000);
 
     // Player 1 has royal flush, Player 2 has worse hand
@@ -66,11 +66,11 @@ fn test_stud_100_percent() -> Result<(), PokerError> {
 
 #[test]
 fn test_equity_identical_hands() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(SevenCardStud, 100000);
+    let mut calculator = EquityCalculator::new(Stud, 100000);
 
     // Two players both with 5-card royal flushes
-    let alice_hand = Hand::from_str(SevenCardStud, "Ah Kh Qh Jh Th")?;
-    let bob_hand = Hand::from_str(SevenCardStud, "As Ks Qs Js Ts")?;
+    let alice_hand = Hand::from_str(Stud, "Ah Kh Qh Jh Th")?;
+    let bob_hand = Hand::from_str(Stud, "As Ks Qs Js Ts")?;
 
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
@@ -86,12 +86,12 @@ fn test_equity_identical_hands() -> Result<(), PokerError> {
 
 #[test]
 fn test_equity_quads_vs_pair() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(SevenCardStud, 100000);
+    let mut calculator = EquityCalculator::new(Stud, 100000);
 
     // Quad aces
-    let alice_hand = Hand::from_str(SevenCardStud, "Ah Ac Ad As 2h")?;
+    let alice_hand = Hand::from_str(Stud, "Ah Ac Ad As 2h")?;
     // Pair of kings
-    let bob_hand = Hand::from_str(SevenCardStud, "Kh Kc 2c 3d 4s")?;
+    let bob_hand = Hand::from_str(Stud, "Kh Kc 2c 3d 4s")?;
 
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
@@ -107,11 +107,11 @@ fn test_equity_quads_vs_pair() -> Result<(), PokerError> {
 
 #[test]
 fn test_equity_trips_vs_three_cards() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(SevenCardStud, 100000);
+    let mut calculator = EquityCalculator::new(Stud, 100000);
 
     // Three aces vs Q72 rainbow
-    let alice_hand = Hand::from_str(SevenCardStud, "As Ah Ad")?;
-    let bob_hand = Hand::from_str(SevenCardStud, "Qs 7h 2d")?;
+    let alice_hand = Hand::from_str(Stud, "As Ah Ad")?;
+    let bob_hand = Hand::from_str(Stud, "Qs 7h 2d")?;
 
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
@@ -127,11 +127,11 @@ fn test_equity_trips_vs_three_cards() -> Result<(), PokerError> {
 
 #[test]
 fn test_equity_trips_vs_flush_draw() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(SevenCardStud, 100000);
+    let mut calculator = EquityCalculator::new(Stud, 100000);
 
     // Three aces vs three cards to a flush
-    let alice_hand = Hand::from_str(SevenCardStud, "As Ah Ad")?;
-    let bob_hand = Hand::from_str(SevenCardStud, "7c 6c 5c")?;
+    let alice_hand = Hand::from_str(Stud, "As Ah Ad")?;
+    let bob_hand = Hand::from_str(Stud, "7c 6c 5c")?;
 
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
@@ -147,12 +147,12 @@ fn test_equity_trips_vs_flush_draw() -> Result<(), PokerError> {
 
 #[test]
 fn test_equity_three_way_trips_vs_draws() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(SevenCardStud, 100000);
+    let mut calculator = EquityCalculator::new(Stud, 100000);
 
     // Three deuces vs club flush draw vs heart flush draw
-    let alice_hand = Hand::from_str(SevenCardStud, "2s 2h 2d")?;
-    let bob_hand = Hand::from_str(SevenCardStud, "7c 6c 5c")?;
-    let charlie_hand = Hand::from_str(SevenCardStud, "Th 9h 8h")?;
+    let alice_hand = Hand::from_str(Stud, "2s 2h 2d")?;
+    let bob_hand = Hand::from_str(Stud, "7c 6c 5c")?;
+    let charlie_hand = Hand::from_str(Stud, "Th 9h 8h")?;
 
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;
@@ -171,10 +171,10 @@ fn test_equity_three_way_trips_vs_draws() -> Result<(), PokerError> {
 #[test]
 fn test_close_equity_stud() -> Result<(), PokerError> {
     // 77x vs AJ9 with 2 cards in a flush draw
-    let mut calculator = EquityCalculator::new(SevenCardStud, 100000);
+    let mut calculator = EquityCalculator::new(Stud, 100000);
 
-    let alice_hand = Hand::from_str(SevenCardStud, "7h 7c 2s")?;
-    let bob_hand = Hand::from_str(SevenCardStud, "Ah Jh 9d")?;
+    let alice_hand = Hand::from_str(Stud, "7h 7c 2s")?;
+    let bob_hand = Hand::from_str(Stud, "Ah Jh 9d")?;
 
     calculator.add_player("Alice".to_string(), alice_hand)?;
     calculator.add_player("Bob".to_string(), bob_hand)?;

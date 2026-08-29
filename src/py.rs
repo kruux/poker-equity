@@ -28,7 +28,7 @@ macro_rules! with_variant {
     ($key:expr, |$variant:ident| $body:expr) => {
         match $key {
             "holdem" => { let $variant = Holdem; $body }
-            "holdem_short_deck" => { let $variant = ShortDeck; $body }
+            "short_deck" => { let $variant = ShortDeck; $body }
             "omaha" => { let $variant = Omaha; $body }
             "omaha_five" => { let $variant = OmahaFive; $body }
             "omaha_six" => { let $variant = OmahaSix; $body }
@@ -36,7 +36,7 @@ macro_rules! with_variant {
             "omaha_five_hi_lo" => { let $variant = OmahaFiveHiLo; $body }
             "courchevel" => { let $variant = Courchevel; $body }
             "courchevel_hi_lo" => { let $variant = CourchevelHiLo; $body }
-            "stud" => { let $variant = SevenCardStud; $body }
+            "stud" => { let $variant = Stud; $body }
             "stud_hi_lo" => { let $variant = StudHiLo; $body }
             "razz" => { let $variant = Razz; $body }
             "deuce_seven" => { let $variant = DeuceSeven; $body }
@@ -97,7 +97,7 @@ fn variants(py: Python<'_>) -> PyResult<Py<PyList>> {
     let out = PyList::empty(py);
     for key in [
         "holdem",
-        "holdem_short_deck",
+        "short_deck",
         "omaha",
         "omaha_five",
         "omaha_six",

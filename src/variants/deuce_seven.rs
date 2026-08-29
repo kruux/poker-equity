@@ -30,7 +30,7 @@ impl PokerVariant for DeuceSeven {
     }
 
     fn to_string(&self) -> String {
-        "2-7 single draw".to_string()
+        "2-7 Lowball (single draw)".to_string()
     }
 
     fn key(&self) -> &'static str {

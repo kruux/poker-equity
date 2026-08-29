@@ -366,11 +366,11 @@ fn test_the_two_ways_of_writing_a_draw_agree() -> Result<(), PokerError> {
 /// Stud works the same way: three cards known, four still to come.
 #[test]
 fn test_a_short_stud_hand_is_dealt_out() -> Result<(), PokerError> {
-    use crate::variants::SevenCardStud;
+    use crate::variants::Stud;
 
-    let short = EquityRequest::from_text(SevenCardStud, &["AhKhQh", "2c3d4s"], "", "")?;
+    let short = EquityRequest::from_text(Stud, &["AhKhQh", "2c3d4s"], "", "")?;
     let spelled_out = EquityRequest::from_text(
-        SevenCardStud,
+        Stud,
         &["Ah Kh Qh * * * *", "2c 3d 4s * * * *"],
         "",
         "",

@@ -23,7 +23,7 @@ fn test_every_variant_row_exists() {
         (OmahaFiveHiLo.key(), OmahaFiveHiLo.hole_cards(), OmahaFiveHiLo.board_cards(), OmahaFiveHiLo.deck().len()),
         (Courchevel.key(), Courchevel.hole_cards(), Courchevel.board_cards(), Courchevel.deck().len()),
         (CourchevelHiLo.key(), CourchevelHiLo.hole_cards(), CourchevelHiLo.board_cards(), CourchevelHiLo.deck().len()),
-        (SevenCardStud.key(), SevenCardStud.hole_cards(), SevenCardStud.board_cards(), SevenCardStud.deck().len()),
+        (Stud.key(), Stud.hole_cards(), Stud.board_cards(), Stud.deck().len()),
         (StudHiLo.key(), StudHiLo.hole_cards(), StudHiLo.board_cards(), StudHiLo.deck().len()),
         (Razz.key(), Razz.hole_cards(), Razz.board_cards(), Razz.deck().len()),
         (DeuceSeven.key(), DeuceSeven.hole_cards(), DeuceSeven.board_cards(), DeuceSeven.deck().len()),
@@ -32,7 +32,7 @@ fn test_every_variant_row_exists() {
 
     let expected: Vec<(&str, usize, usize, u32)> = vec![
         ("holdem", 2, 5, 52),
-        ("holdem_short_deck", 2, 5, 36),
+        ("short_deck", 2, 5, 36),
         ("omaha", 4, 5, 52),
         ("omaha_five", 5, 5, 52),
         ("omaha_six", 6, 5, 52),
@@ -68,6 +68,68 @@ fn test_every_variant_row_exists() {
     }
 }
 
+/// The name every game goes by, at all three layers at once.
+///
+/// A game is named three times over -- as a Rust type, as the key it is
+/// stored and configured under, and as the label a person reads -- and the
+/// three drifted apart once already: a `SevenCardStud` type answering to
+/// `stud`, and a `ShortDeck` type answering to `holdem_short_deck`. Writing
+/// them out together is what makes the next drift deliberate.
+#[test]
+fn test_the_three_names_of_every_game_line_up() {
+    let table: Vec<(&str, &str, &str)> = vec![
+        // Rust type          key                 label
+        ("Holdem", Holdem.key(), Holdem.to_string().leak()),
+        ("ShortDeck", ShortDeck.key(), ShortDeck.to_string().leak()),
+        ("Omaha", Omaha.key(), Omaha.to_string().leak()),
+        ("OmahaFive", OmahaFive.key(), OmahaFive.to_string().leak()),
+        ("OmahaSix", OmahaSix.key(), OmahaSix.to_string().leak()),
+        ("OmahaHiLo", OmahaHiLo.key(), OmahaHiLo.to_string().leak()),
+        ("OmahaFiveHiLo", OmahaFiveHiLo.key(), OmahaFiveHiLo.to_string().leak()),
+        ("Courchevel", Courchevel.key(), Courchevel.to_string().leak()),
+        ("CourchevelHiLo", CourchevelHiLo.key(), CourchevelHiLo.to_string().leak()),
+        ("Stud", Stud.key(), Stud.to_string().leak()),
+        ("StudHiLo", StudHiLo.key(), StudHiLo.to_string().leak()),
+        ("Razz", Razz.key(), Razz.to_string().leak()),
+        ("DeuceSeven", DeuceSeven.key(), DeuceSeven.to_string().leak()),
+        ("Badugi", Badugi.key(), Badugi.to_string().leak()),
+    ];
+
+    let expected: Vec<(&str, &str, &str)> = vec![
+        ("Holdem", "holdem", "Hold'em"),
+        ("ShortDeck", "short_deck", "Short Deck Hold'em (flush beats full house)"),
+        ("Omaha", "omaha", "Omaha"),
+        ("OmahaFive", "omaha_five", "5-Card Omaha"),
+        ("OmahaSix", "omaha_six", "6-Card Omaha"),
+        ("OmahaHiLo", "omaha_hi_lo", "Omaha Hi/Lo"),
+        ("OmahaFiveHiLo", "omaha_five_hi_lo", "5-Card Omaha Hi/Lo"),
+        ("Courchevel", "courchevel", "Courchevel"),
+        ("CourchevelHiLo", "courchevel_hi_lo", "Courchevel Hi/Lo"),
+        ("Stud", "stud", "Seven-Card Stud"),
+        ("StudHiLo", "stud_hi_lo", "Seven-Card Stud Hi/Lo"),
+        ("Razz", "razz", "Razz"),
+        ("DeuceSeven", "deuce_seven", "2-7 Lowball (single draw)"),
+        ("Badugi", "badugi", "Badugi (single draw)"),
+    ];
+
+    assert_eq!(table, expected);
+
+    // A game whose type name spells out what its key abbreviates, or the
+    // other way about, is how the two drifted before. The key should be the
+    // type name in snake case, allowing for the family words that have no
+    // separator in the type.
+    for (type_name, key, _) in &table {
+        let flattened = key.replace('_', "").to_lowercase();
+        assert_eq!(
+            type_name.to_lowercase(),
+            flattened,
+            "{} answers to {:?}, which is not the same name",
+            type_name,
+            key
+        );
+    }
+}
+
 /// Every variant names itself, so a caller can label a table without a
 /// lookup of its own.
 #[test]
@@ -82,7 +144,7 @@ fn test_every_variant_has_a_label() {
         OmahaFiveHiLo.to_string(),
         Courchevel.to_string(),
         CourchevelHiLo.to_string(),
-        SevenCardStud.to_string(),
+        Stud.to_string(),
         StudHiLo.to_string(),
         Razz.to_string(),
         DeuceSeven.to_string(),
@@ -93,7 +155,7 @@ fn test_every_variant_has_a_label() {
     }
     // Short deck names its ruleset, since rooms differ on it.
     assert!(
-        ShortDeck.to_string().contains("flush over full house"),
+        ShortDeck.to_string().contains("flush beats full house"),
         "the ruleset has to be named: {}",
         ShortDeck.to_string()
     );

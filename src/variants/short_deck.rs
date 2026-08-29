@@ -49,10 +49,10 @@ impl PokerVariant for ShortDeck {
     }
 
     fn to_string(&self) -> String {
-        "Short Deck (PokerStars: flush over full house)".to_string()
+        "Short Deck Hold'em (flush beats full house)".to_string()
     }
 
     fn key(&self) -> &'static str {
-        "holdem_short_deck"
+        "short_deck"
     }
 }
