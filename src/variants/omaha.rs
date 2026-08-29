@@ -20,6 +20,14 @@ impl PokerVariant for Omaha {
         9
     }
 
+    fn hole_cards(&self) -> usize {
+        4
+    }
+
+    fn board_cards(&self) -> usize {
+        5
+    }
+
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
         // PLO get's slightly tricky. Need to compare every 2 card combination from hand with every 3 card combination from the board
         let hole_cards = &cards[0..cards.len().min(4)];

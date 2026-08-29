@@ -19,14 +19,6 @@ impl EquityCalculation for Razz {
             .into_iter()
             .map(|cards| Hand::new_with_cards(*self, cards))
             .collect::<Result<Vec<_>, _>>()?;
-
-        // In razz the lowest hand takes the whole pot.
-        let winners = &self.rank_hands(&final_hands)?[0];
-        let share = 1.0 / winners.len() as f64;
-        for &seat in winners {
-            shares[seat] += share;
-        }
-
-        Ok(())
+        self.award(&final_hands, shares)
     }
 }

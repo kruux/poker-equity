@@ -20,6 +20,10 @@ impl PokerVariant for DeuceSeven {
         5
     }
 
+    fn hole_cards(&self) -> usize {
+        5
+    }
+
     fn to_string(&self) -> String {
         "2-7 single draw".to_string()
     }

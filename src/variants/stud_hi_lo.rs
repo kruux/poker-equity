@@ -25,6 +25,10 @@ impl PokerVariant for StudHiLo {
         7
     }
 
+    fn hole_cards(&self) -> usize {
+        7
+    }
+
     fn to_string(&self) -> String {
         "Stud Hi/Lo".to_string()
     }

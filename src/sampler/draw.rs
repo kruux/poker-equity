@@ -39,8 +39,43 @@ enum Strategy {
 /// all be filled from it, which is uniform over valid sets by construction.
 #[derive(Debug, Clone)]
 pub struct SlotSampler {
+    /// Cards that every valid deal must contain, taken from slots that admit
+    /// exactly one card.
+    fixed: Vec<Card>,
+    /// What is left to draw for once the forced slots are settled.
     slots: Vec<CardSet>,
     strategy: Strategy,
+}
+
+/// Pulls out the slots that admit exactly one card.
+///
+/// A slot with a single candidate takes that card in every possible deal, so
+/// the card and the slot can both be removed without changing which sets are
+/// valid. Doing it first is what keeps a named board card from being sampled
+/// for: three known flop cards among five board slots would otherwise mean
+/// drawing five cards and hoping all three turn up.
+///
+/// Removing one card can leave another slot with a single candidate, so this
+/// repeats until it settles.
+fn extract_forced(slots: &[CardSet], available: CardSet) -> (Vec<Card>, Vec<CardSet>) {
+    let mut open: Vec<CardSet> = slots.iter().map(|s| s.intersection(available)).collect();
+    let mut fixed: Vec<Card> = Vec::new();
+
+    loop {
+        let Some(index) = open.iter().position(|slot| slot.len() == 1) else {
+            break;
+        };
+        let Some(card) = open[index].iter().next() else {
+            break;
+        };
+        fixed.push(card);
+        open.remove(index);
+        for slot in open.iter_mut() {
+            slot.remove(card);
+        }
+    }
+
+    (fixed, open)
 }
 
 impl SlotSampler {
@@ -49,16 +84,16 @@ impl SlotSampler {
     /// `available` is what the deck holds before any of this deal is dealt;
     /// the cards other players take are excluded at draw time.
     pub fn new(slots: &[CardSet], available: CardSet) -> Self {
-        let slots = slots.to_vec();
+        let (fixed, slots) = extract_forced(slots, available);
+        let free = available.without(CardSet::from_cards(&fixed));
+
         let pool = slots
             .iter()
             .fold(CardSet::EMPTY, |all, slot| all.union(*slot))
-            .intersection(available);
+            .intersection(free);
 
-        // Nothing to decide when every slot takes anything on offer.
-        let unconstrained = slots
-            .iter()
-            .all(|slot| available.without(*slot).is_empty());
+        // Nothing to decide when every slot takes anything still on offer.
+        let unconstrained = slots.iter().all(|slot| free.without(*slot).is_empty());
 
         let strategy = if unconstrained {
             Strategy::Free
@@ -68,7 +103,11 @@ impl SlotSampler {
             Strategy::DrawAndTest { pool }
         };
 
-        Self { slots, strategy }
+        Self {
+            fixed,
+            slots,
+            strategy,
+        }
     }
 
     /// The same sampler, forced to draw and test.
@@ -83,14 +122,20 @@ impl SlotSampler {
             .fold(CardSet::EMPTY, |all, slot| all.union(*slot))
             .intersection(available);
         Self {
+            fixed: Vec::new(),
             slots,
             strategy: Strategy::DrawAndTest { pool },
         }
     }
 
-    /// How many cards this fills.
+    /// How many cards this fills, forced and drawn together.
     pub fn slot_count(&self) -> usize {
-        self.slots.len()
+        self.fixed.len() + self.slots.len()
+    }
+
+    /// How many of those are settled before any draw.
+    pub fn fixed_count(&self) -> usize {
+        self.fixed.len()
     }
 
     /// Which strategy was chosen, for tests and diagnostics.
@@ -110,28 +155,125 @@ impl SlotSampler {
     /// draw was unlucky, never that the request was impossible.
     pub fn draw(&self, available: CardSet, rng: &mut impl Rng, out: &mut Vec<Card>) -> bool {
         out.clear();
-        match &self.strategy {
+
+        // The forced cards come first. Another seat may have taken one this
+        // deal, which is a rejection like any other.
+        let mut available = available;
+        for &card in &self.fixed {
+            if !available.contains(card) {
+                out.clear();
+                return false;
+            }
+            available.remove(card);
+            out.push(card);
+        }
+        if self.slots.is_empty() {
+            return true;
+        }
+
+        let drawn_from = out.len();
+        let filled = match &self.strategy {
             Strategy::Free => draw_subset(available, self.slots.len(), rng, out),
             Strategy::Listed(sets) => {
                 if sets.is_empty() {
-                    return false;
+                    false
+                } else {
+                    let set = &sets[rng.gen_range(0..sets.len())];
+                    if set.iter().any(|card| !available.contains(*card)) {
+                        false // taken by an earlier seat this deal
+                    } else {
+                        out.extend_from_slice(set);
+                        true
+                    }
                 }
-                let set = &sets[rng.gen_range(0..sets.len())];
-                if set.iter().any(|card| !available.contains(*card)) {
-                    return false; // taken by an earlier seat this deal
-                }
-                out.extend_from_slice(set);
-                true
             }
             Strategy::DrawAndTest { pool } => {
                 let pool = pool.intersection(available);
-                if !draw_subset(pool, self.slots.len(), rng, out) {
-                    return false;
+                if draw_subset(pool, self.slots.len(), rng, out) {
+                    has_perfect_matching(&self.slots, &out[drawn_from..])
+                } else {
+                    false
                 }
-                has_perfect_matching(&self.slots, out)
             }
+        };
+
+        if !filled {
+            out.clear();
+        }
+        filled
+    }
+}
+
+impl SlotSampler {
+    /// Every set of cards these slots admit from `available`, or `None` when
+    /// there are more than `limit` of them.
+    ///
+    /// This is what exact enumeration walks. It is the same set of deals the
+    /// sampler draws from, listed rather than sampled, so the two modes
+    /// cannot disagree about which deals are possible.
+    pub fn all_sets(&self, available: CardSet, limit: usize) -> Option<Vec<Vec<Card>>> {
+        let mut available = available;
+        for &card in &self.fixed {
+            if !available.contains(card) {
+                return Some(Vec::new());
+            }
+            available.remove(card);
+        }
+
+        if self.slots.is_empty() {
+            return Some(vec![self.fixed.clone()]);
+        }
+
+        let pool = match &self.strategy {
+            Strategy::Free => available,
+            Strategy::Listed(_) | Strategy::DrawAndTest { .. } => self
+                .slots
+                .iter()
+                .fold(CardSet::EMPTY, |all, slot| all.union(*slot))
+                .intersection(available),
+        };
+
+        let cards: Vec<Card> = pool.iter().collect();
+        if cards.len() < self.slots.len() {
+            return Some(Vec::new());
+        }
+        if binomial_capped(cards.len(), self.slots.len(), limit) > limit {
+            return None;
+        }
+
+        let unconstrained = matches!(self.strategy, Strategy::Free);
+        Some(
+            cards
+                .into_iter()
+                .combinations(self.slots.len())
+                .filter(|set| unconstrained || has_perfect_matching(&self.slots, set))
+                .map(|set| {
+                    let mut whole = self.fixed.clone();
+                    whole.extend(set);
+                    whole
+                })
+                .collect(),
+        )
+    }
+}
+
+/// `n` choose `k`, stopping once it passes `limit`.
+fn binomial_capped(n: usize, k: usize, limit: usize) -> usize {
+    if k > n {
+        return 0;
+    }
+    let k = k.min(n - k);
+    let mut result: usize = 1;
+    for step in 0..k {
+        let Some(next) = result.checked_mul(n - step) else {
+            return usize::MAX;
+        };
+        result = next / (step + 1);
+        if result > limit {
+            return result;
         }
     }
+    result
 }
 
 /// Draws `count` distinct cards uniformly from `pool`.

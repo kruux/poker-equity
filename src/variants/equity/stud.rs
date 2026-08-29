@@ -25,13 +25,6 @@ impl EquityCalculation for SevenCardStud {
             .into_iter()
             .map(|cards| Hand::new_with_cards(SevenCardStud, cards))
             .collect::<Result<Vec<_>, _>>()?;
-
-        let winners = &self.rank_hands(&final_hands)?[0];
-        let share = 1.0 / winners.len() as f64;
-        for &seat in winners {
-            shares[seat] += share;
-        }
-
-        Ok(())
+        self.award(&final_hands, shares)
     }
 }
