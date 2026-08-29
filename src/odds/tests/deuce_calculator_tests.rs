@@ -230,10 +230,11 @@ fn test_equity_deuce_seven_t8_vs_97() -> Result<(), PokerError> {
 
     let results = calculator.calculate(drop)?;
 
-    // Bob should have 57.75% equity.
-    // When verifying this test, I only used 4 cards without a draw. Shouldn't make a big difference.
-    assert!((results["Alice"] - 42.24).abs() < 0.5);
-    assert!((results["Bob"] - 57.75).abs() < 0.5);
+    // Reference figures from a four-million-sample run of this same scenario,
+    // stable to within 0.01. At a hundred thousand samples one standard error
+    // is about 0.16, so the tolerance below is a little under four of them.
+    assert!((results["Alice"] - 41.83).abs() < 0.6);
+    assert!((results["Bob"] - 58.17).abs() < 0.6);
 
     Ok(())
 }

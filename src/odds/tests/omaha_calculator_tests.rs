@@ -299,3 +299,29 @@ fn test_multiway_drawing_scenario() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// End to end check on the exactly-two rule. Hero holds one heart against a
+/// three-heart board, so no river can give Hero a flush -- Villain's trip
+/// kings are already unbeatable. If the rule were not enforced, Hero would
+/// flush on any of the nine remaining hearts and take a share of the pot.
+#[test]
+fn test_one_hole_heart_never_flushes() -> Result<(), PokerError> {
+    let mut calc = EquityCalculator::new(Omaha, 20000);
+
+    let hero = Hand::from_str(Omaha, "Ah 3d 4s 5c")?; // one heart, no pair, no draw
+    let villain = Hand::from_str(Omaha, "Kd Kc 7h 8s")?; // trip kings with the board
+    let turn = Hand::from_str(Omaha, "Kh Qh Jh 2c")?; // three hearts, one king
+
+    calc.add_player("Hero".to_string(), hero)?;
+    calc.add_player("Villain".to_string(), villain)?;
+    calc.set_community_cards(turn.cards().to_vec())?;
+
+    let result = calc.calculate(drop)?;
+    assert!(
+        (result["Villain"] - 100.0).abs() < 0.0001,
+        "Villain holds trip kings and Hero cannot make a flush, got {}",
+        result["Villain"]
+    );
+
+    Ok(())
+}
