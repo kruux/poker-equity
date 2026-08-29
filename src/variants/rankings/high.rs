@@ -102,30 +102,35 @@ impl HighHandRank {
             .next()
     }
 
+    /// The highest straight among `cards`, as the rank that tops it.
+    ///
+    /// Duplicate ranks are dropped before the walk. A pair alongside a
+    /// straight neither makes nor breaks it, but leaving the duplicates in
+    /// shifts the position of the run and so misnames the rank that tops it.
     fn is_straight(cards: &[Card]) -> Option<Rank> {
-        let ranks = Self::sorted_ranks(cards);
-        if ranks.len() < 5 {
-            return None;
-        }
+        let mut distinct = Self::sorted_ranks(cards);
+        distinct.dedup();
 
-        let mut rank_values: Vec<u8> = ranks.iter().map(|r| r.to_value()).collect();
-        rank_values.dedup();
-
-        if ranks[0] == Rank::Ace {
-            rank_values.push(1);
-        }
-
-        let mut consecutive = 0;
-        for i in 0..rank_values.len() - 1 {
-            if rank_values[i] == rank_values[i + 1] + 1 {
-                consecutive += 1;
+        // Highest first, so the first run of five is the best straight.
+        let mut run = 1;
+        for i in 1..distinct.len() {
+            if distinct[i - 1].to_value() == distinct[i].to_value() + 1 {
+                run += 1;
+                if run == 5 {
+                    return Some(distinct[i - 4]);
+                }
             } else {
-                consecutive = 0;
-            }
-            if consecutive >= 4 {
-                return Some(ranks[i - 3]);
+                run = 1;
             }
         }
+
+        // The wheel is the one straight a descending walk cannot see: the ace
+        // sits at the top of the list and plays at the bottom of the hand.
+        let wheel = [Rank::Ace, Rank::Five, Rank::Four, Rank::Three, Rank::Two];
+        if wheel.iter().all(|rank| distinct.contains(rank)) {
+            return Some(Rank::Five);
+        }
+
         None
     }
 
