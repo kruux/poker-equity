@@ -92,7 +92,7 @@ omaha_hi_lo_variant!(
     OmahaHiLo,
     4,
     "Omaha Hi/Lo",
-    "omahahilo",
+    "omaha_hi_lo",
     "Four hole cards, split between the best high hand and the best\n\
      eight-or-better low."
 );
@@ -100,14 +100,14 @@ omaha_hi_lo_variant!(
     OmahaFiveHiLo,
     5,
     "5-Card Omaha Hi/Lo",
-    "5_omaha8",
+    "omaha_five_hi_lo",
     "Five-card Omaha, split between high and an eight-or-better low."
 );
 omaha_hi_lo_variant!(
     CourchevelHiLo,
     5,
     "Courchevel Hi/Lo",
-    "cour_hilo",
+    "courchevel_hi_lo",
     "Five-card Omaha hi/lo with the first board card dealt face up before\n\
      the betting."
 );

@@ -46,6 +46,6 @@ impl PokerVariant for ShortDeck {
     }
 
     fn key(&self) -> &'static str {
-        "6_holdem"
+        "holdem_short_deck"
     }
 }

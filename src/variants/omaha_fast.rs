@@ -58,6 +58,6 @@ impl PokerVariant for OmahaFast {
     }
 
     fn key(&self) -> &'static str {
-        "omahahi"
+        "omaha"
     }
 }

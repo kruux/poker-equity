@@ -83,28 +83,28 @@ omaha_variant!(
     Omaha,
     4,
     "Omaha",
-    "omahahi",
+    "omaha",
     "Four hole cards, two of which play."
 );
 omaha_variant!(
     OmahaFive,
     5,
     "5-Card Omaha",
-    "5_omahahi",
+    "omaha_five",
     "Five hole cards, two of which play."
 );
 omaha_variant!(
     OmahaSix,
     6,
     "6-Card Omaha",
-    "6_omahahi",
+    "omaha_six",
     "Six hole cards, two of which play."
 );
 omaha_variant!(
     Courchevel,
     5,
     "Courchevel",
-    "cour_hi",
+    "courchevel",
     "Five-card Omaha where the first board card is dealt face up before the\n\
      betting. Not a variant of its own: the same game, plus a rule that at\n\
      least one board card must be known, which lives in its equity validation."

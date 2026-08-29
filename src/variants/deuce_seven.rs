@@ -29,7 +29,7 @@ impl PokerVariant for DeuceSeven {
     }
 
     fn key(&self) -> &'static str {
-        "27_3draw"
+        "deuce_seven"
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> DeuceSevenRank {

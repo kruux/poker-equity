@@ -34,7 +34,7 @@ impl PokerVariant for StudHiLo {
     }
 
     fn key(&self) -> &'static str {
-        "studhilo"
+        "stud_hi_lo"
     }
 
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
