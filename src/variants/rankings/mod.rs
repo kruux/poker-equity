@@ -6,6 +6,7 @@ mod high;
 mod low;
 mod rank_translation;
 mod short_deck;
+mod table_index;
 
 pub type StudHandRank = HighHandRank;
 pub type RazzHandRank = LowHandRank;
@@ -16,7 +17,7 @@ pub type HoldemHandRank = HighHandRank;
 pub type OmahaHandRank = HighHandRank;
 pub use deuce_seven::DeuceSevenRank;
 pub use fast::{FastHandRank, FLUSH_KEYS, RANK_KEYS};
-pub(crate) use hand_rank_table::{FLUSH_RANKS, HAND_RANKS};
+pub(crate) use hand_rank_table::{FLUSH_SCORES, HAND_DISPLACEMENTS, HAND_SCORES};
 pub use hi_lo::HiLoHandRank;
 pub use high::HighHandRank;
 pub use low::LowHandRank;
