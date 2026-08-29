@@ -4,4 +4,5 @@ pub mod hand;
 pub mod notation;
 pub mod odds;
 pub mod player;
+pub mod sampler;
 pub mod variants;
