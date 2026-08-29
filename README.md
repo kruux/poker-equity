@@ -3,34 +3,81 @@
 An equity engine for poker. Give it a game, some hands, a board and some dead
 cards, and it tells you what share of the pot each player wins.
 
-Hands may be only partly known — `AKs`, `2 c`, `A**` are all valid — and the
-answer comes back with an error bar, or with none at all when the spot was
-small enough to enumerate rather than sample.
+## Games
 
-Fourteen games, from hold'em to badugi. Every hand ranking is checked
-exhaustively against an independent implementation; see
-[Correctness](#correctness).
+Deals a second on one core, including dealing, evaluation and splitting the
+pot. Run `cargo run --release --bin benchmark` for your own machine.
+
+| Key | Game | Deals/s |
+|---|---|--:|
+| `holdem` | Hold'em | 3,950,695 |
+| `short_deck` | Short Deck Hold'em — 36 cards, a flush beats a full house | 4,127,282 |
+| `omaha` | Omaha | 2,178,272 |
+| `omaha_five` | 5-Card Omaha | 1,771,263 |
+| `omaha_six` | 6-Card Omaha | 1,440,141 |
+| `omaha_hi_lo` | Omaha Hi/Lo, eight or better | 1,381,754 |
+| `omaha_five_hi_lo` | 5-Card Omaha Hi/Lo | ~1,300,000 |
+| `courchevel` | Courchevel | ~1,770,000 |
+| `courchevel_hi_lo` | Courchevel Hi/Lo | ~1,300,000 |
+| `stud` | Seven-Card Stud | 2,923,334 |
+| `stud_hi_lo` | Seven-Card Stud Hi/Lo | 2,517,386 |
+| `razz` | Razz | 3,041,352 |
+| `deuce_seven` | 2-7 Lowball, single draw | 5,790,994 |
+| `badugi` | Badugi, single draw | 887,681 |
+
+Hold'em across sixteen cores runs at **37.4 million** deals a second.
+
+Courchevel is not a variant of its own: it is five-card Omaha with the first
+board card face up before the betting, so it is the same evaluation plus one
+rule about what a legal board looks like — which is why it runs at the same
+speed as the game it is.
+
+Both draw games model **one** draw. Equity in triple draw is undefined without
+a drawing strategy — a made eight-low and a four-card draw are not comparable
+until you say how the draw resolves — so one draw is modelled and said so,
+rather than a number published from an invented model.
+
+## The short version
+
+Ace-king suited against a pair of queens, over half a million deals:
 
 ```rust
 use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
 
 let request = EquityRequest::from_text(
     Holdem,
-    &["AhAd", "KsKc"],   // one field per seat
-    "2c 7d 9h",          // the board so far
-    "",                  // dead cards
+    &["AhKh", "QsQd"],   // one field per seat
+    "",                  // no board yet
+    "",                  // no dead cards
 )?;
 
-let result = equity(&request, Target::Exact)?;
+let result = equity(&request, Target::Samples(500_000))?;
+
 for (seat, player) in result.equities().iter().enumerate() {
-    println!("seat {}: {:.2}%", seat, player.percent());
+    println!("seat {}: {:.2}% ± {:.2}", seat, player.percent(), player.margin_percent());
 }
-// seat 0: 91.62%
-// seat 1: 8.38%
+// seat 0: 46.20% ± 0.13
+// seat 1: 53.80% ± 0.13
 ```
 
-Only 990 run-outs are possible there, so `Target::Exact` walks all of them and
-the standard error comes back as exactly zero.
+To watch a long run as it goes — to repaint a table, or to notice the user
+cancelling — pass a function to be called after each batch:
+
+```rust
+use poker_calculator::odds::equity_with_progress;
+
+let result = equity_with_progress(&request, Target::Samples(5_000_000), |progress| {
+    println!("{} deals: {:.2}% ± {:.2}",
+        progress.samples,
+        progress.equities[0].percent(),
+        progress.equities[0].margin_percent());
+})?;
+```
+
+Hands may be only partly known — `AKs`, `2 c`, `A**` are all valid — and the
+answer comes with an error bar, or none at all when the spot was small enough
+to walk rather than sample. Every hand ranking is checked exhaustively against
+an independent implementation; see [Correctness](#correctness).
 
 ## Writing hands
 
@@ -104,18 +151,7 @@ short field there is a miscount, and an unknown card is a wildcard.
 
 ## Getting an answer
 
-The simple way. Say how good an answer you want, and get one:
-
-```rust
-use poker_calculator::odds::{equity, Target};
-
-// half a million deals
-let result = equity(&request, Target::Samples(500_000))?;
-
-for (seat, player) in result.equities().iter().enumerate() {
-    println!("seat {}: {:.2}% ± {:.2}", seat, player.percent(), player.margin_percent());
-}
-```
+`equity` takes a target, which is how you say what "good enough" means:
 
 | Target | Runs until |
 |---|---|
@@ -249,60 +285,9 @@ Both APIs are the same request — `from_text` parses into exactly what
 `from_masks` takes, once, before any card is dealt. A test runs both from the
 same seed and compares the raw sums.
 
-## Games
-
-| Key | Game | Hole | Board |
-|---|---|---|---|
-| `holdem` | Hold'em | 2 | 5 |
-| `short_deck` | Short deck — 36 cards, a flush beats a full house | 2 | 5 |
-| `omaha` | Omaha | 4 | 5 |
-| `omaha_five` | Five-card Omaha | 5 | 5 |
-| `omaha_six` | Six-card Omaha | 6 | 5 |
-| `omaha_hi_lo` | Omaha hi/lo, eight or better | 4 | 5 |
-| `omaha_five_hi_lo` | Five-card Omaha hi/lo | 5 | 5 |
-| `courchevel` | Courchevel | 5 | 5 |
-| `courchevel_hi_lo` | Courchevel hi/lo | 5 | 5 |
-| `stud` | Seven-card stud | 7 | — |
-| `stud_hi_lo` | Stud hi/lo | 7 | — |
-| `razz` | Razz | 7 | — |
-| `deuce_seven` | 2-7 lowball, single draw | 5 | — |
-| `badugi` | Badugi, single draw | 4 | — |
-
-Courchevel is not a variant of its own: it is five-card Omaha with the first
-board card face up before the betting, so it is the same evaluation plus one
-rule about what a legal board looks like.
-
-Both draw games model **one** draw. Equity in triple draw is undefined without
-a drawing strategy — a made eight-low and a four-card draw are not comparable
-until you say how the draw resolves — so one draw is modelled and said so,
-rather than a number published from an invented model.
-
 ## Speed
 
-Deals a second on one core, including dealing, evaluation and splitting the
-pot. Run `cargo run --release --bin benchmark` for your own machine.
-
-| Game | Deals/s | | Game | Deals/s |
-|---|--:|---|---|--:|
-| Hold'em | 3,950,695 | | Omaha | 2,178,272 |
-| Short deck | 4,127,282 | | 5-card Omaha | 1,771,263 |
-| Seven-card stud | 2,923,334 | | 6-card Omaha | 1,440,141 |
-| Stud hi/lo | 2,517,386 | | Omaha hi/lo | 1,381,754 |
-| Razz | 3,041,352 | | Badugi | 887,681 |
-| 2-7 single draw | 5,790,994 | | Hold'em, six seats | 1,809,326 |
-
-Hold'em across sixteen cores runs at **37.4 million** deals a second.
-
-The Omaha family used to be an order of magnitude behind the rest, because its
-rule is that exactly two hole cards play with exactly three of the board —
-sixty five-card hands to score per player per deal at four hole cards, a
-hundred at five and a hundred and fifty at six. It no longer is, because those
-sixty are not sixty separate hands: the board's ten three-card parts are the
-same for every hole pair and every seat at the table, a rank key is a sum so
-two parts combine with one addition, and a five-card flush needs both halves
-of the pairing to be of one suit. Sixty evaluations become sixty additions and
-sixty lookups. An inner evaluation costs **1.7 ns**, which is less than
-scoring a five-card hand from scratch.
+The per-game figures are in [Games](#games) above.
 
 Underneath, a hand is scored by two array reads:
 
@@ -372,9 +357,19 @@ Nothing is published to crates.io or PyPI yet.
 ## Building
 
 ```sh
-cargo test                              # 222 tests, about 20 seconds
+cargo test                              # 223 tests, about ten seconds
 cargo test --release -- --ignored       # the exhaustive sweeps
 cargo run --release --bin benchmark     # speed, per game
+```
+
+The tests spread across every core, which is not always what you want on the
+machine you are also using. `scripts/quiet` runs the same commands pinned to
+four cores at the lowest priority, and costs about fifteen percent of wall
+time:
+
+```sh
+scripts/quiet test
+QUIET_CORES=2 scripts/quiet run --release --bin benchmark
 ```
 
 Tests build at `opt-level = 2`, because the equity tests run a hundred

@@ -88,8 +88,12 @@ fn test_razz_equity_tied_hands() -> Result<(), PokerError> {
     let results = calculator.calculate(drop)?;
 
     // Should split equity 50-50
-    assert!((results["Player1"] - 50.0).abs() < 0.5);
-    assert!((results["Player2"] - 50.0).abs() < 0.5);
+    // Exactly half each, and not by measurement: the two hands hold the same
+    // ranks in different suits, and razz ignores suits. Swapping hearts for
+    // diamonds maps one hand to the other, so neither can hold an edge. The
+    // window is six standard errors of a hundred-thousand-deal run.
+    assert!((results["Player1"] - 50.0).abs() < 0.85);
+    assert!((results["Player2"] - 50.0).abs() < 0.85);
 
     Ok(())
 }
