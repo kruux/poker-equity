@@ -6,7 +6,6 @@ edition = "2021"
 [dependencies]
 enum-iterator = "2.1.0"
 itertools = "0.14.0"
-phf = { version = "0.11.3", features = ["macros"] }
 rand = "0.8.5"
 rayon = "1.10.0"
 
@@ -18,9 +17,6 @@ opt-level = 2
 
 [profile.dev.package."*"]
 opt-level = 2
-
-[build-dependencies]
-phf_codegen = "0.11.3"
 
 [dev-dependencies]
 indicatif = "0.17.9"

@@ -97,4 +97,9 @@ fn test_every_variant_has_a_label() {
         "the ruleset has to be named: {}",
         ShortDeck.to_string()
     );
+
+    // Both draw games model one draw, not three. Equity in triple draw is
+    // undefined without a drawing strategy, so the label says which it is.
+    assert!(DeuceSeven.to_string().contains("single draw"));
+    assert!(Badugi.to_string().contains("single draw"));
 }

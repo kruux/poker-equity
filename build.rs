@@ -20,6 +20,11 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+// The evaluator and this generator have to agree exactly about where a key
+// lands, so they read the arithmetic from the same file rather than each
+// keeping a copy.
+include!("src/variants/rankings/table_index.rs");
+
 /// Rank indices: 0 = Two, 12 = Ace. Index *is* rank order, ace high.
 const RANK_IDENTS: [&str; 13] = [
     "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Jack", "Queen",
@@ -239,6 +244,7 @@ fn enumerate_multisets(size: u8) -> Vec<[u8; 13]> {
 
 fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-changed=src/variants/rankings/table_index.rs");
 
     // Non-flush keys: a hand of five to seven cards reaches the rank table
     // only once the flush check has missed, so every multiset in that range
@@ -295,38 +301,140 @@ fn main() -> std::io::Result<()> {
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR is set by cargo");
     write_lookup_tables(Path::new(&out_dir), &hand_scores, &flush_scores)?;
+    println!(
+        "cargo:warning=lookup tables: {} rank keys in {} slots, {} KB total",
+        hand_scores.len(),
+        SLOT_COUNT,
+        (SLOT_COUNT * 2 + BUCKET_COUNT * 2 + 8192 * 2) / 1024
+    );
     write_translation_maps(Path::new(&out_dir), &score_to_rank)?;
     Ok(())
 }
 
+/// The value stored where no hand belongs, and the score a hand too short to
+/// evaluate reports.
+const NOTHING: u16 = u16::MAX;
+
+/// Writes the two lookup tables, plus the displacements the rank table needs.
+///
+/// The scores go out as raw little-endian `u16`s rather than as Rust source.
+/// A hundred and thirty thousand array literals would be slow to compile and
+/// enormous to read, and nobody reads a generated table anyway -- the
+/// generator above is the part worth reviewing.
 fn write_lookup_tables(
     out_dir: &Path,
     hand_scores: &[(u32, u16)],
     flush_scores: &[(u32, u16)],
 ) -> std::io::Result<()> {
-    let mut file = BufWriter::new(File::create(out_dir.join("hand_rank_table.rs"))?);
-
-    let mut hands = phf_codegen::Map::new();
-    for (key, score) in hand_scores {
-        hands.entry(*key, &score.to_string());
-    }
-    writeln!(
-        file,
-        "pub(crate) static HAND_RANKS: phf::Map<u32, u16> = {};",
-        hands.build()
-    )?;
-
-    let mut flushes = phf_codegen::Map::new();
+    // Flush keys are thirteen-bit rank masks, so they index a dense table
+    // directly with nothing computed at all.
+    let mut flushes = vec![NOTHING; 1 << 13];
     for (key, score) in flush_scores {
-        flushes.entry(*key, &score.to_string());
+        flushes[*key as usize] = *score;
     }
+    write_u16s(&out_dir.join("flush_scores.bin"), &flushes)?;
+
+    let (displacements, values) = build_perfect_hash(hand_scores);
+    write_u16s(&out_dir.join("hand_displacements.bin"), &displacements)?;
+    write_u16s(&out_dir.join("hand_scores.bin"), &values)?;
+
+    let mut file = BufWriter::new(File::create(out_dir.join("hand_rank_table.rs"))?);
     writeln!(
         file,
-        "pub(crate) static FLUSH_RANKS: phf::Map<u32, u16> = {};",
-        flushes.build()
+        "/// Scores for every rank multiset, behind the perfect hash in\n\
+         /// `table_index`. Little-endian `u16`s.\n\
+         pub(crate) static HAND_SCORES: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/hand_scores.bin\"));"
     )?;
-
+    writeln!(
+        file,
+        "/// The displacement each bucket needs to clear its collisions.\n\
+         pub(crate) static HAND_DISPLACEMENTS: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/hand_displacements.bin\"));"
+    )?;
+    writeln!(
+        file,
+        "/// Scores for every thirteen-bit flush mask, indexed directly.\n\
+         pub(crate) static FLUSH_SCORES: &[u8] = include_bytes!(concat!(env!(\"OUT_DIR\"), \"/flush_scores.bin\"));"
+    )?;
     file.flush()
+}
+
+/// Writes a slice of scores as little-endian bytes.
+fn write_u16s(path: &Path, values: &[u16]) -> std::io::Result<()> {
+    let mut file = BufWriter::new(File::create(path)?);
+    for value in values {
+        file.write_all(&value.to_le_bytes())?;
+    }
+    file.flush()
+}
+
+/// Places every key in its own slot, and reports the displacement each bucket
+/// needed to get there.
+///
+/// This is the usual displacement construction. Keys are scattered into
+/// buckets; each bucket is then given a displacement that shifts its handful
+/// of keys onto slots nobody has claimed. Crowded buckets are placed first,
+/// because they have the fewest arrangements left to them once the table
+/// fills up -- leaving them until last is what makes a search like this fail.
+fn build_perfect_hash(entries: &[(u32, u16)]) -> (Vec<u16>, Vec<u16>) {
+    let mut buckets: Vec<Vec<(u32, u16)>> = vec![Vec::new(); BUCKET_COUNT];
+    for &(key, score) in entries {
+        buckets[bucket_of(key)].push((key, score));
+    }
+
+    let mut order: Vec<usize> = (0..BUCKET_COUNT).collect();
+    order.sort_by_key(|&bucket| std::cmp::Reverse(buckets[bucket].len()));
+
+    let mut displacements = vec![0u16; BUCKET_COUNT];
+    let mut values = vec![NOTHING; SLOT_COUNT];
+    let mut taken = vec![false; SLOT_COUNT];
+    let mut slots = Vec::new();
+
+    for bucket in order {
+        if buckets[bucket].is_empty() {
+            continue;
+        }
+
+        let displacement = (0..=u16::MAX)
+            .find(|&displacement| {
+                slots.clear();
+                buckets[bucket].iter().all(|&(key, _)| {
+                    let slot = slot_of(key, displacement);
+                    let free = !taken[slot] && !slots.contains(&slot);
+                    if free {
+                        slots.push(slot);
+                    }
+                    free
+                })
+            })
+            .unwrap_or_else(|| {
+                panic!(
+                    "no displacement seats bucket {} of {} keys; the table needs to be larger",
+                    bucket,
+                    buckets[bucket].len()
+                )
+            });
+
+        for &(key, score) in &buckets[bucket] {
+            let slot = slot_of(key, displacement);
+            taken[slot] = true;
+            values[slot] = score;
+        }
+        displacements[bucket] = displacement;
+    }
+
+    let placed = values.iter().filter(|&&v| v != NOTHING).count();
+    let distinct: std::collections::HashSet<u16> = entries.iter().map(|(_, score)| *score).collect();
+    println!(
+        "cargo:warning=perfect hash: {} keys into {} slots ({}% full), \
+         largest displacement {}, {} distinct scores",
+        placed,
+        SLOT_COUNT,
+        placed * 100 / SLOT_COUNT,
+        displacements.iter().max().copied().unwrap_or(0),
+        distinct.len(),
+    );
+
+    (displacements, values)
 }
 
 fn write_translation_maps(

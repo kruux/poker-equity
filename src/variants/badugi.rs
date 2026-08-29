@@ -73,7 +73,7 @@ impl PokerVariant for Badugi {
     }
 
     fn to_string(&self) -> String {
-        "Badugi".to_string()
+        "Badugi (single draw)".to_string()
     }
 
     fn key(&self) -> &'static str {
