@@ -9,6 +9,7 @@ mod rank_translation;
 pub type StudHandRank = HighHandRank;
 pub type RazzHandRank = LowHandRank;
 pub type StudHiLoHandRank = HiLoHandRank;
+pub type OmahaHiLoHandRank = HiLoHandRank;
 pub type HoldemHandRank = HighHandRank;
 pub type OmahaHandRank = HighHandRank;
 pub use deuce_seven::DeuceSevenRank;

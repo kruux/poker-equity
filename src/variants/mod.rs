@@ -3,6 +3,7 @@ mod equity;
 mod holdem;
 mod holdem_fast;
 mod omaha;
+mod omaha_hi_lo;
 mod omaha_fast;
 mod rankings;
 mod razz;
@@ -16,11 +17,13 @@ pub(crate) use equity::HasLow;
 pub use holdem::Holdem;
 pub use holdem_fast::HoldemFast;
 pub use omaha::{Courchevel, Omaha, OmahaFive, OmahaSix};
+pub use omaha_hi_lo::{CourchevelHiLo, OmahaFiveHiLo, OmahaHiLo};
 pub use omaha_fast::OmahaFast;
 pub use rankings::fast_to_high;
 pub use rankings::high_to_fast;
 pub use rankings::{
     DeuceSevenRank, FastHandRank, HiLoHandRank, HighHandRank, LowHandRank, OmahaHandRank,
+    OmahaHiLoHandRank,
     RazzHandRank, StudHandRank, StudHiLoHandRank, FLUSH_KEYS, RANK_KEYS,
 };
 pub use razz::Razz;
@@ -74,6 +77,7 @@ pub trait PokerVariant: Clone + Copy {
 mod tests {
     mod deuce_seven_tests;
     mod holdem_tests;
+    mod omaha_hi_lo_tests;
     mod omaha_tests;
     mod razz_tests;
     mod stud_hi_lo_tests;

@@ -10,6 +10,7 @@ mod holdem;
 mod holdem_fast;
 mod omaha;
 mod omaha_fast;
+mod omaha_hi_lo;
 mod razz;
 mod stud;
 mod stud_base;
@@ -75,6 +76,44 @@ where
         _low_shares: &mut [f64],
     ) -> Result<(), PokerError> {
         self.award(hands, shares)
+    }
+
+    /// Splits the pot between the best high hand and the best qualifying
+    /// low, each half shared among ties.
+    ///
+    /// With nobody qualifying for the low, the high hand takes it all. The
+    /// shares are computed directly rather than derived from win and tie
+    /// counts afterwards, because quartering -- two players splitting the
+    /// high while one of them also takes the low, leaving 75% and 25% -- is
+    /// neither a win nor a tie in any countable sense.
+    fn award_hi_lo(
+        &self,
+        hands: &[Hand<Self>],
+        shares: &mut [f64],
+        low_shares: &mut [f64],
+    ) -> Result<(), PokerError>
+    where
+        Self::HandRank: HasLow,
+    {
+        let high_half = match self.rank_low_hands(hands)? {
+            Some(low_places) => {
+                let winners = &low_places[0];
+                let each = 0.5 / winners.len() as f64;
+                for &seat in winners {
+                    shares[seat] += each;
+                    low_shares[seat] += each;
+                }
+                0.5
+            }
+            None => 1.0,
+        };
+
+        let winners = &self.rank_hands(hands)?[0];
+        let each = high_half / winners.len() as f64;
+        for &seat in winners {
+            shares[seat] += each;
+        }
+        Ok(())
     }
 
     /// Places the players by hand strength, best first, as seat indices.
