@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    cards::{Card, Deck},
+    cards::{Card, CardSet, Deck},
     error::{EquityError, GameError, PokerError},
     hand::Hand,
     variants::{CommunityCardGame, EquityCalculation, PokerVariant},
@@ -132,13 +132,19 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
         self.validate_base()?;
         self.variant.validate(self)?;
 
-        let completed_sims = Arc::new(Mutex::new(0));
-        let results = Arc::new(Mutex::new(HashMap::<String, f64>::new()));
-
-        // Add all players to the results with 0 equity
-        for (name, _, _) in &self.players {
-            results.lock().unwrap().insert(name.clone(), 0.0);
+        // Everything the deal cannot touch, worked out once rather than per
+        // simulation: the deck each deal starts from is the same every time.
+        let mut known = CardSet::from_cards(&self.dead_cards);
+        known = known.union(CardSet::from_cards(&self.community_cards));
+        for (_, hand, _) in &self.players {
+            known = known.union(CardSet::from_cards(hand.cards()));
         }
+        let starting_deck = Deck::from_set(CardSet::FULL_DECK.without(known));
+
+        let seats = self.players.len();
+        let completed_sims = Arc::new(Mutex::new(0));
+        // Shares accumulate by seat, so nothing is keyed by name until the end.
+        let totals = Arc::new(Mutex::new(vec![0.0f64; seats]));
 
         let chunk_size = 10000;
         let mut chunks = vec![chunk_size; self.num_simulations / chunk_size];
@@ -151,38 +157,17 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
         chunks
             .par_iter()
             .try_for_each(|&size| -> Result<(), PokerError> {
-                let mut local_results = HashMap::new();
+                let mut local = vec![0.0f64; seats];
 
                 for _ in 0..size {
-                    // Create a new deck
-                    let mut deck = Deck::new();
-
-                    // Remove known cards from deck
-                    for card in &self.dead_cards {
-                        deck.remove_card(card)?;
-                    }
-
-                    // Remove all cards that are in players' hands
-                    for (_, hand, _) in &self.players {
-                        for card in hand.cards() {
-                            deck.remove_card(card)?;
-                        }
-                    }
-                    // Remove all community cards
-                    for card in &self.community_cards {
-                        deck.remove_card(card)?;
-                    }
-
-                    let sim_results = self.variant.run_single_simulation(deck, self)?;
-                    for (name, equity) in sim_results {
-                        *local_results.entry(name).or_insert(0.0) += equity;
-                    }
+                    self.variant
+                        .run_single_simulation(starting_deck, self, &mut local)?;
                 }
 
                 // After chunk_size amount of simulations have been made update global results
-                let mut global_results = results.lock().unwrap();
-                for (name, equity) in local_results {
-                    *global_results.entry(name).or_insert(0.0) += equity;
+                let mut global = totals.lock().unwrap();
+                for (total, local) in global.iter_mut().zip(local) {
+                    *total += local;
                 }
                 let mut completed = completed_sims.lock().unwrap();
                 *completed += size;
@@ -192,9 +177,13 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
                     completed_simulations: *completed,
                     total_simulations: self.num_simulations,
                     progress_percent: (*completed as f64 / self.num_simulations as f64) * 100.0,
-                    current_results: global_results
+                    current_results: self
+                        .players
                         .iter()
-                        .map(|(name, equity)| (name.clone(), (*equity / *completed as f64) * 100.0))
+                        .zip(global.iter())
+                        .map(|((name, _, _), total)| {
+                            (name.clone(), (total / *completed as f64) * 100.0)
+                        })
                         .collect(),
                 };
 
@@ -204,14 +193,15 @@ impl<V: PokerVariant + EquityCalculation + Send + Sync> EquityCalculator<V> {
                 Ok(())
             })?;
 
-        let final_results = results.lock().unwrap();
-        let mut percentages = HashMap::new();
-        for (name, equity) in final_results.iter() {
-            percentages.insert(
-                name.clone(),
-                (*equity / self.num_simulations as f64) * 100.0,
-            );
-        }
+        let totals = totals.lock().unwrap();
+        let percentages = self
+            .players
+            .iter()
+            .zip(totals.iter())
+            .map(|((name, _, _), total)| {
+                (name.clone(), (total / self.num_simulations as f64) * 100.0)
+            })
+            .collect();
 
         Ok(percentages)
     }

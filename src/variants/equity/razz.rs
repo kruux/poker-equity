@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator, variants::Razz};
 
 use super::{EquityCalculation, StudCardGame};
@@ -14,26 +12,21 @@ impl EquityCalculation for Razz {
         &self,
         deck: Deck,
         calculator: &EquityCalculator<Self>,
-    ) -> Result<HashMap<String, f64>, PokerError> {
+        shares: &mut [f64],
+    ) -> Result<(), PokerError> {
         let final_players = self.deal_cards(deck, calculator)?;
+        let final_hands = final_players
+            .into_iter()
+            .map(|cards| Hand::new_with_cards(*self, cards))
+            .collect::<Result<Vec<_>, _>>()?;
 
-        // Convert to hands and evaluate
-        let mut final_hands = Vec::new();
-        for (name, cards) in final_players {
-            let hand = Hand::new_with_cards(*self, cards)?;
-            final_hands.push((name, hand));
+        // In razz the lowest hand takes the whole pot.
+        let winners = &self.rank_hands(&final_hands)?[0];
+        let share = 1.0 / winners.len() as f64;
+        for &seat in winners {
+            shares[seat] += share;
         }
 
-        // For Razz, lowest hand(s) wins 100% of pot
-        let rankings = self.rank_hands(&final_hands)?;
-        let winners = &rankings[0];
-
-        let equity_share = 1.0 / (winners.len() as f64);
-        let mut equity = HashMap::new();
-        for winner in winners {
-            equity.insert(winner.clone(), equity_share);
-        }
-
-        Ok(equity)
+        Ok(())
     }
 }

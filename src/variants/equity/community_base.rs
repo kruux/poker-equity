@@ -8,6 +8,8 @@ use crate::{
 use super::EquityCalculation;
 
 pub trait CommunityCardGame: EquityCalculation {
+    /// The checks every community game shares: enough players, equal hand
+    /// sizes, and a board that still has something to deal.
     fn validate_community(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         // At least 2 players for a meaningful simulation
         let players = calculator.players();
@@ -33,6 +35,7 @@ pub trait CommunityCardGame: EquityCalculation {
         Ok(())
     }
 
+    /// Fills the board out to five cards from `deck`.
     fn deal_community_cards(
         &self,
         calculator: &EquityCalculator<Self>,
@@ -48,23 +51,22 @@ pub trait CommunityCardGame: EquityCalculation {
         Ok(community_cards)
     }
 
+    /// Each player's hole cards with the board added, in seat order.
     fn build_final_hands(
         &self,
         calculator: &EquityCalculator<Self>,
         community_cards: Vec<Card>,
-    ) -> Result<Vec<(String, Hand<Self>)>, PokerError> {
-        let players = calculator.players();
-        let final_hands = players
+    ) -> Result<Vec<Hand<Self>>, PokerError> {
+        calculator
+            .players()
             .iter()
-            .map(|(name, hand, _)| {
+            .map(|(_, hand, _)| {
                 let mut final_hand = hand.clone();
                 final_hand
                     .add_cards(community_cards.clone())
                     .map_err(PokerError::from)?;
-                Ok((name.clone(), final_hand))
+                Ok(final_hand)
             })
-            .collect::<Result<Vec<_>, PokerError>>()?;
-
-        Ok(final_hands)
+            .collect()
     }
 }

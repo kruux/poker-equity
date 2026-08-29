@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::{CommunityCardGame, EquityCalculation};
 use crate::{
     cards::Deck,
@@ -29,21 +27,17 @@ impl EquityCalculation for OmahaFast {
         &self,
         deck: Deck,
         calculator: &EquityCalculator<Self>,
-    ) -> Result<HashMap<String, f64>, PokerError> {
+        shares: &mut [f64],
+    ) -> Result<(), PokerError> {
         let community_cards = self.deal_community_cards(calculator, deck)?;
-
-        // Add the community cards to every players hand
         let final_hands = self.build_final_hands(calculator, community_cards)?;
 
-        let rankings = self.rank_hands(&final_hands)?;
-        let winners = &rankings[0];
-
-        let equity_share = 1.0 / (winners.len() as f64);
-        let mut equity_map = HashMap::new();
-        for winner in winners {
-            equity_map.insert(winner.to_string(), equity_share);
+        let winners = &self.rank_hands(&final_hands)?[0];
+        let share = 1.0 / winners.len() as f64;
+        for &seat in winners {
+            shares[seat] += share;
         }
 
-        Ok(equity_map)
+        Ok(())
     }
 }
