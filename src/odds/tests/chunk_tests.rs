@@ -399,3 +399,204 @@ fn test_community_games_still_want_every_hole_card() {
         "an unknown hole card is written as a wildcard"
     );
 }
+
+/// Text is turned into masks once, when the request is built, and the answer
+/// is the same either way in.
+///
+/// The sampling loop never sees a string: `from_text` parses into the same
+/// `HandSpec` masks `from_masks` takes, so the two are the same request and
+/// must deal the same cards from the same seed.
+#[test]
+fn test_text_and_masks_are_the_same_request() -> Result<(), PokerError> {
+    use crate::cards::{Card, CardSet};
+    use crate::notation::HandSpec;
+
+    let card = |text: &str| CardSet::from_cards(&Card::from_str(text).unwrap());
+
+    let by_text = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "2c 7d 9h", "3s")?;
+    let by_masks = EquityRequest::from_masks(
+        Holdem,
+        &[
+            HandSpec::from_slots(&[card("Ah"), card("Kh")]),
+            HandSpec::from_slots(&[card("Qs"), card("Qd")]),
+        ],
+        &[card("2c"), card("7d"), card("9h")],
+        card("3s"),
+    )?;
+
+    // Same seed, same deals, so any difference at all is a difference in the
+    // request rather than in the sampling.
+    let from_text = run_chunk(&by_text, 50_000, 99)?;
+    let from_masks = run_chunk(&by_masks, 50_000, 99)?;
+    assert_eq!(
+        from_text.share_sum, from_masks.share_sum,
+        "the two ways of asking gave different answers"
+    );
+
+    // And a wildcard survives the round trip: "A" is the four aces.
+    let spec = crate::notation::parse_hand("A Kh", 2)?;
+    assert_eq!(spec.alternatives[0][0], CardSet::of_rank(crate::cards::Rank::Ace));
+    assert_eq!(spec.alternatives[0][0].len(), 4);
+
+    Ok(())
+}
+
+/// No card can be dealt twice, wherever the two claims on it come from.
+///
+/// Two mechanisms share the job, and they catch different things. A field
+/// that names a card twice is caught while it is read, so the error can point
+/// at the second naming. A card claimed by two *different* fields is invisible
+/// to the reader and is caught by the matching that settles the whole request
+/// at once -- which a count could not do, since there are fifty-two cards and
+/// only nine slots wanting them.
+#[test]
+fn test_a_card_cannot_be_in_two_places() {
+    // Caught while reading, because both claims are in one field.
+    for (hands, board, why) in [
+        (vec!["AhAh", "QsJs"], "", "a hand naming the same card twice"),
+        (vec!["AhKh", "QsJs"], "2c 2c 3d", "a board repeating a card"),
+    ] {
+        let refused = EquityRequest::from_text(Holdem, &hands, board, "");
+        assert!(
+            matches!(refused, Err(PokerError::Equity(EquityError::Notation(_)))),
+            "the reader should have caught {}",
+            why
+        );
+    }
+
+    // Caught by the matching, because the two claims are in different fields
+    // and nothing reading one of them can see the other.
+    for (hands, board, dead, why) in [
+        (vec!["AhKh", "AhQs"], "", "", "two seats holding the ace of hearts"),
+        (vec!["AhKh", "QsJs"], "Ah 2c 3d", "", "a seat and the board sharing a card"),
+        (vec!["AhKh", "QsJs"], "", "Ah", "a seat holding a card that is dead"),
+        (vec!["AhKh", "QsJs"], "2c 3d 4h", "2c", "the board holding a dead card"),
+    ] {
+        let refused = EquityRequest::from_text(Holdem, &hands, board, dead);
+        assert!(
+            matches!(refused, Err(PokerError::Equity(EquityError::Infeasible(_)))),
+            "the matching should have caught {}",
+            why
+        );
+    }
+
+    // The same request without a clash is fine.
+    assert!(EquityRequest::from_text(Holdem, &["AhKh", "QsJs"], "2c 3d 4h", "5c").is_ok());
+}
+
+/// Wildcards that overlap are still a valid request, and the constraint is
+/// enforced on the deal rather than on each card in isolation.
+#[test]
+fn test_overlapping_wildcards_deal_consistently() -> Result<(), PokerError> {
+    use crate::cards::{Rank, Suit};
+
+    // "A c" is any ace and any club. The ace of clubs satisfies either slot
+    // but cannot satisfy both, so every deal has to hold two distinct cards
+    // that between them cover an ace and a club.
+    let request = EquityRequest::from_text(Holdem, &["A c", "QsJs"], "", "")?;
+    let result = run_chunk(&request, 20_000, 5)?;
+    assert_eq!(result.samples, 20_000, "the request is satisfiable");
+
+    // Narrowing a wildcard until one card is left makes it that card.
+    let narrowed = run_exact(&EquityRequest::from_text(
+        Holdem,
+        &["A Kh", "QsJs"],
+        "Th 9c 2c",
+        "Ad Ac As",
+    )?)?
+    .expect("small enough to enumerate");
+    let named = run_exact(&EquityRequest::from_text(
+        Holdem,
+        &["Ah Kh", "QsJs"],
+        "Th 9c 2c",
+        "Ad Ac As",
+    )?)?
+    .expect("small enough to enumerate");
+    assert_eq!(narrowed.share_sum, named.share_sum);
+
+    // A wildcard with nothing left to admit is refused rather than spun on.
+    let nothing_left = EquityRequest::from_text(
+        Holdem,
+        &["A Kh", "QsJs"],
+        "",
+        "Ah Ad Ac As",
+    );
+    assert!(
+        matches!(nothing_left, Err(PokerError::Equity(EquityError::Infeasible(_)))),
+        "no ace is left to fill the slot"
+    );
+
+    let _ = (Rank::Ace, Suit::Club);
+    Ok(())
+}
+
+/// Two seats asking for the same thing must split the pot exactly, and the
+/// order they are dealt in must not show.
+///
+/// Seats are dealt one after another, each drawing from its own list of valid
+/// holdings and rejecting anything an earlier seat already took, with the
+/// whole deal retried when that happens. That is what keeps it uniform over
+/// complete deals rather than favouring whoever was dealt first -- and this
+/// is the test that would notice if it stopped being true.
+#[test]
+fn test_seats_asking_for_the_same_thing_split_evenly() -> Result<(), PokerError> {
+    for spec in ["A *", "A c", "* *"] {
+        let request = EquityRequest::from_text(Holdem, &[spec, spec], "", "")?;
+
+        // Averaged over seeds, because one run of a quarter-million deals
+        // wanders a standard error or two on its own.
+        let mut lean = 0.0;
+        let seeds = 4;
+        for seed in 0..seeds {
+            let equities = run_chunk(&request, 250_000, seed * 7919)?.equities();
+            lean += (equities[0].equity - 0.5) / equities[0].std_error;
+        }
+        lean /= seeds as f64;
+
+        assert!(
+            lean.abs() < 1.5,
+            "{:?} against itself leans {:+.2} standard errors toward the seat \
+             dealt first, which symmetry forbids",
+            spec,
+            lean
+        );
+    }
+    Ok(())
+}
+
+/// A wildcard needs a card left to satisfy it, and that is settled before
+/// sampling starts rather than discovered by spinning.
+#[test]
+fn test_a_wildcard_needs_something_left_to_fill_it() {
+    // "2 *" wants a deuce and any second card.
+    assert!(
+        EquityRequest::from_text(Holdem, &["2 *", "QsJs"], "", "2c 2d 2h").is_ok(),
+        "one deuce is still enough"
+    );
+    assert!(
+        matches!(
+            EquityRequest::from_text(Holdem, &["2 *", "QsJs"], "", "2c 2d 2h 2s"),
+            Err(PokerError::Equity(EquityError::Infeasible(_)))
+        ),
+        "with every deuce dead there is nothing to fill the slot"
+    );
+
+    // Two seats both wanting a deuce need two deuces between them.
+    assert!(EquityRequest::from_text(Holdem, &["2 *", "2 *"], "", "2c 2d").is_ok());
+    assert!(
+        matches!(
+            EquityRequest::from_text(Holdem, &["2 *", "2 *"], "", "2c 2d 2h"),
+            Err(PokerError::Equity(EquityError::Infeasible(_)))
+        ),
+        "one deuce cannot fill two seats"
+    );
+
+    // And the board counts as a claim like any other.
+    assert!(
+        matches!(
+            EquityRequest::from_text(Holdem, &["2 *", "QsJs"], "2c 2d 2h", "2s"),
+            Err(PokerError::Equity(EquityError::Infeasible(_)))
+        ),
+        "the board and the dead cards together take every deuce"
+    );
+}

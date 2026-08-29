@@ -32,6 +32,7 @@ works before committing to the whole run.
 import argparse
 import itertools
 import multiprocessing
+import random
 import sys
 import time
 from pathlib import Path
@@ -39,6 +40,7 @@ from pathlib import Path
 import poker_calculator as pc
 from pokerkit.hands import (
     BadugiHand,
+    OmahaHoldemHand,
     RegularLowHand,
     ShortDeckHoldemHand,
     StandardHighHand,
@@ -68,6 +70,17 @@ GAMES = {
                "every four-card badugi holding"),
 }
 
+# Omaha cannot be walked: a deal is one of C(52,4) x C(48,5), which is
+# 4.6e11 of them. It is sampled instead, and a sample is enough here because
+# what is left untested is a fixed enumeration -- the sixty ways to pair two
+# hole cards with three of the board -- which does not depend on which cards
+# arrive. A fault in it shows on nearly every deal rather than hiding in a
+# corner of the space. The five-card evaluations it is built from are covered
+# exhaustively by `high`.
+SAMPLED = {
+    "omaha": (4, 5, OmahaHoldemHand, "Omaha deals, sampled"),
+}
+
 # How many hands to score at once. Large enough that crossing into Rust costs
 # nothing, small enough that a chunk's hands fit comfortably in memory.
 BATCH = 20_000
@@ -79,6 +92,42 @@ def count_hands(deck_size, size):
     for step in range(size):
         total = total * (deck_size - step) // (step + 1)
     return total
+
+
+def check_deals(seed_and_count):
+    """Checks a run of randomly dealt Omaha hands, keeping only the mapping."""
+    game, seed, count = seed_and_count
+    hole_size, board_size, evaluator, _ = SAMPLED[game]
+
+    rng = random.Random(seed)
+    ours_to_theirs, theirs_to_ours, clashes = {}, {}, []
+    seen = 0
+
+    while seen < count:
+        batch = min(BATCH, count - seen)
+        deals = [rng.sample(FULL_DECK, hole_size + board_size) for _ in range(batch)]
+
+        written = ["".join(deal) for deal in deals]
+        ours = pc.score_batch(game, written)
+        theirs = [
+            evaluator.from_game(
+                "".join(deal[:hole_size]), "".join(deal[hole_size:])
+            ).entry.index
+            for deal in deals
+        ]
+
+        for shown, mine, yours in zip(written, ours, theirs):
+            entry = ours_to_theirs.setdefault(mine, (yours, shown))
+            if entry[0] != yours:
+                clashes.append(f"we score {shown} and {entry[1]} alike ({mine}), "
+                               f"pokerkit does not ({yours} against {entry[0]})")
+            entry = theirs_to_ours.setdefault(yours, (mine, shown))
+            if entry[0] != mine:
+                clashes.append(f"pokerkit ranks {shown} and {entry[1]} alike ({yours}), "
+                               f"we do not ({mine} against {entry[0]})")
+        seen += batch
+
+    return ours_to_theirs, theirs_to_ours, clashes, seen
 
 
 def check_batch(game, hands):
@@ -142,14 +191,78 @@ def merge(found, ours_to_theirs, theirs_to_ours, clashes):
                            f"we do not ({entry[0]} against {seen[0]})")
 
 
+def run_sampled(args):
+    """Checks a game that cannot be walked, by dealing at random."""
+    _, _, _, covers = SAMPLED[args.game]
+    total = args.limit or args.samples
+    print(f"{args.game}: {covers}")
+    print(f"  {total:,} deals, {args.workers} workers")
+
+    # Each piece gets its own seed, so a disagreement can be dealt again.
+    pieces = args.workers * 8
+    per_piece = max(1, total // pieces)
+    tasks = [(args.game, 0x0A_4A_11_5E_ED + index, per_piece) for index in range(pieces)]
+
+    ours_to_theirs, theirs_to_ours, clashes = {}, {}, []
+    seen = 0
+    started = time.time()
+
+    with multiprocessing.Pool(args.workers) as pool:
+        for mine, yours, problems, counted in pool.imap_unordered(check_deals, tasks):
+            merge((mine, yours, problems), ours_to_theirs, theirs_to_ours, clashes)
+            seen += counted
+            elapsed = time.time() - started
+            rate = seen / max(elapsed, 1e-9)
+            print(f"\r  {seen:,}/{total:,} ({seen / total:5.1%})  "
+                  f"{rate:,.0f}/s  {(total - seen) / max(rate, 1e-9) / 60:.0f} min left  "
+                  f"{len(ours_to_theirs):,} classes  {len(clashes)} clashes{' ' * 8}",
+                  end="", flush=True)
+    print()
+
+    return report(args, ours_to_theirs, clashes, sampled=True)
+
+
+def report(args, ours_to_theirs, clashes, sampled=False):
+    """Checks the mapping runs one way throughout, and says how it went."""
+    ordered = sorted((score, entry[0]) for score, entry in ours_to_theirs.items())
+    direction = 0
+    for (_, a), (_, b) in zip(ordered, ordered[1:]):
+        if a != b:
+            direction = 1 if b > a else -1
+            break
+    for (score_a, a), (score_b, b) in zip(ordered, ordered[1:]):
+        if direction * (b - a) <= 0:
+            clashes.append(f"order breaks between our scores {score_a} and {score_b}: "
+                           f"pokerkit has {a} then {b}")
+
+    print(f"  {len(ours_to_theirs):,} classes, ours and theirs "
+          f"{'agree' if not clashes else 'DISAGREE'}")
+
+    if clashes:
+        args.out.write_text("\n".join(clashes))
+        print(f"  {len(clashes):,} disagreements written to {args.out}")
+        for clash in clashes[:5]:
+            print(f"    {clash}")
+        return 1
+
+    how = "sampled" if sampled else ("partial run" if args.limit else "exhaustive")
+    print(f"  every deal agrees with pokerkit ({how})")
+    return 0
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("game", choices=sorted(GAMES))
+    parser.add_argument("game", choices=sorted(set(GAMES) | set(SAMPLED)))
     parser.add_argument("--workers", type=int, default=multiprocessing.cpu_count())
     parser.add_argument("--limit", type=int, default=0,
                         help="stop after roughly this many hands, for a trial run")
     parser.add_argument("--out", type=Path, default=Path("disagreements.txt"))
+    parser.add_argument("--samples", type=int, default=50_000_000,
+                        help="how many deals to check, for a game too large to walk")
     args = parser.parse_args()
+
+    if args.game in SAMPLED:
+        return run_sampled(args)
 
     kernel, deck, size, evaluator, covers = GAMES[args.game]
     total = count_hands(len(deck), size)
@@ -197,31 +310,7 @@ def main():
                 break
     print()
 
-    # Sorted by our score, their ranks must move in one direction throughout.
-    ordered = sorted((score, entry[0]) for score, entry in ours_to_theirs.items())
-    direction = 0
-    for (_, a), (_, b) in zip(ordered, ordered[1:]):
-        if a != b:
-            direction = 1 if b > a else -1
-            break
-    for (score_a, a), (score_b, b) in zip(ordered, ordered[1:]):
-        if direction * (b - a) <= 0:
-            clashes.append(f"order breaks between our scores {score_a} and {score_b}: "
-                           f"pokerkit has {a} then {b}")
-
-    print(f"  {len(ours_to_theirs):,} classes, ours and theirs "
-          f"{'agree' if not clashes else 'DISAGREE'}")
-
-    if clashes:
-        args.out.write_text("\n".join(clashes))
-        print(f"  {len(clashes):,} disagreements written to {args.out}")
-        for clash in clashes[:5]:
-            print(f"    {clash}")
-        return 1
-
-    print(f"  every hand agrees with pokerkit "
-          f"({'partial run' if args.limit else 'exhaustive'})")
-    return 0
+    return report(args, ours_to_theirs, clashes)
 
 
 if __name__ == "__main__":
