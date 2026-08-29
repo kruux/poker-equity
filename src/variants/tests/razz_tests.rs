@@ -19,22 +19,27 @@ fn test_hand_ranks() -> Result<(), PokerError> {
     assert_eq!(ranks[3], Rank::Two);
     assert_eq!(ranks[4], Rank::Ace);
 
-    // Test with duplicate ranks
+    // Only four ranks to work with, so one of them must be played twice.
+    // The lowest available pair is chosen, leaving 5-4-3 as the kickers.
     let hand = Hand::from_str(Razz, "2h 2d 3h 3d 4h 4d 5h")?;
     let RazzHandRank::Low(ranks) = hand.evaluate();
-    assert_eq!(ranks.len(), 4, "Should have 4 unique ranks");
+    assert_eq!(ranks.len(), 5, "Always plays five cards");
     assert_eq!(ranks[0], Rank::Five);
     assert_eq!(ranks[1], Rank::Four);
     assert_eq!(ranks[2], Rank::Three);
     assert_eq!(ranks[3], Rank::Two);
+    assert_eq!(ranks[4], Rank::Two);
 
-    // Test with multiple duplicates of the same rank
+    // Only three ranks. Two pair beats trips, so 2-2-3-3-4 is played rather
+    // than 2-2-2-3-4.
     let hand = Hand::from_str(Razz, "2h 2d 2c 3h 3d 3c 4h")?;
     let RazzHandRank::Low(ranks) = hand.evaluate();
-    assert_eq!(ranks.len(), 3, "Should have 3 unique ranks");
+    assert_eq!(ranks.len(), 5, "Always plays five cards");
     assert_eq!(ranks[0], Rank::Four);
     assert_eq!(ranks[1], Rank::Three);
-    assert_eq!(ranks[2], Rank::Two);
+    assert_eq!(ranks[2], Rank::Three);
+    assert_eq!(ranks[3], Rank::Two);
+    assert_eq!(ranks[4], Rank::Two);
 
     // Test high cards (K, Q, J)
     let hand = Hand::from_str(Razz, "Kh Qh Jh Th 9h")?;
@@ -74,13 +79,14 @@ fn test_hand_comparisons() -> Result<(), PokerError> {
     let hand6 = Hand::from_str(Razz, "3h 3d 4c 5s 6h")?; // Becomes 6543
     assert!(hand6 > hand5, "4 card hand should beat 3 card hand");
 
-    // Test identical hands with different duplicate patterns
-    let hand7 = Hand::from_str(Razz, "2h 2d 3c 3s 4h")?; // Becomes 432
-    let hand8 = Hand::from_str(Razz, "2c 3h 4d")?; // Becomes 432
-    assert_eq!(
-        hand7.evaluate(),
-        hand8.evaluate(),
-        "Same ranks should be equal"
+    // A complete hand beats an incomplete one, even a paired complete hand.
+    // These two share their distinct ranks, but only the first plays five
+    // cards.
+    let hand7 = Hand::from_str(Razz, "2h 2d 3c 3s 4h")?; // Plays 4-3-3-2-2
+    let hand8 = Hand::from_str(Razz, "2c 3h 4d")?; // Only three cards
+    assert!(
+        hand7 > hand8,
+        "a five-card low beats a three-card holding"
     );
 
     Ok(())
@@ -160,6 +166,57 @@ fn test_empty_hand_comparison() -> Result<(), PokerError> {
     // Any hand with cards should beat an empty hand
     assert!(one_card_hand > empty_hand1);
     assert!(empty_hand1 < one_card_hand);
+
+    Ok(())
+}
+
+/// Paired lows are ranked among themselves by pair rank and then kickers, all
+/// reversed so that lower wins. The two examples are the ones given by
+/// Wikipedia's "Lowball (poker)" and Upswing's lowball rankings.
+#[test]
+fn test_paired_lows_rank_by_pair_then_kickers() -> Result<(), PokerError> {
+    // Same pair, so the kickers decide: 6-4-2 is lower than 6-5-A.
+    let lower_kicker = Hand::from_str(Razz, "3h 3d 6c 4s 2h")?;
+    let higher_kicker = Hand::from_str(Razz, "3c 3s 6d 5h Ac")?;
+    assert!(
+        lower_kicker > higher_kicker,
+        "3-3-6-4-2 beats 3-3-6-5-A"
+    );
+
+    // Different pairs, so the pair decides. The ace is the lowest card, so a
+    // pair of aces is the lowest pair there is.
+    let pair_of_aces = Hand::from_str(Razz, "Ah Ad 9c 5s 3h")?;
+    let pair_of_deuces = Hand::from_str(Razz, "2h 2d 5c 4s 3d")?;
+    assert!(
+        pair_of_aces > pair_of_deuces,
+        "A-A-9-5-3 beats 2-2-5-4-3"
+    );
+
+    // ...but both lose to any hand with no pair at all, however high.
+    let no_pair = Hand::from_str(Razz, "Kh Jd 8c 6s 4h")?;
+    assert!(no_pair > pair_of_aces, "K-J-8-6-4 beats a pair of aces");
+    assert!(no_pair > pair_of_deuces, "K-J-8-6-4 beats a pair of deuces");
+
+    Ok(())
+}
+
+/// Two holdings can share their distinct ranks and still not be equal: which
+/// duplicate each is forced to play decides the pot. Reducing a low to its
+/// distinct ranks made these two chop.
+#[test]
+fn test_same_distinct_ranks_are_not_a_tie() -> Result<(), PokerError> {
+    // Both hold only 2, 3, 4 and 5, so both must play a pair.
+    let pair_of_deuces = Hand::from_str(Razz, "2c 2d 2h 3c 3d 4c 5d")?; // plays 5-4-3-2-2
+    let pair_of_fours = Hand::from_str(Razz, "4h 4s 4d 5h 5s 3h 2s")?; // plays 5-4-4-3-2
+
+    assert_eq!(pair_of_deuces.evaluate().ranks().len(), 5);
+    assert_eq!(pair_of_fours.evaluate().ranks().len(), 5);
+    assert!(
+        pair_of_deuces > pair_of_fours,
+        "a pair of deuces beats a pair of fours: {} against {}",
+        pair_of_deuces.evaluate(),
+        pair_of_fours.evaluate()
+    );
 
     Ok(())
 }

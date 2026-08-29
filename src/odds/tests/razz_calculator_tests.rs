@@ -163,3 +163,26 @@ fn test_razz_dead_cards() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// End to end: two complete holdings sharing the same four distinct ranks are
+/// not a chop. The lower pair takes the whole pot.
+#[test]
+fn test_paired_low_wins_outright() -> Result<(), PokerError> {
+    let mut calculator = EquityCalculator::new(Razz, 10);
+
+    let hero = Hand::from_str(Razz, "2c 2d 2h 3c 3d 4c 5d")?; // plays 5-4-3-2-2
+    let villain = Hand::from_str(Razz, "4h 4s 4d 5h 5s 3h 2s")?; // plays 5-4-4-3-2
+
+    calculator.add_player("Hero".to_string(), hero)?;
+    calculator.add_player("Villain".to_string(), villain)?;
+
+    // Both hands are complete, so there is nothing left to sample.
+    let results = calculator.calculate(drop)?;
+    assert!(
+        (results["Hero"] - 100.0).abs() < 0.001,
+        "Hero's pair of deuces beats Villain's pair of fours, got {}",
+        results["Hero"]
+    );
+
+    Ok(())
+}

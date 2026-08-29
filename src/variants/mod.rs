@@ -29,18 +29,36 @@ pub use stud_hi_lo::StudHiLo;
 
 use crate::cards::Card;
 
+/// How a variant deals its cards, which decides what the sampler has to fill
+/// in for each simulation.
 pub enum PokerType {
-    Draw,      // 5 card draw
-    Stud,      // Stud games
-    Community, // Community card games
+    /// Players hold a private hand and replace cards from the deck.
+    Draw,
+    /// Players hold a private hand of their own and share no cards.
+    Stud,
+    /// Players share a board and combine it with their hole cards.
+    Community,
 }
 
+/// One poker variant: how many cards a hand holds and how to score it.
 pub trait PokerVariant: Clone + Copy {
+    /// The strength of a scored hand. Ordered best-last, so that `>` means
+    /// "beats", whichever direction the underlying game ranks in.
     type HandRank: PartialOrd;
 
+    /// How this variant deals.
     fn poker_type(&self) -> PokerType;
+
+    /// The largest number of cards a hand can hold, hole cards and board
+    /// together. Used to size hands and to reject overfull ones.
     fn max_cards(&self) -> usize;
+
+    /// Scores a hand. `cards` holds the private cards first and any shared
+    /// board after them, and may be short, in which case the result is an
+    /// incomplete rank that loses to any complete hand.
     fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank;
+
+    /// The variant's display name.
     fn to_string(&self) -> String;
 }
 

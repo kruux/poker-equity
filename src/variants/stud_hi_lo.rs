@@ -1,29 +1,16 @@
 use super::{HighHandRank, LowHandRank, StudHiLoHandRank};
 use crate::{
-    cards::{Card, Rank},
+    cards::Card,
     variants::{PokerType, PokerVariant},
 };
 
 #[derive(Debug, Clone, Copy)]
 pub struct StudHiLo;
 impl StudHiLo {
-    /// Returns an Option<LowHandRank> if the hand qualifies for a low.
-    /// Returns None if the low hand doesn't have 5 cards 8 or lower.
+    /// Returns the low hand if it qualifies under the eight-or-better rule,
+    /// and `None` otherwise.
     fn qualify_for_low(&self, low_rank: &LowHandRank) -> Option<LowHandRank> {
-        // Need at least 5 cards
-        let ranks = low_rank.ranks();
-        if ranks.len() < 5 {
-            return None;
-        }
-
-        // Check if highest card is 8 or lower
-        if let Some(highest_low) = ranks.get(0) {
-            if highest_low.to_value() <= Rank::Eight.to_value() || *highest_low == Rank::Ace {
-                return Some(low_rank.clone());
-            }
-        }
-
-        None
+        low_rank.is_eight_or_better().then(|| low_rank.clone())
     }
 }
 
