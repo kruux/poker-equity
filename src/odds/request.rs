@@ -22,6 +22,16 @@ pub struct EquityRequest<V: PokerVariant + EquityCalculation> {
     variant: V,
     /// One prepared sampler per alternative, per seat.
     seats: Vec<Vec<SlotSampler>>,
+    /// What to deal in what order, tightest first. `seats.len()` stands for
+    /// the board.
+    ///
+    /// Which goes first cannot change the answer -- each draws from its own
+    /// list of holdings regardless of what is left, and a draw that clashes
+    /// throws the whole deal away -- but it changes how often a deal has to
+    /// be thrown away at all. Something that will take any card will happily
+    /// take the one card a fussier hand was waiting for, and a named board
+    /// card is the fussiest thing at the table.
+    order: Vec<usize>,
     /// The board's slots, padded out with wildcards to the game's full board.
     board: SlotSampler,
     board_slots: usize,
@@ -107,7 +117,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
 
         Self::check_feasible(hands, &board_masks, available)?;
 
-        let seats = hands
+        let seats: Vec<Vec<SlotSampler>> = hands
             .iter()
             .map(|spec| {
                 spec.alternatives
@@ -117,9 +127,35 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             })
             .collect();
 
+        // How much choice each hand has: the fewest cards any of its holdings
+        // could be built from. A hand naming its cards has almost none and
+        // goes first; one that will take anything goes last. The board is in
+        // the same reckoning, since a named flop is as fixed as a named hand
+        // and a runout is as free as a wildcard.
+        let freedom = |slots: &[CardSet]| -> u64 {
+            slots
+                .iter()
+                .map(|slot| slot.intersection(available).len() as u64)
+                .sum()
+        };
+        let mut order: Vec<usize> = (0..=hands.len()).collect();
+        order.sort_by_key(|&which| {
+            if which == hands.len() {
+                freedom(&board_masks)
+            } else {
+                hands[which]
+                    .alternatives
+                    .iter()
+                    .map(|slots| freedom(slots))
+                    .min()
+                    .unwrap_or(u64::MAX)
+            }
+        });
+
         Ok(Self {
             variant,
             seats,
+            order,
             board: SlotSampler::new(&board_masks, available),
             board_slots,
             available,
@@ -205,23 +241,30 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         board: &mut Vec<Card>,
     ) -> bool {
         let mut available = self.available;
+        board.clear();
 
-        for (seat, alternatives) in self.seats.iter().enumerate() {
-            let sampler = &alternatives[rng.gen_range(0..alternatives.len())];
-            if !sampler.draw(available, rng, &mut holes[seat]) {
+        // Tightest first, so that whatever will take any card does not take
+        // the one card something fussier was waiting for.
+        for &which in &self.order {
+            let (sampler, out) = if which == self.seats.len() {
+                if self.board_slots == 0 {
+                    continue;
+                }
+                (&self.board, &mut *board)
+            } else {
+                let alternatives = &self.seats[which];
+                (
+                    &alternatives[rng.gen_range(0..alternatives.len())],
+                    &mut holes[which],
+                )
+            };
+
+            if !sampler.draw(available, rng, out) {
                 return false;
             }
-            for &card in &holes[seat] {
+            for &card in out.iter() {
                 available.remove(card);
             }
-        }
-
-        if self.board_slots > 0 {
-            if !self.board.draw(available, rng, board) {
-                return false;
-            }
-        } else {
-            board.clear();
         }
 
         true
@@ -417,7 +460,11 @@ where
             .into());
         }
 
+        result.attempts += 1;
         if !request.deal(&mut rng, &mut holes, &mut board) {
+            // The cards drawn could not fill every slot, so the whole deal
+            // goes back. Rejecting the deal entire rather than re-drawing one
+            // seat is what keeps the result uniform over deals.
             continue;
         }
 
