@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use crate::{
     cards::Rank,
     error::PokerError,
@@ -138,21 +140,21 @@ fn test_three_of_a_kind() -> Result<(), PokerError> {
     let hand = Hand::from_str(Holdem, "Ah Ac Ad Kh Qc 2s 3d")?;
     assert_eq!(
         hand.evaluate(),
-        HoldemHandRank::ThreeOfAKind(Rank::Ace, vec![Rank::King, Rank::Queen])
+        HoldemHandRank::ThreeOfAKind(Rank::Ace, [Rank::King, Rank::Queen])
     );
 
     // Test three fives
     let hand = Hand::from_str(Holdem, "5h 5c 5d Ah Kc Qs 2d")?;
     assert_eq!(
         hand.evaluate(),
-        HoldemHandRank::ThreeOfAKind(Rank::Five, vec![Rank::Ace, Rank::King])
+        HoldemHandRank::ThreeOfAKind(Rank::Five, [Rank::Ace, Rank::King])
     );
 
     // Test three deuces
     let hand = Hand::from_str(Holdem, "2h 2c 2d Ah Kc Qs Jd")?;
     assert_eq!(
         hand.evaluate(),
-        HoldemHandRank::ThreeOfAKind(Rank::Two, vec![Rank::Ace, Rank::King])
+        HoldemHandRank::ThreeOfAKind(Rank::Two, [Rank::Ace, Rank::King])
     );
 
     Ok(())
@@ -190,21 +192,21 @@ fn test_one_pair() -> Result<(), PokerError> {
     let hand = Hand::from_str(Holdem, "Ah Ac Kh Qc Js 2c 3d")?;
     assert_eq!(
         hand.evaluate(),
-        HoldemHandRank::Pair(Rank::Ace, vec![Rank::King, Rank::Queen, Rank::Jack])
+        HoldemHandRank::Pair(Rank::Ace, [Rank::King, Rank::Queen, Rank::Jack])
     );
 
     // Test pair of tens
     let hand = Hand::from_str(Holdem, "Th Tc Ah Kc Qc 2s 3d")?;
     assert_eq!(
         hand.evaluate(),
-        HoldemHandRank::Pair(Rank::Ten, vec![Rank::Ace, Rank::King, Rank::Queen])
+        HoldemHandRank::Pair(Rank::Ten, [Rank::Ace, Rank::King, Rank::Queen])
     );
 
     // Test pair of deuces
     let hand = Hand::from_str(Holdem, "2h 2c Ah 9c Qc Js Td")?;
     assert_eq!(
         hand.evaluate(),
-        HoldemHandRank::Pair(Rank::Two, vec![Rank::Ace, Rank::Queen, Rank::Jack])
+        HoldemHandRank::Pair(Rank::Two, [Rank::Ace, Rank::Queen, Rank::Jack])
     );
 
     Ok(())
@@ -352,6 +354,54 @@ fn test_hand_comparisons() -> Result<(), PokerError> {
     assert!(trips > two_pair);
     assert!(two_pair > pair);
     assert!(pair > high_card);
+
+    Ok(())
+}
+
+#[test]
+fn test_empty_hand_comparison() -> Result<(), PokerError> {
+    // First, test direct construction of incomplete Hold'em hand rankings.
+    let empty_rank = HoldemHandRank::Incomplete(0);
+    let one_card_rank = HoldemHandRank::Incomplete(1);
+
+    // Incomplete hands with the same card count should be equal.
+    assert_eq!(empty_rank.partial_cmp(&empty_rank), Some(Ordering::Equal));
+    // An incomplete hand with more cards should beat one with fewer cards.
+    assert_eq!(empty_rank.partial_cmp(&one_card_rank), Some(Ordering::Less));
+    assert_eq!(
+        one_card_rank.partial_cmp(&empty_rank),
+        Some(Ordering::Greater)
+    );
+
+    // Now test the evaluation of hands using Hand::from_str.
+    // These functions now evaluate to an Incomplete variant when not enough cards are present.
+    let empty_hand1 = Hand::from_str(Holdem, "")?;
+    let empty_hand2 = Hand::from_str(Holdem, "")?;
+    let one_card_hand = Hand::from_str(Holdem, "2h")?;
+
+    // Here we test that evaluating these hands produces the correct Incomplete result.
+    match empty_hand1.evaluate() {
+        HoldemHandRank::Incomplete(n) => {
+            assert_eq!(n, 0, "Empty hand should evaluate to Incomplete(0)");
+        }
+        r => panic!("Expected Incomplete(0) for an empty hand, got {:?}", r),
+    }
+    match one_card_hand.evaluate() {
+        HoldemHandRank::Incomplete(n) => {
+            assert_eq!(n, 1, "A one-card hand should evaluate to Incomplete(1)");
+        }
+        r => panic!("Expected Incomplete(1) for a one-card hand, got {:?}", r),
+    }
+
+    // Finally, compare Hand instances.
+    // Empty hands should be equal.
+    assert_eq!(empty_hand1, empty_hand2);
+    assert!(!(empty_hand1 > empty_hand2));
+    assert!(!(empty_hand1 < empty_hand2));
+
+    // A hand with a card should compare as greater than an empty hand.
+    assert!(one_card_hand > empty_hand1);
+    assert!(empty_hand1 < one_card_hand);
 
     Ok(())
 }

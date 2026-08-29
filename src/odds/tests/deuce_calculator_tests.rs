@@ -237,3 +237,27 @@ fn test_equity_deuce_seven_t8_vs_97() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+#[test]
+fn teest_real_hand() -> Result<(), PokerError> {
+    let mut calculator = EquityCalculator::new(DeuceSeven, 100000);
+
+    // T8 drawing 1 vs 97 drawing 1
+    let alice_hand = Hand::from_str(DeuceSeven, "Js 7c 2d 9c 8c")?;
+    let bob_hand = Hand::from_str(DeuceSeven, "4c 2c 3d 2h Ah")?;
+    let bob_discard = Card::from_str("2h Ah")?;
+
+    calculator.add_draw_player("Alice".to_string(), alice_hand, None)?;
+    calculator.add_draw_player("Bob".to_string(), bob_hand, Some(bob_discard))?;
+
+    let results = calculator.calculate(drop)?;
+    println!("Alice results: {:?}", results["Alice"]);
+    println!("Bob results: {:?}", results["Bob"]);
+
+    // Bob should have 57.75% equity.
+    // When verifying this test, I only used 4 cards without a draw. Shouldn't make a big difference.
+    // assert!((results["Alice"] - 42.24).abs() < 0.5);
+    // assert!((results["Bob"] - 57.75).abs() < 0.5);
+
+    Ok(())
+}

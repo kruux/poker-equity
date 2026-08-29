@@ -95,6 +95,10 @@ impl Suit {
             Suit::Spade => return 's',
         }
     }
+
+    pub fn all() -> [Suit; 4] {
+        [Suit::Club, Suit::Diamond, Suit::Heart, Suit::Spade]
+    }
 }
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, Sequence)]
 pub enum Rank {
@@ -130,9 +134,7 @@ impl Rank {
     pub fn to_value(&self) -> u8 {
         *self as u8
     }
-}
 
-impl Rank {
     /// Takes a char and returns Rank or CardError if char doesn't match a rank
     pub fn from_char(c: char) -> Result<Rank, CardError> {
         match c.to_ascii_uppercase() {
@@ -170,6 +172,24 @@ impl Rank {
             Rank::King => return 'K',
             Rank::Ace => return 'A',
         }
+    }
+
+    pub fn all() -> [Rank; 13] {
+        [
+            Rank::Two,
+            Rank::Three,
+            Rank::Four,
+            Rank::Five,
+            Rank::Six,
+            Rank::Seven,
+            Rank::Eight,
+            Rank::Nine,
+            Rank::Ten,
+            Rank::Jack,
+            Rank::Queen,
+            Rank::King,
+            Rank::Ace,
+        ]
     }
 }
 

@@ -7,6 +7,9 @@ use super::{LowHandRank, PokerVariant};
 mod community_base;
 mod deuce_seven;
 mod holdem;
+mod holdem_fast;
+mod omaha;
+mod omaha_fast;
 mod razz;
 mod stud;
 mod stud_base;
@@ -18,6 +21,7 @@ pub(crate) use stud_base::StudCardGame;
 pub trait HasLow {
     fn low(&self) -> Option<&LowHandRank>;
 }
+
 pub trait EquityCalculation: PokerVariant
 where
     Self: Sized,

@@ -5,19 +5,19 @@ use crate::{
     cards::Deck,
     error::{EquityError, PokerError},
     odds::EquityCalculator,
-    variants::Holdem,
+    variants::Omaha,
 };
 
-impl CommunityCardGame for Holdem {}
-impl EquityCalculation for Holdem {
+impl CommunityCardGame for Omaha {}
+impl EquityCalculation for Omaha {
     fn validate(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError> {
         // Validation reused by all community card games
         self.validate_community(calculator)?;
 
-        // Make sure all players have 2 cards
+        // Make sure all players have 4 cards
         let players = calculator.players();
         for (_, hand, _) in players {
-            if hand.num_cards() != 2 {
+            if hand.num_cards() != 4 {
                 return Err(EquityError::NotEnoughCards(hand.num_cards()).into());
             }
         }
@@ -41,7 +41,7 @@ impl EquityCalculation for Holdem {
         let equity_share = 1.0 / (winners.len() as f64);
         let mut equity_map = HashMap::new();
         for winner in winners {
-            equity_map.insert(winner.clone(), equity_share);
+            equity_map.insert(winner.to_string(), equity_share);
         }
 
         Ok(equity_map)

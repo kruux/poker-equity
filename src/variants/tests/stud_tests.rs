@@ -1,7 +1,10 @@
+use std::cmp::Ordering;
+
 use crate::{
     cards::Rank,
+    error::PokerError,
     hand::Hand,
-    variants::{HighHandRank, SevenCardStud},
+    variants::{rankings::HighHandRank, SevenCardStud},
 };
 
 #[test]
@@ -171,7 +174,7 @@ fn test_three_of_a_kind() {
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "Ah Ac Ad Qh Jc 9c 2d").unwrap();
     if let HighHandRank::ThreeOfAKind(rank, kickers) = hand.evaluate() {
         assert_eq!(rank, Rank::Ace);
-        assert_eq!(kickers, vec![Rank::Queen, Rank::Jack]);
+        assert_eq!(kickers, [Rank::Queen, Rank::Jack]);
     } else {
         panic!("Expected ThreeOfAKind, got different hand rank");
     }
@@ -187,7 +190,7 @@ fn test_three_of_a_kind() {
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "7h 7c 7d 8h 9c Tc 2d").unwrap();
     if let HighHandRank::ThreeOfAKind(rank, kickers) = hand.evaluate() {
         assert_eq!(rank, Rank::Seven);
-        assert_eq!(kickers, vec![Rank::Ten, Rank::Nine]);
+        assert_eq!(kickers, [Rank::Ten, Rank::Nine]);
     } else {
         panic!("Expected ThreeOfAKind, got different hand rank");
     }
@@ -196,7 +199,7 @@ fn test_three_of_a_kind() {
     let hand = Hand::<SevenCardStud>::from_str(SevenCardStud, "7h 7c 7d 2h 3h 4h 9c").unwrap();
     if let HighHandRank::ThreeOfAKind(rank, kickers) = hand.evaluate() {
         assert_eq!(rank, Rank::Seven);
-        assert_eq!(kickers, vec![Rank::Nine, Rank::Four]);
+        assert_eq!(kickers, [Rank::Nine, Rank::Four]);
     } else {
         panic!("Expected ThreeOfAKind, got different hand rank");
     }
@@ -433,4 +436,35 @@ fn test_detailed_hand_ranking() {
     assert!(sf_high > high_card_high);
     assert!(quad_high > pair_high);
     assert!(fh_high > two_pair_high);
+}
+
+#[test]
+fn test_empty_hand_comparison() -> Result<(), PokerError> {
+    // Test incomplete HandRanks
+    let empty1 = HighHandRank::Incomplete(0);
+    let empty2 = HighHandRank::Incomplete(0);
+    let one_card_rank = HighHandRank::Incomplete(1);
+
+    // Empty hands should be equal
+    assert_eq!(empty1.partial_cmp(&empty2), Some(Ordering::Equal));
+
+    // Empty hand should be less than any non-empty hand
+    assert_eq!(empty1.partial_cmp(&one_card_rank), Some(Ordering::Less));
+    assert_eq!(one_card_rank.partial_cmp(&empty1), Some(Ordering::Greater));
+
+    // Test empty Hand instances
+    let empty_hand1 = Hand::from_str(SevenCardStud, "")?;
+    let empty_hand2 = Hand::from_str(SevenCardStud, "")?;
+    let one_card_hand = Hand::from_str(SevenCardStud, "2h")?;
+
+    // Empty hands should be equal
+    assert_eq!(empty_hand1, empty_hand2);
+    assert!(!(empty_hand1 > empty_hand2));
+    assert!(!(empty_hand1 < empty_hand2));
+
+    // Any hand with cards should beat an empty hand
+    assert!(one_card_hand > empty_hand1);
+    assert!(empty_hand1 < one_card_hand);
+
+    Ok(())
 }
