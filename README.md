@@ -284,26 +284,32 @@ pot. Run `cargo run --release --bin benchmark` for your own machine.
 
 | Game | Deals/s | | Game | Deals/s |
 |---|--:|---|---|--:|
-| Hold'em | 3,707,232 | | Omaha | 287,869 |
-| Short deck | 3,983,484 | | Five-card Omaha | 175,836 |
-| Stud | 2,833,198 | | Six-card Omaha | 119,820 |
-| Stud hi/lo | 2,461,528 | | Omaha hi/lo | 155,637 |
-| Razz | 2,900,203 | | Badugi | 851,080 |
-| 2-7 single draw | 5,365,421 | | Hold'em, six seats | 1,746,337 |
+| Hold'em | 3,950,695 | | Omaha | 2,178,272 |
+| Short deck | 4,127,282 | | 5-card Omaha | 1,771,263 |
+| Seven-card stud | 2,923,334 | | 6-card Omaha | 1,440,141 |
+| Stud hi/lo | 2,517,386 | | Omaha hi/lo | 1,381,754 |
+| Razz | 3,041,352 | | Badugi | 887,681 |
+| 2-7 single draw | 5,790,994 | | Hold'em, six seats | 1,809,326 |
 
-Hold'em across sixteen cores runs at **33.2 million** deals a second.
+Hold'em across sixteen cores runs at **37.4 million** deals a second.
 
-The Omaha family is an order of magnitude behind the rest, and unavoidably:
-its rule is that exactly two hole cards play with exactly three of the board,
-which is 60 five-card evaluations per player per deal at four hole cards, 100
-at five and 150 at six.
+The Omaha family used to be an order of magnitude behind the rest, because its
+rule is that exactly two hole cards play with exactly three of the board —
+sixty five-card hands to score per player per deal at four hole cards, a
+hundred at five and a hundred and fifty at six. It no longer is, because those
+sixty are not sixty separate hands: the board's ten three-card parts are the
+same for every hole pair and every seat at the table, a rank key is a sum so
+two parts combine with one addition, and a five-card flush needs both halves
+of the pairing to be of one suit. Sixty evaluations become sixty additions and
+sixty lookups. An inner evaluation costs **1.7 ns**, which is less than
+scoring a five-card hand from scratch.
 
 Underneath, a hand is scored by two array reads:
 
 | | Hands/s |
 |---|--:|
-| `score` — reads the lookup tables | 95,691,138 |
-| `evaluate_hand` — names the hand | 1,863,222 |
+| `score` — reads the lookup tables | 99,726,346 |
+| `evaluate_hand` — names the hand | 1,956,053 |
 
 Both are kept. `score` is what the sampling loop compares; `evaluate_hand` is
 what tells a player they have two pair, and is the independent second
