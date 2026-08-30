@@ -68,6 +68,24 @@ impl<V: PokerVariant> Hand<V> {
         Ok(Self { cards, variant })
     }
 
+    /// Replaces the cards with `hole` followed by `board`, keeping whatever
+    /// room the hand has already taken.
+    ///
+    /// The deal loop shows the same seats down over and over, and only the
+    /// cards change. Writing over a hand rather than building a new one is
+    /// what keeps a chunk of a million deals from asking the allocator a
+    /// million times.
+    pub fn refill(&mut self, hole: &[Card], board: &[Card]) -> Result<(), CardError> {
+        let total = hole.len() + board.len();
+        if total > self.variant.max_cards() {
+            return Err(CardError::TooManyCards(total));
+        }
+        self.cards.clear();
+        self.cards.extend_from_slice(hole);
+        self.cards.extend_from_slice(board);
+        Ok(())
+    }
+
     /// Adds one card, or errors if the hand is already full.
     pub fn add_card(&mut self, card: Card) -> Result<(), CardError> {
         let n = self.num_cards() + 1;

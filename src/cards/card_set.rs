@@ -112,11 +112,31 @@ impl CardSet {
         if index >= self.len() {
             return None;
         }
+
+        // Halving rather than counting up one card at a time. Each step
+        // splits what is left in two and counts the cards in the lower half:
+        // either the one wanted is down there, or it is above and the whole
+        // lower half can be skipped at once. Six steps settle any set, where
+        // stepping card by card takes twenty-five on a full deck -- and this
+        // is the single hottest thing in the deal loop.
         let mut bits = self.0;
-        for _ in 0..index {
-            bits &= bits - 1; // clear the lowest set bit
+        let mut index = index;
+        let mut position = 0;
+        let mut width = 32;
+        while width >= 1 {
+            let lower = bits & (u64::MAX >> (64 - width));
+            let count = lower.count_ones();
+            if index >= count {
+                index -= count;
+                bits >>= width;
+                position += width;
+            } else {
+                bits = lower;
+            }
+            width /= 2;
         }
-        Card::from_index(bits.trailing_zeros() as u8)
+
+        Card::from_index(position as u8)
     }
 
     /// The cards in the set, lowest index first.

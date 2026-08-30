@@ -107,3 +107,54 @@ fn test_a_pat_badugi_beats_a_drawing_hand() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// Badugi's two answers must agree, and here they can be made to agree over
+/// every holding there is. `score` packs the ordering straight out of two
+/// bitmasks; `evaluate` names the badugi by trying all fifteen subsets. They
+/// are written separately, so any four cards they place differently is a bug
+/// in one of them.
+///
+/// All 270,725 four-card holdings, which is cheap enough to do outright.
+#[test]
+fn test_badugis_score_and_name_agree_everywhere() {
+    use crate::variants::PokerVariant;
+
+    /// The ordering `score` produces, read off a named badugi instead.
+    fn key_from_name(cards: &[Card]) -> u32 {
+        let BadugiHandRank::Low(played) = Badugi.evaluate_hand(cards);
+        let mut key = (4 - played.len().min(4)) as u32;
+        for slot in 0..4 {
+            let value = played.get(slot).map_or(0, |rank| {
+                if *rank == Rank::Ace {
+                    1
+                } else {
+                    rank.to_value()
+                }
+            });
+            key = (key << 4) | value as u32;
+        }
+        key
+    }
+
+    let deck: Vec<Card> = (0..52).map(|i| Card::from_index(i).expect("a card")).collect();
+    let mut checked = 0;
+
+    for a in 0..deck.len() {
+        for b in a + 1..deck.len() {
+            for c in b + 1..deck.len() {
+                for d in c + 1..deck.len() {
+                    let hand = [deck[a], deck[b], deck[c], deck[d]];
+                    assert_eq!(
+                        Badugi.score(&hand),
+                        key_from_name(&hand),
+                        "scored and named differently: {:?}",
+                        hand
+                    );
+                    checked += 1;
+                }
+            }
+        }
+    }
+
+    assert_eq!(checked, 270_725, "every four-card holding");
+}

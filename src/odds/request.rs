@@ -1,4 +1,10 @@
-use rand::{rngs::StdRng, Rng, SeedableRng};
+// The sampling loop draws nine or more cards a deal, millions of deals over,
+// so the generator is a real share of the work. `SmallRng` is Xoshiro256++
+// here, which is not cryptographic and does not need to be: nothing is being
+// hidden from anyone, and it passes the statistical tests that matter to a
+// Monte Carlo. What a seed reproduces is unchanged -- see `run_batch` -- but
+// which deals a given seed draws is not promised across versions.
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 use crate::{
     cards::{Card, CardSet},
@@ -236,7 +242,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
     /// retried.
     fn deal(
         &self,
-        rng: &mut StdRng,
+        rng: &mut SmallRng,
         holes: &mut [Vec<Card>],
         board: &mut Vec<Card>,
     ) -> bool {
@@ -412,20 +418,19 @@ where
         }
     };
 
+    let mut hands: Vec<Hand<V>> = (0..holes.len())
+        .map(|_| Hand::new(request.variant))
+        .collect();
+
     for board in boards {
         if *budget == 0 {
             return Ok(false);
         }
         *budget -= 1;
 
-        let hands = holes
-            .iter()
-            .map(|hole| {
-                let mut cards = hole.clone();
-                cards.extend_from_slice(&board);
-                Hand::new_with_cards(request.variant, cards)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        for (hand, hole) in hands.iter_mut().zip(holes.iter()) {
+            hand.refill(hole, &board)?;
+        }
 
         shares.iter_mut().for_each(|share| *share = 0.0);
         low_shares.iter_mut().for_each(|share| *share = 0.0);
@@ -453,12 +458,17 @@ where
 {
     let seats = request.players();
     let mut result = ChunkResult::empty(seats);
-    let mut rng = StdRng::seed_from_u64(seed);
+    let mut rng = SmallRng::seed_from_u64(seed);
 
     let mut holes: Vec<Vec<Card>> = vec![Vec::new(); seats];
     let mut board: Vec<Card> = Vec::new();
     let mut shares = vec![0.0f64; seats];
     let mut low_shares = vec![0.0f64; seats];
+
+    // The seats are the same all chunk long; only their cards change. Each
+    // hand is built once, with room for the most cards this game deals, and
+    // written over deal by deal.
+    let mut hands: Vec<Hand<V>> = (0..seats).map(|_| Hand::new(request.variant)).collect();
 
     // Feasibility was settled at construction, so a rejected draw is only
     // ever bad luck. The cap keeps a pathological request from spinning
@@ -483,14 +493,9 @@ where
             continue;
         }
 
-        let hands = holes
-            .iter()
-            .map(|hole| {
-                let mut cards = hole.clone();
-                cards.extend_from_slice(&board);
-                Hand::new_with_cards(request.variant, cards)
-            })
-            .collect::<Result<Vec<_>, _>>()?;
+        for (hand, hole) in hands.iter_mut().zip(holes.iter()) {
+            hand.refill(hole, &board)?;
+        }
 
         shares.iter_mut().for_each(|share| *share = 0.0);
         low_shares.iter_mut().for_each(|share| *share = 0.0);

@@ -62,9 +62,12 @@ where
     /// high while one of them also takes the low, for 75% and 25% -- is
     /// neither a win nor a tie in any countable sense.
     fn award(&self, hands: &[Hand<Self>], shares: &mut [f64]) -> Result<(), PokerError> {
-        let winners = &self.rank_hands(hands)?[0];
+        let winners = self.winning_seats(hands);
+        if winners.is_empty() {
+            return Ok(());
+        }
         let share = 1.0 / winners.len() as f64;
-        for &seat in winners {
+        for seat in winners {
             shares[seat] += share;
         }
         Ok(())
@@ -97,89 +100,140 @@ where
         shares: &mut [f64],
         low_shares: &mut [f64],
     ) -> Result<(), PokerError> {
-        let high_half = match self.rank_low_hands(hands)? {
-            Some(low_places) => {
-                let winners = &low_places[0];
-                let each = 0.5 / winners.len() as f64;
-                for &seat in winners {
-                    shares[seat] += each;
-                    low_shares[seat] += each;
-                }
-                0.5
+        let low_winners = self.best_low_seats(hands);
+        let high_half = if low_winners.is_empty() {
+            1.0
+        } else {
+            let each = 0.5 / low_winners.len() as f64;
+            for seat in low_winners {
+                shares[seat] += each;
+                low_shares[seat] += each;
             }
-            None => 1.0,
+            0.5
         };
 
-        let winners = &self.rank_hands(hands)?[0];
+        let winners = self.winning_seats(hands);
+        if winners.is_empty() {
+            return Ok(());
+        }
         let each = high_half / winners.len() as f64;
-        for &seat in winners {
+        for seat in winners {
             shares[seat] += each;
         }
         Ok(())
     }
 
-    /// Places the players by hand strength, best first, as seat indices.
+    /// The seats holding the best hand, which is the set that shares the pot.
     ///
-    /// Two dimensional so that ties are representable at any position:
-    /// `result[0]` holds the winners, `result[1]` those in second, and so on.
-    /// Players tie when they compare equal, which in a split game is not the
-    /// same as their hands being identical.
+    /// One pass over the table, and nothing allocated: only the best score
+    /// decides anything, so there is no reason to place the rest of the
+    /// seats. Each hand is scored once rather than compared -- comparing two
+    /// `Hand`s rescores both -- and the score is a table lookup for every
+    /// game but badugi, which is where the tables earn their keep.
     ///
-    /// Each hand is scored once and the indices are sorted, rather than
-    /// sorting the hands themselves -- comparing two `Hand`s rescores both.
-    /// The score is a lookup for every game but badugi, so this is where the
-    /// tables earn their keep.
-    fn rank_hands(&self, hands: &[Hand<Self>]) -> Result<Vec<Vec<usize>>, PokerError> {
-        if hands.is_empty() {
-            return Ok(vec![]);
+    /// Returns an empty set for an empty table.
+    fn winning_seats(&self, hands: &[Hand<Self>]) -> Seats {
+        let mut best = u32::MAX;
+        let mut winners = Seats::NONE;
+        for (seat, hand) in hands.iter().enumerate() {
+            // Lower scores are better hands.
+            let score = self.score(hand.cards());
+            if score < best {
+                best = score;
+                winners = Seats::only(seat);
+            } else if score == best {
+                winners.add(seat);
+            }
         }
-
-        // Lower scores are better hands, so the seats sort ascending.
-        let scores: Vec<u32> = hands.iter().map(|hand| self.score(hand.cards())).collect();
-        let mut seats: Vec<usize> = (0..hands.len()).collect();
-        seats.sort_by_key(|&seat| scores[seat]);
-
-        Ok(group_ties(&seats, |a, b| scores[a] == scores[b]))
+        winners
     }
 
-    /// Places the players by their low hands, best first, in the same shape
-    /// `rank_hands` returns.
+    /// The seats holding the best qualifying low, which share the low half.
     ///
-    /// Players without a qualifying low are left out entirely. Returns `None`
-    /// when nobody qualifies, which is how a split game learns that the high
-    /// hand takes the whole pot.
-    fn rank_low_hands(
-        &self,
-        hands: &[Hand<Self>],
-    ) -> Result<Option<Vec<Vec<usize>>>, PokerError> {
-        let lows: Vec<Option<u32>> = hands
-            .iter()
-            .map(|hand| self.low_score(hand.cards()))
-            .collect();
-
-        let mut seats: Vec<usize> = (0..hands.len()).filter(|&i| lows[i].is_some()).collect();
-        if seats.is_empty() {
-            return Ok(None);
+    /// Seats without a qualifying low are not in the set, so an empty set is
+    /// how a split game learns that nobody made a low and the high hand takes
+    /// the whole pot.
+    fn best_low_seats(&self, hands: &[Hand<Self>]) -> Seats {
+        let mut best = u32::MAX;
+        let mut winners = Seats::NONE;
+        for (seat, hand) in hands.iter().enumerate() {
+            let Some(score) = self.low_score(hand.cards()) else {
+                continue;
+            };
+            if score < best {
+                best = score;
+                winners = Seats::only(seat);
+            } else if score == best {
+                winners.add(seat);
+            }
         }
-
-        seats.sort_by_key(|&seat| lows[seat]);
-        Ok(Some(group_ties(&seats, |a, b| lows[a] == lows[b])))
+        winners
     }
 }
 
-/// Splits `seats`, already ordered best first, into groups of equal strength.
-fn group_ties(seats: &[usize], ties: impl Fn(usize, usize) -> bool) -> Vec<Vec<usize>> {
-    let mut places: Vec<Vec<usize>> = Vec::new();
-    let mut current = vec![seats[0]];
-    for window in seats.windows(2) {
-        let (previous, seat) = (window[0], window[1]);
-        if ties(previous, seat) {
-            current.push(seat);
-        } else {
-            places.push(std::mem::take(&mut current));
-            current.push(seat);
-        }
+/// A set of seats at one table, as one bit each.
+///
+/// The deal loop asks who won millions of times over, so the answer has to
+/// come back without touching the allocator. Thirty-two bits is room to
+/// spare: every game here deals a player at least two cards, so fifty-two
+/// cards cannot seat more than twenty-six.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Seats(u32);
+
+impl Seats {
+    /// Nobody.
+    pub const NONE: Self = Seats(0);
+
+    /// Just the one seat.
+    pub fn only(seat: usize) -> Self {
+        debug_assert!(seat < 32, "seat {} is past the width of the set", seat);
+        Seats(1 << seat)
     }
-    places.push(current);
-    places
+
+    /// Adds a seat to the set.
+    pub fn add(&mut self, seat: usize) {
+        debug_assert!(seat < 32, "seat {} is past the width of the set", seat);
+        self.0 |= 1 << seat;
+    }
+
+    /// Whether the seat is in the set.
+    pub fn contains(&self, seat: usize) -> bool {
+        seat < 32 && self.0 >> seat & 1 == 1
+    }
+
+    /// How many seats are in the set.
+    pub fn len(&self) -> usize {
+        self.0.count_ones() as usize
+    }
+
+    /// Whether the set names nobody at all.
+    pub fn is_empty(&self) -> bool {
+        self.0 == 0
+    }
+}
+
+impl IntoIterator for Seats {
+    type Item = usize;
+    type IntoIter = SeatIter;
+
+    fn into_iter(self) -> SeatIter {
+        SeatIter(self.0)
+    }
+}
+
+/// Walks the seats of a [`Seats`] set in order, lowest first.
+pub struct SeatIter(u32);
+
+impl Iterator for SeatIter {
+    type Item = usize;
+
+    fn next(&mut self) -> Option<usize> {
+        if self.0 == 0 {
+            return None;
+        }
+        let seat = self.0.trailing_zeros() as usize;
+        // Clears the lowest bit that is set.
+        self.0 &= self.0 - 1;
+        Some(seat)
+    }
 }

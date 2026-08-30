@@ -15,6 +15,7 @@ pub use deuce_seven::DeuceSeven;
 pub(crate) use equity::CommunityCardGame;
 pub use equity::EquityCalculation;
 pub use equity::HasLow;
+pub use equity::{SeatIter, Seats};
 pub use holdem::Holdem;
 pub use omaha::{Courchevel, Omaha, OmahaFive, OmahaSix};
 pub use omaha_hi_lo::{CourchevelHiLo, OmahaFiveHiLo, OmahaHiLo};
