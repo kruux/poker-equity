@@ -2,8 +2,13 @@ use super::{CommunityCardGame, EquityCalculation};
 use crate::{
     cards::Deck,
     error::{EquityError, PokerError},
+    hand::Hand,
     odds::EquityCalculator,
-    variants::{Courchevel, Omaha, OmahaFive, OmahaSix, PokerVariant},
+    variants::{
+        omaha::best_seats,
+        rankings::high_score_from_parts,
+        Courchevel, Omaha, OmahaFive, OmahaSix, PokerVariant, Seats,
+    },
 };
 
 /// Wires an Omaha variant into the equity engine. They differ only in how
@@ -31,6 +36,12 @@ macro_rules! omaha_equity {
                 let community_cards = self.deal_community_cards(calculator, deck)?;
                 let final_hands = self.build_final_hands(calculator, community_cards)?;
                 self.award(&final_hands, shares)
+            }
+
+            /// Every seat is playing the same board, so its three-card halves
+            /// are worked out once for the table instead of once a seat.
+            fn winning_seats(&self, hands: &[Hand<Self>]) -> Seats {
+                best_seats(hands, self.hole_cards(), high_score_from_parts, |_| true)
             }
         }
     };
@@ -82,5 +93,11 @@ impl EquityCalculation for Courchevel {
         let community_cards = self.deal_community_cards(calculator, deck)?;
         let final_hands = self.build_final_hands(calculator, community_cards)?;
         self.award(&final_hands, shares)
+    }
+
+    /// Every seat is playing the same board, so its three-card halves are
+    /// worked out once for the table instead of once a seat.
+    fn winning_seats(&self, hands: &[Hand<Self>]) -> Seats {
+        best_seats(hands, self.hole_cards(), high_score_from_parts, |_| true)
     }
 }
