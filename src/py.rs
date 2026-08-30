@@ -5,7 +5,8 @@
 //! addition rather than a rewrite.
 //!
 //! The boundary carries `u64` masks and `u8` card indices, which is what
-//! fpdb's Python side already produces, so nothing is translated crossing it.
+//! a caller's Python side is likely to hold already, so nothing is translated
+//! crossing it.
 //! Text may cross too, for the convenience calls.
 
 use pyo3::exceptions::PyValueError;
@@ -217,7 +218,8 @@ fn default_thread_count() -> usize {
 /// Samples a batch of deals, taking this library's notation.
 ///
 /// The convenience form: `["AhKh", "QsQd"]` for hold'em, `"Kh Qh Jh"` for a
-/// flop. fpdb drives the mask form; this is for everyone else.
+/// flop. The mask form is the one to reach for from a program that already
+/// holds masks; this one is for everything else.
 #[pyfunction]
 #[pyo3(signature = (variant, hands, board="", dead="", samples=100_000, seed=0, threads=0))]
 fn chunk_from_text(
@@ -269,8 +271,9 @@ fn exact_from_text(
     }
 }
 
-/// Reads a hand field into masks, which is how fpdb's own parser can be
-/// checked against this one without running a whole simulation.
+/// Reads a hand field into masks, which is how another implementation of
+/// the notation can be checked against this one without running a whole
+/// simulation.
 ///
 /// `slots` is how many cards the game deals a player. Where cards arrive over
 /// time -- stud, a draw game -- a shorter field is allowed and means the rest

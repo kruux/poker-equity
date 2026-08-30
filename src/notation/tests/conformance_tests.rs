@@ -1,8 +1,9 @@
 //! Runs the conformance fixture, which is the grammar's source of truth.
 //!
-//! Every rule in PLAN section 3 has a row. fpdb's Python parser reads the
-//! same file, so a change to the grammar that only lands on one side shows up
-//! here as a failure rather than as a disagreement in the field months later.
+//! Every rule of the notation has a row. The fixture is a flat file rather
+//! than Rust so that a second implementation of the grammar can be held to
+//! the same rows, and so a change that lands on only one side shows up here
+//! as a failure rather than as a disagreement in the field months later.
 
 use crate::notation::{parse_board, parse_dead, parse_hand, parse_hand_up_to};
 

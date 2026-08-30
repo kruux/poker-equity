@@ -48,8 +48,8 @@ pub struct EquityRequest<V: PokerVariant + EquityCalculation> {
 impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
     /// Builds a request from masks, with no text involved.
     ///
-    /// This is the entry point fpdb uses; the text form in
-    /// [`from_text`](Self::from_text) sits on top of it.
+    /// This is the entry point for a caller that already holds masks; the text
+    /// form in [`from_text`](Self::from_text) parses into exactly this.
     pub fn from_masks(
         variant: V,
         hands: &[HandSpec],

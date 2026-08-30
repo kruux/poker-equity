@@ -3,9 +3,8 @@
 //!
 //! Every pattern becomes a [`CardSet`](crate::cards::CardSet), so a named
 //! card and a wildcard are the same kind of thing to everything downstream.
-//! The grammar is specified in PLAN section 3 and pinned by the conformance
-//! fixture in `tests/fixtures/notation.tsv`, which fpdb's own parser reads
-//! too.
+//! The grammar is pinned by the conformance fixture in
+//! `tests/fixtures/notation.tsv`, which another parser can read too.
 
 mod error;
 mod hand_spec;

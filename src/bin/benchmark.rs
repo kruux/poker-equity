@@ -1,4 +1,4 @@
-//! Reports how many deals a second each variant manages.
+//! Reports how many showdowns a second each variant manages.
 //!
 //! This is a report, not a gate. Perf assertions in CI are flaky and get
 //! muted, which is worse than not having them; the only assertion anywhere is
@@ -39,11 +39,11 @@ macro_rules! time_variant {
 
 fn report(label: &str, seats: usize, per_second: f64) {
     let short: String = label.chars().take(26).collect();
-    println!("{:28} {:>2} seats  {:>13.0} deals/s", short, seats, per_second);
+    println!("{:28} {:>2} seats  {:>13.0} showdowns/s", short, seats, per_second);
 }
 
 fn main() {
-    println!("One core. Deals a second, including evaluation and pot splitting.\n");
+    println!("One core. Showdowns a second, including evaluation and pot splitting.\n");
 
     time_variant!(Holdem, &["AhKh", "QsQd"], "", 400_000);
     time_variant!(Holdem, &["AhKh", "QsQd"], "", 200_000);
@@ -55,6 +55,11 @@ fn main() {
     time_variant!(OmahaFive, &["AhKh7c2d3c", "QsQdJsTd4h"], "", 30_000);
     time_variant!(OmahaSix, &["AhKh7c2d3c5s", "QsQdJsTd4h6h"], "", 20_000);
     time_variant!(OmahaHiLo, &["Ah2c3d4s", "QsQdJsTd"], "", 20_000);
+    time_variant!(OmahaFiveHiLo, &["Ah2c3d4s5c", "QsQdJsTd9h"], "", 20_000);
+    // Courchevel deals its first board card face up, so a board of one is the
+    // spot it is actually played from.
+    time_variant!(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "8s", 30_000);
+    time_variant!(CourchevelHiLo, &["Ah2c3d4s5c", "QsQdJsTd9h"], "8s", 20_000);
     // Six-handed, where sharing the board's ten three-card halves across the
     // table rather than working them out per seat pays the most.
     time_variant!(

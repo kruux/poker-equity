@@ -65,9 +65,9 @@ fn test_published_preflop_equities() {
 
 /// Exact against Monte Carlo, agreeing within four standard errors.
 ///
-/// This is the only test that catches the multiplicity bias of PLAN section
-/// 7.2, because comparing one Monte Carlo run to another compares two runs
-/// that are wrong in the same way.
+/// This is the only test that catches the sampler's multiplicity bias,
+/// because comparing one Monte Carlo run to another compares two runs that
+/// are wrong in the same way.
 #[test]
 fn test_sampling_agrees_with_enumeration() {
     let cases: [(&[&str], &str); 4] = [

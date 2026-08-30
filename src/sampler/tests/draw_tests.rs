@@ -31,8 +31,7 @@ fn tally(sampler: &SlotSampler, available: CardSet, draws: usize) -> HashMap<Str
     counts
 }
 
-/// The failure mode PLAN section 7.2 warns about, in the smallest case that
-/// shows it.
+/// The multiplicity bias, in the smallest case that shows it.
 ///
 /// Slot masks `{2c,2d,2h}` and `{2c,2d}` admit three sets: `2c 2d`, `2c 2h`
 /// and `2d 2h`. Sampling one card per slot and rejecting collisions is

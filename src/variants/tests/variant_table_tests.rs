@@ -2,14 +2,12 @@ use std::collections::HashSet;
 
 use crate::variants::*;
 
-/// Every row of the table in PLAN section 4, checked against what the library
-/// actually implements.
+/// Every game the library claims to support, checked against what it
+/// actually implements: how many cards it deals a player, how many to the
+/// board, and how big its deck is.
 ///
-/// The keys are this library's own, not the ones the plan lists. The plan
-/// carries fpdb's existing database categories, which mix four conventions
-/// -- `5_omahahi`, `omahahilo`, `cour_hi`, `27_3draw` -- and one of them
-/// cannot even be an identifier. These are one word per idea, family first,
-/// and fpdb is being renamed to match.
+/// The keys are one word per idea, family first -- `omaha_five_hi_lo`, not
+/// `5_omahahi` -- so that they sort into families and can all be identifiers.
 #[test]
 fn test_every_variant_row_exists() {
     // key, label, hole cards, board cards, deck size
