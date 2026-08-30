@@ -82,8 +82,7 @@ fn test_binding_is_immediate_only() {
 }
 
 /// A wildcard that admits exactly one card must be the same thing as naming
-/// that card. This is the property in PLAN section 9.4 that tests the
-/// wildcard path against the concrete path.
+/// that card, which is what holds the wildcard path to the concrete one.
 #[test]
 fn test_a_wildcard_admitting_one_card_equals_naming_it() {
     let ace_of_spades = Card::new(Suit::Spade, Rank::Ace);
@@ -178,7 +177,7 @@ fn test_board_and_dead_card_rules() {
     }
 }
 
-/// The mask API in PLAN section 3.6, for callers that never touch text.
+/// The mask API, for callers that never touch text.
 #[test]
 fn test_specs_can_be_built_from_masks() {
     let deuces = CardSet::of_rank(Rank::Two);

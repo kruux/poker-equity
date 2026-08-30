@@ -21,8 +21,8 @@ fn test_full_deck_holds_every_card_once() {
 
 #[test]
 fn test_indices_are_rank_times_four_plus_suit() {
-    // The layout fpdb's Python side produces, so the boundary needs no
-    // translation.
+    // The layout a caller's own side is expected to produce, so the
+    // boundary needs no translation.
     assert_eq!(Card::new(Suit::Club, Rank::Two).index(), 0);
     assert_eq!(Card::new(Suit::Spade, Rank::Two).index(), 3);
     assert_eq!(Card::new(Suit::Club, Rank::Three).index(), 4);
@@ -107,7 +107,7 @@ fn test_nth_walks_the_set_in_order() {
 /// A set prints highest card first, which is how a hand is read aloud.
 ///
 /// Walking the bits gives the opposite, since a card's index is
-/// `rank * 4 + suit`. fpdb matches against this, so the order is part of the
+/// `rank * 4 + suit`. Callers match against this, so the order is part of the
 /// grammar rather than an accident of the representation.
 #[test]
 fn test_display_reads_highest_first() -> Result<(), PokerError> {

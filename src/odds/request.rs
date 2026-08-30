@@ -8,14 +8,14 @@ use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 use crate::{
     cards::{Card, CardSet},
-    error::{EquityError, PokerError},
+    error::{EquityError, GameError, PokerError},
     hand::Hand,
     notation::{parse_board, parse_dead, parse_hand, parse_hand_up_to, HandSpec},
     sampler::{is_feasible, SlotSampler},
     variants::{EquityCalculation, PokerType, PokerVariant},
 };
 
-use super::chunk::ChunkResult;
+use super::{chunk::ChunkResult, default_threads};
 
 /// One equity question: a game, some hands, a board and some dead cards.
 ///
@@ -42,14 +42,62 @@ pub struct EquityRequest<V: PokerVariant + EquityCalculation> {
     board: SlotSampler,
     board_slots: usize,
     available: CardSet,
+    /// Per participant, in `order`'s numbering, the cards it holds in every
+    /// deal that satisfies the request. `seats.len()` stands for the board.
+    certain: Vec<CardSet>,
+    /// Every card spoken for by somebody, which is the union of the above.
+    spoken_for: CardSet,
     players: usize,
+    threads: usize,
+}
+
+/// The cards a participant holds in *every* deal the request admits.
+///
+/// A slot with one candidate takes that card whatever else happens. Where a
+/// seat has alternatives it has to be certain under all of them -- `AKs`
+/// names no card for sure, since the suit is still open, while `Ah2c3d`
+/// names three.
+///
+/// This is what makes it safe to keep those cards away from everybody else:
+/// if a seat holds a card in every valid deal, no other seat holds it in any
+/// of them, so removing it from their pools removes no deal that counts.
+fn certain_cards(alternatives: &[Vec<CardSet>]) -> CardSet {
+    alternatives
+        .iter()
+        .map(|slots| {
+            slots
+                .iter()
+                .filter(|slot| slot.len() == 1)
+                .fold(CardSet::EMPTY, |all, slot| all.union(*slot))
+        })
+        .reduce(|all, alternative| all.intersection(alternative))
+        .unwrap_or(CardSet::EMPTY)
+}
+
+/// Whether this deal runs the deck out, so that the last card is shared.
+///
+/// Seven-card stud gives every player seven cards, which is more than a deck
+/// holds once eight sit down: eight sevens is fifty-six. The rule is that the
+/// last card is not dealt to each player at all. One card goes face up in the
+/// middle and every player counts it as their seventh, which brings the deal
+/// back to `8 x 6 + 1 = 49`.
+///
+/// Rare enough that most players never see it, and a rule all the same. Razz
+/// and the split-pot stud games share it, since they share the dealing.
+///
+/// Burn cards are not counted here, because the library does not model them:
+/// nothing is hidden from anyone in an equity calculation, so a burnt card is
+/// only a card that was never named.
+fn last_card_is_shared<V: PokerVariant>(variant: V, players: usize) -> bool {
+    matches!(variant.poker_type(), PokerType::Stud)
+        && players * variant.hole_cards() > variant.deck().len() as usize
 }
 
 impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
     /// Builds a request from masks, with no text involved.
     ///
-    /// This is the entry point fpdb uses; the text form in
-    /// [`from_text`](Self::from_text) sits on top of it.
+    /// This is the entry point for a caller that already holds masks; the text
+    /// form in [`from_text`](Self::from_text) parses into exactly this.
     pub fn from_masks(
         variant: V,
         hands: &[HandSpec],
@@ -70,11 +118,28 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         // Community games deal every hole card at once, so a short field
         // there is a miscount rather than a hand in progress. Name an unknown
         // card with a wildcard instead.
-        let hole = variant.hole_cards();
+        // Eight-handed stud runs the deck out, so the seventh card is shared
+        // rather than dealt: six cards a seat and one in the middle.
+        let shared_last = last_card_is_shared(variant, hands.len());
+        let hole = variant.hole_cards() - usize::from(shared_last);
         let cards_arrive_over_time = matches!(
             variant.poker_type(),
             PokerType::Draw | PokerType::Stud
         );
+
+        // In stud every live player is on the same street: third street is
+        // three cards for everyone at the table, fourth is four. So fields of
+        // different lengths are not a table caught mid-deal, they are a
+        // miscount. Draw games are the opposite -- a short field is how a
+        // player says how many they are drawing, so five against four is a
+        // pat hand against a one-card draw and entirely legal.
+        if matches!(variant.poker_type(), PokerType::Stud) {
+            let mut counts = hands.iter().map(|spec| spec.slot_count());
+            let first = counts.next().flatten();
+            if counts.any(|count| count != first) {
+                return Err(EquityError::UnequalHandSizes.into());
+            }
+        }
 
         let hands: Vec<HandSpec> = hands
             .iter()
@@ -106,8 +171,13 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             }
         }
 
-        let board_slots = variant.board_cards();
+        let board_slots = variant.board_cards() + usize::from(shared_last);
         if board.len() > board_slots {
+            return Err(EquityError::InvalidCommunityCards(board.len()).into());
+        }
+        // Courchevel's first board card is face up before the betting, so a
+        // Courchevel question with nothing showing is not one.
+        if board.len() < variant.least_board_cards() {
             return Err(EquityError::InvalidCommunityCards(board.len()).into());
         }
 
@@ -120,6 +190,39 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         // as a full one, which is how a flop and a river spot share a path.
         let mut board_masks = board.to_vec();
         board_masks.resize(board_slots, CardSet::FULL_DECK);
+
+        // Which cards are already spoken for. This does two jobs: it names a
+        // card that two participants both claim, which is a mistake worth a
+        // better message than "no deal is possible"; and at sampling time it
+        // keeps a seat filling a free slot from taking a card another seat
+        // has named, without which a seven-handed stud game cannot be dealt
+        // at all.
+        let mut certain: Vec<CardSet> = hands
+            .iter()
+            .map(|spec| certain_cards(&spec.alternatives))
+            .collect();
+        certain.push(certain_cards(std::slice::from_ref(&board_masks)));
+
+        let mut spoken_for = CardSet::EMPTY;
+        for claimed in &certain {
+            let clash = spoken_for.intersection(*claimed);
+            if let Some(card) = clash.iter().next() {
+                return Err(GameError::DuplicateCard(card).into());
+            }
+            spoken_for = spoken_for.union(*claimed);
+        }
+
+        // A named card that is not on offer is one of two mistakes, and they
+        // want different words: a card this game's deck never held, or one
+        // the caller has already declared dead.
+        if let Some(card) = spoken_for.without(available).iter().next() {
+            return Err(if variant.deck().contains(card) {
+                GameError::DuplicateCard(card)
+            } else {
+                GameError::NotInDeck(card)
+            }
+            .into());
+        }
 
         Self::check_feasible(hands, &board_masks, available)?;
 
@@ -165,7 +268,10 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             board: SlotSampler::new(&board_masks, available),
             board_slots,
             available,
+            certain,
+            spoken_for,
             players: hands.len(),
+            threads: default_threads(),
         })
     }
 
@@ -186,11 +292,13 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         } else {
             parse_hand
         };
+        let shared_last = last_card_is_shared(variant, hands.len());
+        let hole = variant.hole_cards() - usize::from(shared_last);
         let specs = hands
             .iter()
-            .map(|text| read(text, variant.hole_cards()))
+            .map(|text| read(text, hole))
             .collect::<Result<Vec<_>, _>>()?;
-        let board = parse_board(board, variant.board_cards())?;
+        let board = parse_board(board, variant.board_cards() + usize::from(shared_last))?;
         Self::from_masks(variant, &specs, &board, parse_dead(dead)?)
     }
 
@@ -237,6 +345,63 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         self.variant
     }
 
+    /// How many cards each seat holds privately in this request.
+    ///
+    /// The game's own figure, except in an eight-handed stud game where the
+    /// deck runs out and the last card is shared instead of dealt -- there it
+    /// is one fewer, and [`board_cards`](Self::board_cards) is the one that
+    /// went to the middle.
+    pub fn hole_cards(&self) -> usize {
+        self.variant.hole_cards() - usize::from(self.board_slots > self.variant.board_cards())
+    }
+
+    /// How many cards this request shares between the seats.
+    ///
+    /// Five for a community game, zero for stud and draw -- except for the
+    /// eight-handed stud game that runs the deck out, where it is one.
+    pub fn board_cards(&self) -> usize {
+        self.board_slots
+    }
+
+    /// How many threads a run of this request spreads over.
+    ///
+    /// Starts at [`default_threads`](crate::odds::default_threads), which is
+    /// polite rather than greedy -- several calculators may be open at once
+    /// and one must not starve the others. Raise it with
+    /// [`with_threads`](Self::with_threads) when the machine is yours.
+    pub fn threads(&self) -> usize {
+        self.threads
+    }
+
+    /// The same request, run over `threads` threads.
+    ///
+    /// ```no_run
+    /// # use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
+    /// let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?
+    ///     .with_threads(std::thread::available_parallelism()?.get());
+    /// let result = equity(&request, Target::Samples(5_000_000))?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// Held between one thread and as many as the machine reports, so
+    /// `with_threads(usize::MAX)` reads as "all of it" and no count can ask
+    /// for threads that are not there. More threads than cores buys nothing
+    /// here: the loop is pure arithmetic and never waits on anything, so a
+    /// thread with no core to run on only adds a context switch.
+    ///
+    /// Note that the deals a seed draws depend on how many threads divide
+    /// them, so reproducing a run means matching this too.
+    pub fn with_threads(mut self, threads: usize) -> Self {
+        self.set_threads(threads);
+        self
+    }
+
+    /// Sets the thread count in place, for a request already built.
+    pub fn set_threads(&mut self, threads: usize) {
+        let most = std::thread::available_parallelism().map_or(1, |cores| cores.get());
+        self.threads = threads.clamp(1, most);
+    }
+
     /// Deals once, writing each seat's cards into `holes` and the shared
     /// cards into `board`. Returns false when the draw failed and should be
     /// retried.
@@ -265,7 +430,13 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
                 )
             };
 
-            if !sampler.draw(available, rng, out) {
+            // Everybody else's named cards are off limits, so a free slot
+            // cannot take one and spoil the deal for the seat that named it.
+            let pool = available
+                .without(self.spoken_for)
+                .union(self.certain[which].intersection(available));
+
+            if !sampler.draw(pool, rng, out) {
                 return false;
             }
             for &card in out.iter() {

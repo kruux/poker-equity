@@ -1,3 +1,9 @@
 /target
 codebase.md
 .vscode/
+
+# The validation scripts need pokerkit, which is not a dependency of this
+# library and is not to become one. Make a virtualenv here, install it there,
+# and it stays out of the repo. See validation/README.md.
+/.venv
+/disagreements.txt

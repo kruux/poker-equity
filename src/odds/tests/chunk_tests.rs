@@ -1,4 +1,4 @@
-use crate::error::{EquityError, PokerError};
+use crate::error::{EquityError, GameError, PokerError};
 use crate::odds::{run_chunk, run_exact, ChunkResult, EquityRequest};
 use crate::variants::Holdem;
 
@@ -65,9 +65,9 @@ fn test_published_preflop_equities() {
 
 /// Exact against Monte Carlo, agreeing within four standard errors.
 ///
-/// This is the only test that catches the multiplicity bias of PLAN section
-/// 7.2, because comparing one Monte Carlo run to another compares two runs
-/// that are wrong in the same way.
+/// This is the only test that catches the sampler's multiplicity bias,
+/// because comparing one Monte Carlo run to another compares two runs that
+/// are wrong in the same way.
 #[test]
 fn test_sampling_agrees_with_enumeration() {
     let cases: [(&[&str], &str); 4] = [
@@ -233,19 +233,21 @@ fn test_the_error_bar_behaves() {
 /// A request no deal satisfies is refused when it is built, not spun on.
 #[test]
 fn test_impossible_requests_are_refused() {
-    // Both seats named the same card.
+    // Both seats named the same card, and the refusal says which card.
     let clash = EquityRequest::from_text(Holdem, &["AhKh", "AhQs"], "", "");
     assert!(
-        matches!(clash, Err(PokerError::Equity(EquityError::Infeasible(_)))),
-        "one ace of hearts cannot sit in two hands"
+        matches!(&clash, Err(PokerError::Game(GameError::DuplicateCard(card)))
+                 if card.to_string() == "Ah"),
+        "one ace of hearts cannot sit in two hands, got {:?}",
+        clash
     );
 
-    // The board wants a card that is dead.
+    // The board wants a card that is dead, which names the card too.
     let dead_board = EquityRequest::from_text(Holdem, &["AhKh", "QsJs"], "2c 7d 9h", "2c");
     assert!(matches!(
-        dead_board,
-        Err(PokerError::Equity(EquityError::Infeasible(_)))
-    ));
+        &dead_board,
+        Err(PokerError::Game(GameError::DuplicateCard(card))) if card.to_string() == "2c"
+    ), "got {:?}", dead_board);
 
     // Five hearts wanted from a deck with only four left.
     let too_few = EquityRequest::from_text(
@@ -466,17 +468,23 @@ fn test_a_card_cannot_be_in_two_places() {
 
     // Caught by the matching, because the two claims are in different fields
     // and nothing reading one of them can see the other.
-    for (hands, board, dead, why) in [
-        (vec!["AhKh", "AhQs"], "", "", "two seats holding the ace of hearts"),
-        (vec!["AhKh", "QsJs"], "Ah 2c 3d", "", "a seat and the board sharing a card"),
-        (vec!["AhKh", "QsJs"], "", "Ah", "a seat holding a card that is dead"),
-        (vec!["AhKh", "QsJs"], "2c 3d 4h", "2c", "the board holding a dead card"),
+    // Each of these names one card twice, and the error names that card --
+    // "you have used Ah twice" is a mistake a person can fix, where "no deal
+    // satisfies this request" is a puzzle.
+    for (hands, board, dead, twice, why) in [
+        (vec!["AhKh", "AhQs"], "", "", "Ah", "two seats holding the ace of hearts"),
+        (vec!["AhKh", "QsJs"], "Ah 2c 3d", "", "Ah", "a seat and the board sharing a card"),
+        (vec!["AhKh", "QsJs"], "", "Ah", "Ah", "a seat holding a card that is dead"),
+        (vec!["AhKh", "QsJs"], "2c 3d 4h", "2c", "2c", "the board holding a dead card"),
     ] {
         let refused = EquityRequest::from_text(Holdem, &hands, board, dead);
         assert!(
-            matches!(refused, Err(PokerError::Equity(EquityError::Infeasible(_)))),
-            "the matching should have caught {}",
-            why
+            matches!(&refused, Err(PokerError::Game(GameError::DuplicateCard(card)))
+                     if card.to_string() == twice),
+            "{} should have been refused naming {}, got {:?}",
+            why,
+            twice,
+            refused
         );
     }
 

@@ -1,8 +1,8 @@
 //! Drawing deals, and deciding up front whether a request has any.
 //!
-//! The care here is in PLAN section 7: a hand is an unordered set, so the
-//! sampler must be uniform over sets rather than over ordered assignments,
-//! and a request no deal can satisfy must be refused rather than spun on.
+//! Two things need care. A hand is an unordered set, so the sampler must be
+//! uniform over sets rather than over ordered assignments; and a request no
+//! deal can satisfy must be refused up front rather than spun on.
 
 mod draw;
 mod matching;

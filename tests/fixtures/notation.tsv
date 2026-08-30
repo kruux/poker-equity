@@ -1,8 +1,8 @@
-# Conformance fixture for the notation grammar in PLAN section 3.
+# Conformance fixture for the hand notation.
 #
-# This file is the grammar's only source of truth. Both this library and
-# fpdb's Python parser read it, so that two implementations of one grammar
-# cannot drift apart unnoticed.
+# This file is the grammar's only source of truth. It is a flat table rather
+# than Rust so that a second implementation of the notation can be held to the
+# same rows, and the two cannot drift apart unnoticed.
 #
 # Columns, tab separated:
 #   field    hand | hand_up_to | board | dead

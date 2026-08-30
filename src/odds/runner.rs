@@ -158,8 +158,10 @@ where
 /// # Ok::<(), poker_calculator::error::PokerError>(())
 /// ```
 ///
-/// Threads default to something polite: several calculators may be open at
-/// once and one must not starve the others.
+/// The run spreads over [`EquityRequest::threads`], which starts at
+/// [`default_threads`] and is changed with
+/// [`with_threads`](EquityRequest::with_threads). Nothing has to be passed to
+/// get the default.
 pub fn equity_with_progress<V, F>(
     request: &EquityRequest<V>,
     target: Target,
@@ -204,7 +206,7 @@ where
     V: PokerVariant + EquityCalculation + Send + Sync,
     F: FnMut(&Progress),
 {
-    let threads = default_threads();
+    let threads = request.threads();
     let mut total = ChunkResult::empty(request.players());
     let mut round: u64 = 0;
 

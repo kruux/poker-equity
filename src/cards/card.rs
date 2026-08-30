@@ -6,7 +6,7 @@ use crate::error::CardError;
 /// A single card, stored as an index in `0..52`.
 ///
 /// The layout is `rank * 4 + suit`, with ranks `0..13` running `23456789TJQKA`
-/// and suits `0..4` running `cdhs`. That is the encoding fpdb's Python side
+/// and suits `0..4` running `cdhs`. That is the encoding a caller's own side
 /// already produces, so the two sides need no translation, and it is what lets
 /// a set of cards be a single `u64` -- see [`CardSet`].
 ///
@@ -28,7 +28,7 @@ impl Card {
 
     /// Builds a card from its index, or `None` if the index is not a card.
     ///
-    /// Use this at the fpdb boundary, where indices arrive from outside.
+    /// Use this where indices arrive from outside the library.
     pub fn from_index(index: u8) -> Option<Self> {
         (index < Self::COUNT).then_some(Self(index))
     }

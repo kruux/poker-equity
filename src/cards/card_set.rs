@@ -32,7 +32,7 @@ impl CardSet {
         Self(bits & Self::FULL_DECK.0)
     }
 
-    /// The raw bits, for the fpdb boundary.
+    /// The raw bits, for crossing a language boundary.
     pub fn bits(self) -> u64 {
         self.0
     }
