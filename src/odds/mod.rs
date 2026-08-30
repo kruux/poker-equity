@@ -14,6 +14,7 @@ pub use runner::{
 mod tests {
     mod calibration;
     mod chunk_tests;
+    mod request_tests;
     mod runner_tests;
     mod deuce_calculator_tests;
     mod holdem_calculator_tests;

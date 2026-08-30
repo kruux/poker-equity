@@ -31,6 +31,9 @@ pub enum GameError {
     InactivePlayer(String),
     InvalidDiscard(Card),
     DuplicateCard(Card),
+    /// A card that this game's deck does not contain -- a deuce in short
+    /// deck, say. Naming it is a mistake about the game, not about the hand.
+    NotInDeck(Card),
     NotEnoughCards,
 }
 
@@ -42,6 +45,9 @@ impl GameError {
             GameError::DuplicateCard(card) => format!("Found duplicated card: {}", card),
             GameError::InvalidDiscard(card) => format!("Card not in hand {}", card),
             GameError::InactivePlayer(name) => format!("Player '{}' is not active", name),
+            GameError::NotInDeck(card) => {
+                format!("{} is not in this game's deck", card)
+            }
             GameError::NotEnoughCards => "Not enough cards in deck".to_string(),
         }
     }
