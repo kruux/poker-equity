@@ -5,27 +5,35 @@ cards, and it tells you what share of the pot each player wins.
 
 ## Games
 
-Deals a second on one core, including dealing, evaluation and splitting the
-pot. Run `cargo run --release --bin benchmark` for your own machine.
+Showdowns a second, per thread: dealing, evaluating and splitting the pot,
+end to end. Measured heads-up on one core of an AMD Ryzen 7 9800X3D. Run
+`cargo run --release --bin benchmark` for your own machine.
 
-| Key | Game | Deals/s |
+| Key | Game | Per thread |
 |---|---|--:|
-| `holdem` | Hold'em | 3,950,695 |
-| `short_deck` | Short Deck Hold'em — 36 cards, a flush beats a full house | 4,127,282 |
-| `omaha` | Omaha | 2,178,272 |
-| `omaha_five` | 5-Card Omaha | 1,771,263 |
-| `omaha_six` | 6-Card Omaha | 1,440,141 |
-| `omaha_hi_lo` | Omaha Hi/Lo, eight or better | 1,381,754 |
-| `omaha_five_hi_lo` | 5-Card Omaha Hi/Lo | ~1,300,000 |
-| `courchevel` | Courchevel | ~1,770,000 |
-| `courchevel_hi_lo` | Courchevel Hi/Lo | ~1,300,000 |
-| `stud` | Seven-Card Stud | 2,923,334 |
-| `stud_hi_lo` | Seven-Card Stud Hi/Lo | 2,517,386 |
-| `razz` | Razz | 3,041,352 |
-| `deuce_seven` | 2-7 Lowball, single draw | 5,790,994 |
-| `badugi` | Badugi, single draw | 887,681 |
+| `holdem` | Hold'em | 6.86 M/s |
+| `short_deck` | Short Deck Hold'em — 36 cards, a flush beats a full house | 7.14 M/s |
+| `omaha` | Omaha | 2.86 M/s |
+| `omaha_five` | 5-Card Omaha | 2.15 M/s |
+| `omaha_six` | 6-Card Omaha | 1.67 M/s |
+| `omaha_hi_lo` | Omaha Hi/Lo, eight or better | 1.77 M/s |
+| `omaha_five_hi_lo` | 5-Card Omaha Hi/Lo | 1.29 M/s |
+| `courchevel` | Courchevel | 2.26 M/s |
+| `courchevel_hi_lo` | Courchevel Hi/Lo | 1.33 M/s |
+| `stud` | Seven-Card Stud | 4.52 M/s |
+| `stud_hi_lo` | Seven-Card Stud Hi/Lo | 4.12 M/s |
+| `razz` | Razz | 4.84 M/s |
+| `deuce_seven` | 2-7 Lowball, single draw | 10.55 M/s |
+| `badugi` | Badugi, single draw | 5.35 M/s |
 
-Hold'em across sixteen cores runs at **37.4 million** deals a second.
+Threads share nothing while they sample, so multiply by however many you give
+it. More seats cost more: six-handed hold'em runs at 3.51 M/s a thread, and
+six-handed Omaha at 1.31 M/s.
+
+A run spreads over four threads unless told otherwise, which is polite rather
+than greedy: several calculators may be open at once and one must not starve
+the others. `EquityRequest::with_threads` takes as many as you want to give
+it, and nothing needs passing to get the default.
 
 Courchevel is not a variant of its own: it is five-card Omaha with the first
 board card face up before the betting, so it is the same evaluation plus one
@@ -37,20 +45,22 @@ a drawing strategy — a made eight-low and a four-card draw are not comparable
 until you say how the draw resolves — so one draw is modelled and said so,
 rather than a number published from an invented model.
 
-## The short version
+## Examples
 
-Ace-king suited against a pair of queens, over half a million deals:
+Two games, to show that the shape of the question does not change with the
+game being asked about.
+
+### Hold'em: ace-king suited against a pair of queens
 
 ```rust
 use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
 
-let request = EquityRequest::from_text(
-    Holdem,
-    &["AhKh", "QsQd"],   // one field per seat
-    "",                  // no board yet
-    "",                  // no dead cards
-)?;
+let hero = "AhKh";        // one field per seat
+let villain = "QsQd";
+let board = "";           // nothing dealt yet
+let dead = "";            // no cards out of play
 
+let request = EquityRequest::from_text(Holdem, &[hero, villain], board, dead)?;
 let result = equity(&request, Target::Samples(500_000))?;
 
 for (seat, player) in result.equities().iter().enumerate() {
@@ -60,24 +70,50 @@ for (seat, player) in result.equities().iter().enumerate() {
 // seat 1: 53.80% ± 0.13
 ```
 
-To watch a long run as it goes — to repaint a table, or to notice the user
-cancelling — pass a function to be called after each batch:
+Seats come back in the order they were passed in, so seat 0 is `hero`.
+
+### 2-7 draw: a pat nine against a one-card draw
+
+Change the variant, and the fields mean what that game means by them:
 
 ```rust
-use poker_calculator::odds::equity_with_progress;
+use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::DeuceSeven};
 
-let result = equity_with_progress(&request, Target::Samples(5_000_000), |progress| {
-    println!("{} deals: {:.2}% ± {:.2}",
-        progress.samples,
-        progress.equities[0].percent(),
-        progress.equities[0].margin_percent());
-})?;
+let villain = "9s7d5c4h2s";   // five cards: a made nine-low, standing pat
+let hero = "8h6d4s3c";        // four cards, so one is still to come
+let board = "";               // a draw game never has a board
+let dead = "Kc";              // the king hero threw away
+
+let request = EquityRequest::from_text(DeuceSeven, &[villain, hero], board, dead)?;
+let result = equity(&request, Target::Samples(1_000_000))?;
+// seat 0 (villain): 78.57% ± 0.00
+// seat 1 (hero):    21.43% ± 0.00
 ```
+
+Three things differ from the hold'em example, and every one of them is the
+game rather than the API.
+
+**A draw or stud field may be short.** Five cards is a hand standing pat; four
+is a hand drawing one, and the card still to come is dealt. A community game
+may *not* do this. Hold'em deals both hole cards at once, so a field holding
+one card is a miscount rather than a hand in progress, and is an error — write
+`A*` there if you mean one known card and one unknown.
+
+**Discards are dead cards.** A card thrown away is out of the deck but was
+seen, so it belongs in the dead field rather than nowhere.
+
+**There is no error bar**, though a million deals were asked for. Only
+forty-two cards can arrive, so the whole question is forty-two deals wide and
+was walked rather than sampled: `result.samples` comes back as 42. Nine of
+those cards — the deuces, fives and sevens still in the deck — give hero a
+better low than a nine, and 9/42 is 21.43% exactly.
 
 Hands may be only partly known — `AKs`, `2 c`, `A**` are all valid — and the
 answer comes with an error bar, or none at all when the spot was small enough
-to walk rather than sample. Every hand ranking is checked exhaustively against
-an independent implementation; see [Correctness](#correctness).
+to walk rather than sample. To follow a long run while it goes, see
+[Watching a long run](#watching-a-long-run). Every hand ranking is checked
+exhaustively against an independent implementation; see
+[Correctness](#correctness).
 
 ## Writing hands
 
@@ -126,14 +162,43 @@ Ranges exist only where a hand is two cards. In Omaha and stud there is no
 range grammar at all, which is what makes the collision between `AKs` the
 range and `A` `Ks` the two cards impossible there rather than merely unlikely.
 
-Percentage ranges (`top 15%`) are refused: they need a hand-strength ordering
-that is a product decision, not a parsing one.
+Percentage ranges (`top 15%`) are not supported. There is no one ordering of
+starting hands by strength — it changes with the game, the table size and
+whose chart you trust — so naming the hands is the honest way to ask.
 
 ### Boards, dead cards, and hands still being dealt
 
-A board may be short and may hold wildcards — that is how "what if the turn is
-a heart" is asked. Dead cards must be exact, because "a club is dead" does not
-say *which* club and every reading changes the answer.
+A board is **how much of it you know**, not which street you are on. Nought to
+five cards, wildcards allowed anywhere among them:
+
+```rust
+""              // nothing showing
+"2c 7d 9h"      // a flop
+"2c 7d 9h * Ks" // flop and river known, turn not
+"2c 7d 9h Ts 4c"// finished: who won?
+```
+
+So "what if the turn is a heart" is `"2c 7d 9h h"`, and a finished board is a
+fair question with an exact answer. Courchevel is the one game with a floor:
+its first board card is face up before the betting, so a Courchevel request
+showing nothing is refused — that spot is five-card Omaha, not Courchevel.
+
+Dead cards must be exact, because "a club is dead" does not say *which* club
+and every reading changes the answer.
+
+How many cards a field may name is three rules, not one, because the games
+deal differently:
+
+| | A short field | Why |
+|---|---|---|
+| Community | refused | both hole cards arrive at once |
+| Stud | allowed, **equally for every seat** | the whole table is on the same street |
+| Draw | allowed, seat by seat | a short field *is* the draw |
+
+Stud is the one worth care. Third street is three cards for everybody, so
+`A23` against `2345` is not a table caught mid-deal, it is a miscount, and it
+is refused. A draw game is the opposite: five against four is a pat hand
+against a one-card draw, and saying so is the point of the notation.
 
 In stud and the draw games, cards arrive over time, so a field says what a
 player holds **now** and whatever is missing is still to come:
@@ -146,8 +211,24 @@ EquityRequest::from_text(DeuceSeven, &["7h5c4d3s", "9h8c6d5h2c"], "", "Kd")?;
 //                        Hero draws one; the king he threw is dead. Villain stands pat.
 ```
 
-Community games want every hole card, since they are all dealt at once — a
-short field there is a miscount, and an unknown card is a wildcard.
+Eight seats is more stud than a deck holds — eight sevens is fifty-six — so
+the last card is not dealt to each player at all. One goes face up in the
+middle and everyone counts it as their seventh, which is a rule most players
+never see used. The request reshapes itself to match, and says so:
+
+```rust
+let request = EquityRequest::from_text(Stud, &eight_fields, "", "")?;
+request.hole_cards();    // 6, not 7
+request.board_cards();   // 1 -- the shared card, which may be named or not
+```
+
+Razz and stud hi/lo deal the same way, so they do the same thing. Seven seats
+is forty-nine cards and needs none of it.
+
+A community game wants every hole card, because they are all dealt at once:
+there is no moment at which a hold'em player holds one card. So a short field
+there is a miscount and is rejected. To say "an ace and something I cannot
+see", write the unknown card as a wildcard — `A*`, not `A`.
 
 ## Getting an answer
 
@@ -244,7 +325,7 @@ interval around it.
 
 Text is a convenience. Underneath, a card is a `u8` and a set of cards is a
 `u64` with one bit per card, and that is what the engine speaks. A caller that
-already has masks — fpdb does — can skip the parser entirely:
+already holds masks can skip the parser entirely:
 
 ```rust
 use poker_calculator::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
@@ -341,7 +422,7 @@ r = pc.exact_from_text("holdem", ["AhAd", "KsKc"], "2c 7d 9h")
 print(r["players"][0]["equity"])        # 0.916161...
 print(r["exact"], r["samples"])         # True 990
 
-# or masks, which is what fpdb passes
+# or masks, skipping the parser
 hands = [[[1 << pc.card_index("Ah"), 1 << pc.card_index("Kh")]],
          [[1 << pc.card_index("Qs"), 1 << pc.card_index("Qd")]]]
 r = pc.chunk("holdem", hands, [], 0, 200_000, seed=3)
@@ -357,7 +438,7 @@ Nothing is published to crates.io or PyPI yet.
 ## Building
 
 ```sh
-cargo test                              # 223 tests, about ten seconds
+cargo test                              # 249 tests, about ten seconds
 cargo test --release -- --ignored       # the exhaustive sweeps
 cargo run --release --bin benchmark     # speed, per game
 ```
@@ -377,6 +458,6 @@ thousand Monte Carlo deals apiece and that is minutes unoptimised against
 seconds optimised.
 
 `tests/fixtures/notation.tsv` is the grammar's source of truth — a plain table
-of input and expected output, with a row for every rule above. fpdb's own
-parser reads the same file, so a change that lands on only one side shows up
-as a failing test rather than as a disagreement in the field.
+of input and expected output, with a row for every rule above. It is a flat
+file rather than Rust so that another implementation of the notation can be
+checked against the same rows.
