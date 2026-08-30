@@ -174,6 +174,11 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         if board.len() > board_slots {
             return Err(EquityError::InvalidCommunityCards(board.len()).into());
         }
+        // Courchevel's first board card is face up before the betting, so a
+        // Courchevel question with nothing showing is not one.
+        if board.len() < variant.least_board_cards() {
+            return Err(EquityError::InvalidCommunityCards(board.len()).into());
+        }
 
         // Anything in this game's deck and not dead is on offer. Known cards
         // are not removed here: they are slots with exactly one candidate, so

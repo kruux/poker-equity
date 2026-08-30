@@ -53,7 +53,7 @@ fn best_hi_lo(hole_count: usize, cards: &[Card]) -> HiLoHandRank {
 /// Defines a split-pot Omaha variant. They differ only in how many cards a
 /// player holds.
 macro_rules! omaha_hi_lo_variant {
-    ($name:ident, $hole:expr, $label:expr, $key:expr, $doc:expr) => {
+    ($name:ident, $hole:expr, $least_board:expr, $label:expr, $key:expr, $doc:expr) => {
         #[doc = $doc]
         #[derive(Debug, Clone, Copy)]
         pub struct $name;
@@ -75,6 +75,10 @@ macro_rules! omaha_hi_lo_variant {
 
             fn board_cards(&self) -> usize {
                 5
+            }
+
+            fn least_board_cards(&self) -> usize {
+                $least_board
             }
 
             fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
@@ -107,6 +111,7 @@ macro_rules! omaha_hi_lo_variant {
 omaha_hi_lo_variant!(
     OmahaHiLo,
     4,
+    0,
     "Omaha Hi/Lo",
     "omaha_hi_lo",
     "Four hole cards, split between the best high hand and the best\n\
@@ -115,6 +120,7 @@ omaha_hi_lo_variant!(
 omaha_hi_lo_variant!(
     OmahaFiveHiLo,
     5,
+    0,
     "5-Card Omaha Hi/Lo",
     "omaha_five_hi_lo",
     "Five-card Omaha, split between high and an eight-or-better low."
@@ -122,6 +128,7 @@ omaha_hi_lo_variant!(
 omaha_hi_lo_variant!(
     CourchevelHiLo,
     5,
+    1,
     "Courchevel Hi/Lo",
     "courchevel_hi_lo",
     "Five-card Omaha hi/lo with the first board card dealt face up before\n\

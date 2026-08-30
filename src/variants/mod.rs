@@ -67,6 +67,16 @@ pub trait PokerVariant: Clone + Copy {
     /// How many cards a player holds privately.
     fn hole_cards(&self) -> usize;
 
+    /// The fewest board cards a request for this game must name.
+    ///
+    /// Zero almost everywhere: a hold'em question is perfectly well asked
+    /// before the flop. Courchevel is the exception, because its first board
+    /// card is dealt face up before the betting -- a Courchevel hand with no
+    /// board showing is not a spot that occurs, it is five-card Omaha.
+    fn least_board_cards(&self) -> usize {
+        0
+    }
+
     /// How many cards the shared board holds, or zero where there is none.
     fn board_cards(&self) -> usize {
         0

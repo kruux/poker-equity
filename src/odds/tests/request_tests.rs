@@ -309,3 +309,54 @@ fn test_a_card_outside_the_deck_says_so() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// The board is how much of it you know, not which street you are on.
+///
+/// A hold'em board may hold nought to five cards, and wildcards among them,
+/// so "I know the flop and the river but not the turn" is a question that can
+/// be asked. Restricting it to 0, 3 or 4 would model the streets and forbid
+/// perfectly good questions -- including the simplest one, which is a
+/// finished board and the question of who won.
+///
+/// Courchevel is the one game with a floor, because its first board card is
+/// face up before the betting: a Courchevel hand showing nothing is not
+/// Courchevel, it is five-card Omaha.
+#[test]
+fn test_how_much_of_the_board_may_be_known() -> Result<(), PokerError> {
+    use crate::error::EquityError;
+    use crate::variants::{Courchevel, CourchevelHiLo, Holdem, OmahaFive};
+
+    for board in ["", "2c", "2c7d", "2c7d9h", "2c7d9hTs", "2c7d9hTs4c"] {
+        assert!(
+            EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], board, "").is_ok(),
+            "a board of {:?} should be a fair question",
+            board
+        );
+    }
+
+    // Known flop and river, unknown turn.
+    let gappy = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "2c7d9h*Ks", "")?;
+    assert_eq!(gappy.board_cards(), 5);
+    assert_eq!(run_chunk(&gappy, 1_000, 4)?.samples, 1_000);
+
+    // Six is more board than there is.
+    assert!(EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "2c7d9hTs4c3d", "").is_err());
+
+    // Courchevel needs its first card, and both split-pot and high forms
+    // agree about that.
+    assert!(matches!(
+        EquityRequest::from_text(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "", ""),
+        Err(PokerError::Equity(EquityError::InvalidCommunityCards(0)))
+    ));
+    assert!(matches!(
+        EquityRequest::from_text(CourchevelHiLo, &["Ah2c3d4s5c", "QsQdJsTd9h"], "", ""),
+        Err(PokerError::Equity(EquityError::InvalidCommunityCards(0)))
+    ));
+    assert!(EquityRequest::from_text(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "8s", "").is_ok());
+
+    // Five-card Omaha is the same game without that rule, so it may show
+    // nothing at all.
+    assert!(EquityRequest::from_text(OmahaFive, &["AhKh7c2d3c", "QsQdJsTd4h"], "", "").is_ok());
+
+    Ok(())
+}

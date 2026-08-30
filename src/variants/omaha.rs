@@ -223,7 +223,7 @@ where
 /// holds. The two-from-hand rule and the five-card board are the same
 /// throughout.
 macro_rules! omaha_variant {
-    ($name:ident, $hole:expr, $label:expr, $key:expr, $doc:expr) => {
+    ($name:ident, $hole:expr, $least_board:expr, $label:expr, $key:expr, $doc:expr) => {
         #[doc = $doc]
         #[derive(Debug, Clone, Copy)]
         pub struct $name;
@@ -245,6 +245,10 @@ macro_rules! omaha_variant {
 
             fn board_cards(&self) -> usize {
                 5
+            }
+
+            fn least_board_cards(&self) -> usize {
+                $least_board
             }
 
             fn evaluate_hand(&self, cards: &[Card]) -> Self::HandRank {
@@ -269,6 +273,7 @@ macro_rules! omaha_variant {
 omaha_variant!(
     Omaha,
     4,
+    0,
     "Omaha",
     "omaha",
     "Four hole cards, two of which play."
@@ -276,6 +281,7 @@ omaha_variant!(
 omaha_variant!(
     OmahaFive,
     5,
+    0,
     "5-Card Omaha",
     "omaha_five",
     "Five hole cards, two of which play."
@@ -283,6 +289,7 @@ omaha_variant!(
 omaha_variant!(
     OmahaSix,
     6,
+    0,
     "6-Card Omaha",
     "omaha_six",
     "Six hole cards, two of which play."
@@ -290,6 +297,7 @@ omaha_variant!(
 omaha_variant!(
     Courchevel,
     5,
+    1,
     "Courchevel",
     "courchevel",
     "Five-card Omaha where the first board card is dealt face up before the\n\
