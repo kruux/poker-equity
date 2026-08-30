@@ -4,7 +4,11 @@ use crate::{
     error::{EquityError, PokerError},
     hand::Hand,
     odds::EquityCalculator,
-    variants::{CourchevelHiLo, OmahaFiveHiLo, OmahaHiLo, PokerVariant},
+    variants::{
+        omaha::best_seats,
+        rankings::{high_score_from_parts, low_a5_score_from_parts, EIGHT_OR_BETTER_LIMIT},
+        CourchevelHiLo, OmahaFiveHiLo, OmahaHiLo, PokerVariant, Seats,
+    },
 };
 
 /// Wires a split-pot Omaha variant into the equity engine.
@@ -45,6 +49,25 @@ macro_rules! omaha_hi_lo_equity {
                 let final_hands = self.build_final_hands(calculator, community_cards)?;
                 let mut low_shares = vec![0.0; shares.len()];
                 self.award_hi_lo(&final_hands, shares, &mut low_shares)
+            }
+
+            /// Every seat is playing the same board, so its three-card halves
+            /// are worked out once for the table instead of once a seat.
+            fn winning_seats(&self, hands: &[Hand<Self>]) -> Seats {
+                best_seats(hands, self.hole_cards(), high_score_from_parts, |_| true)
+            }
+
+            /// The low half of the same table. Suits never matter to a low,
+            /// so the flush half of a pairing is ignored; a qualifying low is
+            /// the best kind of low there is, so the eight-or-better rule is
+            /// one comparison against the threshold.
+            fn best_low_seats(&self, hands: &[Hand<Self>]) -> Seats {
+                best_seats(
+                    hands,
+                    self.hole_cards(),
+                    |key, _| low_a5_score_from_parts(key),
+                    |score| score < EIGHT_OR_BETTER_LIMIT as u32,
+                )
             }
         }
     };

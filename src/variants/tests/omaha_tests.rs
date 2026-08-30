@@ -272,3 +272,117 @@ fn test_courchevel_evaluates_as_five_card_omaha() -> Result<(), PokerError> {
     Ok(())
 }
 
+
+/// The equity path works the board out once for the whole table; scoring a
+/// hand on its own works it out again. They must name the same winners, or
+/// sharing the board has changed an answer -- which is the one thing an
+/// optimisation may not do.
+///
+/// Checked at two seats through six, since sharing is exactly what varies
+/// with the size of the table, and on hi/lo as well, where both halves
+/// share.
+#[test]
+fn test_sharing_the_board_names_the_same_winners() -> Result<(), PokerError> {
+    use crate::variants::{EquityCalculation, OmahaHiLo, Seats};
+
+    /// The winners worked out one seat at a time, which is what the shared
+    /// path has to agree with.
+    fn seat_by_seat<V: PokerVariant + EquityCalculation>(
+        variant: V,
+        hands: &[Hand<V>],
+    ) -> (Seats, Seats) {
+        let mut high = (u32::MAX, Seats::NONE);
+        let mut low = (u32::MAX, Seats::NONE);
+
+        for (seat, hand) in hands.iter().enumerate() {
+            let score = variant.score(hand.cards());
+            match score.cmp(&high.0) {
+                Ordering::Less => high = (score, Seats::only(seat)),
+                Ordering::Equal => high.1.add(seat),
+                Ordering::Greater => {}
+            }
+
+            if let Some(score) = variant.low_score(hand.cards()) {
+                match score.cmp(&low.0) {
+                    Ordering::Less => low = (score, Seats::only(seat)),
+                    Ordering::Equal => low.1.add(seat),
+                    Ordering::Greater => {}
+                }
+            }
+        }
+
+        (high.1, low.1)
+    }
+
+    /// One deal's hands: four cards a seat, then the shared board.
+    fn build<V: PokerVariant>(
+        variant: V,
+        seats: usize,
+        chosen: &[usize],
+        deck: &[Card],
+        board: &[Card],
+    ) -> Result<Vec<Hand<V>>, PokerError> {
+        (0..seats)
+            .map(|seat| {
+                let mut cards: Vec<Card> =
+                    chosen[seat * 4..seat * 4 + 4].iter().map(|&i| deck[i]).collect();
+                cards.extend_from_slice(board);
+                Ok(Hand::new_with_cards(variant, cards)?)
+            })
+            .collect()
+    }
+
+    let deck: Vec<Card> = (0..52).map(|i| Card::from_index(i).expect("a card")).collect();
+
+    let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+
+    for seats in 2..=6 {
+        for _ in 0..2_000 {
+            // Four cards each, then a five-card board, all distinct.
+            let wanted = seats * 4 + 5;
+            let mut chosen: Vec<usize> = Vec::with_capacity(wanted);
+            while chosen.len() < wanted {
+                let pick = (next() % 52) as usize;
+                if !chosen.contains(&pick) {
+                    chosen.push(pick);
+                }
+            }
+            let board: Vec<Card> = chosen[seats * 4..].iter().map(|&i| deck[i]).collect();
+
+            let hands = build(Omaha, seats, &chosen, &deck, &board)?;
+            let (high, _) = seat_by_seat(Omaha, &hands);
+            assert_eq!(
+                Omaha.winning_seats(&hands),
+                high,
+                "omaha, {} seats, board {:?}",
+                seats,
+                board
+            );
+
+            let hands = build(OmahaHiLo, seats, &chosen, &deck, &board)?;
+            let (high, low) = seat_by_seat(OmahaHiLo, &hands);
+            assert_eq!(
+                OmahaHiLo.winning_seats(&hands),
+                high,
+                "omaha hi/lo high, {} seats, board {:?}",
+                seats,
+                board
+            );
+            assert_eq!(
+                OmahaHiLo.best_low_seats(&hands),
+                low,
+                "omaha hi/lo low, {} seats, board {:?}",
+                seats,
+                board
+            );
+        }
+    }
+
+    Ok(())
+}

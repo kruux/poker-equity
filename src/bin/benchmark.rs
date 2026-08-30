@@ -55,6 +55,16 @@ fn main() {
     time_variant!(OmahaFive, &["AhKh7c2d3c", "QsQdJsTd4h"], "", 30_000);
     time_variant!(OmahaSix, &["AhKh7c2d3c5s", "QsQdJsTd4h6h"], "", 20_000);
     time_variant!(OmahaHiLo, &["Ah2c3d4s", "QsQdJsTd"], "", 20_000);
+    // Six-handed, where sharing the board's ten three-card halves across the
+    // table rather than working them out per seat pays the most.
+    time_variant!(
+        Omaha,
+        &[
+            "AhKh7c2d", "QsQdJsTd", "9c8c7d6d", "AsAd5h4h", "KsQh9s8h", "3c3d2h2s"
+        ],
+        "",
+        20_000
+    );
     println!();
     time_variant!(Stud, &["AhKh7c", "QsQdJs"], "", 200_000);
     time_variant!(StudHiLo, &["Ah2c3d", "QsQdJs"], "", 100_000);
