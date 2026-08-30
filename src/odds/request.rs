@@ -15,7 +15,7 @@ use crate::{
     variants::{EquityCalculation, PokerType, PokerVariant},
 };
 
-use super::chunk::ChunkResult;
+use super::{chunk::ChunkResult, default_threads};
 
 /// One equity question: a game, some hands, a board and some dead cards.
 ///
@@ -48,6 +48,7 @@ pub struct EquityRequest<V: PokerVariant + EquityCalculation> {
     /// Every card spoken for by somebody, which is the union of the above.
     spoken_for: CardSet,
     players: usize,
+    threads: usize,
 }
 
 /// The cards a participant holds in *every* deal the request admits.
@@ -270,6 +271,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             certain,
             spoken_for,
             players: hands.len(),
+            threads: default_threads(),
         })
     }
 
@@ -359,6 +361,45 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
     /// eight-handed stud game that runs the deck out, where it is one.
     pub fn board_cards(&self) -> usize {
         self.board_slots
+    }
+
+    /// How many threads a run of this request spreads over.
+    ///
+    /// Starts at [`default_threads`](crate::odds::default_threads), which is
+    /// polite rather than greedy -- several calculators may be open at once
+    /// and one must not starve the others. Raise it with
+    /// [`with_threads`](Self::with_threads) when the machine is yours.
+    pub fn threads(&self) -> usize {
+        self.threads
+    }
+
+    /// The same request, run over `threads` threads.
+    ///
+    /// ```no_run
+    /// # use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
+    /// let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?
+    ///     .with_threads(std::thread::available_parallelism()?.get());
+    /// let result = equity(&request, Target::Samples(5_000_000))?;
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// Held between one thread and as many as the machine reports, so
+    /// `with_threads(usize::MAX)` reads as "all of it" and no count can ask
+    /// for threads that are not there. More threads than cores buys nothing
+    /// here: the loop is pure arithmetic and never waits on anything, so a
+    /// thread with no core to run on only adds a context switch.
+    ///
+    /// Note that the deals a seed draws depend on how many threads divide
+    /// them, so reproducing a run means matching this too.
+    pub fn with_threads(mut self, threads: usize) -> Self {
+        self.set_threads(threads);
+        self
+    }
+
+    /// Sets the thread count in place, for a request already built.
+    pub fn set_threads(&mut self, threads: usize) {
+        let most = std::thread::available_parallelism().map_or(1, |cores| cores.get());
+        self.threads = threads.clamp(1, most);
     }
 
     /// Deals once, writing each seat's cards into `holes` and the shared

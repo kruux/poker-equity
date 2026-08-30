@@ -142,3 +142,44 @@ fn test_a_batch_spreads_without_changing_the_answer() -> Result<(), PokerError> 
 
     Ok(())
 }
+
+/// The thread count rides on the request, so the default costs nothing to
+/// use and changing it costs one call. Whatever it is set to is what the
+/// run actually spreads over.
+#[test]
+fn test_a_request_carries_its_own_thread_count() -> Result<(), PokerError> {
+    use crate::odds::{default_threads, equity, EquityRequest, Target};
+    use crate::variants::Holdem;
+
+    let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?;
+    assert_eq!(
+        request.threads(),
+        default_threads(),
+        "a fresh request starts at the polite default"
+    );
+
+    let mine = request.clone().with_threads(2);
+    assert_eq!(mine.threads(), 2);
+    assert_eq!(request.threads(), default_threads(), "the original is untouched");
+
+    // The count is held to what the machine has: none is one, and more than
+    // there are cores is every core.
+    let cores = std::thread::available_parallelism().map_or(1, |cores| cores.get());
+    assert_eq!(request.clone().with_threads(0).threads(), 1);
+    assert_eq!(request.clone().with_threads(usize::MAX).threads(), cores);
+
+    let mut later = request.clone();
+    later.set_threads(3);
+    assert_eq!(later.threads(), 3);
+
+    // The count is used, not just stored: the same seeds over a different
+    // number of threads divide the deals differently, so the answers agree
+    // without the deals being the same.
+    let one = equity(&request.clone().with_threads(1), Target::Samples(200_000))?;
+    let two = equity(&mine, Target::Samples(200_000))?;
+    let gap = (one.equities()[0].equity - two.equities()[0].equity).abs();
+    let slack = 4.0 * (one.equities()[0].std_error + two.equities()[0].std_error);
+    assert!(gap <= slack, "{:.5} apart, against {:.5} of slack", gap, slack);
+
+    Ok(())
+}
