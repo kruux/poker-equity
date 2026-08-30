@@ -1,5 +1,4 @@
 use crate::cards::{Card, Rank};
-use itertools::Itertools;
 use std::{cmp::Ordering, fmt};
 
 /// An ace-to-five low hand: the five cards a holding plays for low.
@@ -45,8 +44,20 @@ fn low_key(ranks: &[Rank]) -> u64 {
         counts[rank.to_value() as usize] += 1;
     }
 
-    let mut groups: Vec<u8> = counts.iter().copied().filter(|&count| count > 0).collect();
-    groups.sort_unstable_by(|a, b| b.cmp(a));
+    // Everything below stays on the stack. Naming a hand runs this over
+    // every candidate five, so one allocation here is twenty-one a hand, and
+    // it is the sweeps that check the lookup tables which pay for them.
+    debug_assert!(ranks.len() <= MOST_RANKS, "more ranks than a deck holds one of");
+
+    let mut groups = [0u8; MOST_RANKS];
+    let mut distinct = 0;
+    for &count in counts.iter() {
+        if count > 0 {
+            groups[distinct] = count;
+            distinct += 1;
+        }
+    }
+    groups[..distinct].sort_unstable_by(|a, b| b.cmp(a));
 
     let mut key: u64 = 0;
     for slot in 0..5 {
@@ -55,19 +66,26 @@ fn low_key(ranks: &[Rank]) -> u64 {
 
     // Within a category, the biggest group decides first -- the rank of the
     // pair before its kickers -- and a lower card is better.
-    let mut ordered = ranks.to_vec();
-    ordered.sort_by(|a, b| {
+    let played = ranks.len().min(MOST_RANKS);
+    let mut ordered = [Rank::Two; MOST_RANKS];
+    ordered[..played].copy_from_slice(&ranks[..played]);
+    ordered[..played].sort_by(|a, b| {
         counts[b.to_value() as usize]
             .cmp(&counts[a.to_value() as usize])
             .then(low_value(*b).cmp(&low_value(*a)))
     });
     for slot in 0..5 {
-        let value = ordered.get(slot).map_or(0, |rank| low_value(*rank));
+        let value = ordered[..played]
+            .get(slot)
+            .map_or(0, |rank| low_value(*rank));
         key = (key << 4) | value as u64;
     }
 
     key
 }
+
+/// How many ranks a set can hold before the deck runs out of distinct ones.
+const MOST_RANKS: usize = 13;
 
 impl LowHandRank {
     /// The ranks played, worst first: highest card leads and the ace is last.
@@ -103,12 +121,29 @@ impl LowHandRank {
         // Play the best five. At seven cards that is twenty-one candidates,
         // which is cheaper to score outright than to reason about -- which
         // duplicate to keep depends on the whole holding.
-        let best = ranks
-            .into_iter()
-            .combinations(5)
-            .min_by_key(|five| low_key(five))
-            .expect("more than five cards hold at least one five-card hand");
-        Self::Low(Self::worst_first(best))
+        //
+        // The five are walked by index rather than built, so the twenty-one
+        // candidates cost nothing but the scoring.
+        let mut best = [Rank::Two; 5];
+        let mut best_key = u64::MAX;
+        let count = ranks.len();
+        for a in 0..count {
+            for b in a + 1..count {
+                for c in b + 1..count {
+                    for d in c + 1..count {
+                        for e in d + 1..count {
+                            let five = [ranks[a], ranks[b], ranks[c], ranks[d], ranks[e]];
+                            let key = low_key(&five);
+                            if key < best_key {
+                                best_key = key;
+                                best = five;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        Self::Low(Self::worst_first(best.to_vec()))
     }
 
     /// Whether this qualifies under an eight-or-better rule: five cards, no
@@ -121,9 +156,13 @@ impl LowHandRank {
         if ranks.len() != 5 {
             return false;
         }
-        let distinct = ranks.iter().map(|rank| rank.to_value()).unique().count();
+        // A bit per rank, so counting the distinct ones needs nothing built.
+        let mut seen: u16 = 0;
+        for rank in ranks {
+            seen |= 1 << rank.to_value();
+        }
         // `ranks` is worst first, so the highest card leads.
-        distinct == 5 && low_value(ranks[0]) <= low_value(Rank::Eight)
+        seen.count_ones() == 5 && low_value(ranks[0]) <= low_value(Rank::Eight)
     }
 }
 

@@ -129,3 +129,53 @@ fn test_display_reads_highest_first() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// `nth` counts by halving rather than card by card, which is worth checking
+/// against the obvious way of doing it -- on random sets, at every index.
+#[test]
+fn test_nth_agrees_with_counting_card_by_card() {
+    /// The plain version: clear the lowest card `index` times over.
+    fn by_counting(set: CardSet, index: u32) -> Option<Card> {
+        if index >= set.len() {
+            return None;
+        }
+        let mut bits: u64 = set.iter().map(|card| 1u64 << card.index()).sum();
+        for _ in 0..index {
+            bits &= bits - 1;
+        }
+        Card::from_index(bits.trailing_zeros() as u8)
+    }
+
+    let mut state: u64 = 0x1234_5678_9ABC_DEF0;
+    let mut next = move || {
+        state ^= state << 13;
+        state ^= state >> 7;
+        state ^= state << 17;
+        state
+    };
+
+    // The empty set, the full deck, and a thousand sets in between.
+    let mut sets = vec![CardSet::EMPTY, CardSet::FULL_DECK];
+    for _ in 0..1_000 {
+        let bits = next() & CardSet::FULL_DECK.bits();
+        sets.push(
+            (0..52)
+                .filter(|index| bits >> index & 1 == 1)
+                .filter_map(|index| Card::from_index(index as u8))
+                .collect(),
+        );
+    }
+
+    for set in sets {
+        // One past the end as well, which must come back empty.
+        for index in 0..=set.len() {
+            assert_eq!(
+                set.nth(index),
+                by_counting(set, index),
+                "set {:?} at {}",
+                set,
+                index
+            );
+        }
+    }
+}
