@@ -38,10 +38,11 @@ impl Card {
         self.0
     }
 
-    /// Takes a string e.g. "AdKc" and returns a vec of Cards
-    /// Turn into a vec of chars for easier handling
-    /// Also remove any whitespace so you can call both "AhKh" and "Ah Kh"
-    /// and get the same result
+    /// Reads a field of cards: `"AdKc"` and `"Ad Kc"` both give two cards.
+    ///
+    /// Not `FromStr`, which reads one value from one string -- this reads a
+    /// whole field, so it returns however many cards were named.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(cards_str: &str) -> Result<Vec<Card>, CardError> {
         let cards_chars: Vec<char> = cards_str.chars().filter(|c| !c.is_whitespace()).collect();
         let mut cards: Vec<Card> = Vec::<Card>::new();

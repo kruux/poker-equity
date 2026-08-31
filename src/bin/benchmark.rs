@@ -11,8 +11,7 @@ use std::time::Instant;
 
 use poker_calculator::{
     cards::Card,
-    hand::Hand,
-    odds::{run_chunk, EquityCalculator, EquityRequest},
+    odds::{equity, run_chunk, EquityRequest, Target},
     variants::*,
 };
 
@@ -35,6 +34,11 @@ macro_rules! time_variant {
             result.samples as f64 / elapsed.as_secs_f64(),
         );
     }};
+}
+
+/// Reports a figure that belongs to no particular seat count.
+fn report_wide(label: &str, per_second: f64) {
+    println!("{:28}          {:>13.0} showdowns/s", label, per_second);
 }
 
 fn report(label: &str, seats: usize, per_second: f64) {
@@ -106,20 +110,19 @@ fn main() {
         rounds as f64 / started.elapsed().as_secs_f64()
     );
 
-    println!("\nThe old calculator, across every core:");
+    // The whole machine, which is what a caller gets by raising the thread
+    // count. Threads share nothing while they sample, so this should be the
+    // single-thread figure above multiplied by the cores there are.
+    let cores = std::thread::available_parallelism().map_or(1, |n| n.get());
+    println!("\nAcross every core ({} of them):", cores);
+    let deals = 4_000_000;
+    let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")
+        .unwrap()
+        .with_threads(cores);
     let started = Instant::now();
-    let deals = 1_000_000;
-    let mut calculator = EquityCalculator::new(Holdem, deals);
-    calculator
-        .add_player("Hero".into(), Hand::from_str(Holdem, "AhKh").unwrap())
-        .unwrap();
-    calculator
-        .add_player("Villain".into(), Hand::from_str(Holdem, "QsQd").unwrap())
-        .unwrap();
-    calculator.calculate(drop).unwrap();
-    println!(
-        "{:28}          {:>13.0} deals/s",
+    equity(&request, Target::Samples(deals)).unwrap();
+    report_wide(
         "hold'em, all cores",
-        deals as f64 / started.elapsed().as_secs_f64()
+        deals as f64 / started.elapsed().as_secs_f64(),
     );
 }

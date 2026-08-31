@@ -319,52 +319,6 @@ fn test_a_short_draw_hand_draws_the_difference() -> Result<(), PokerError> {
     Ok(())
 }
 
-/// The two APIs describe the draw differently and must agree.
-///
-/// The old one takes a whole hand plus the cards to throw; the new one takes
-/// what is kept, with the thrown cards named as dead. Both leave the same
-/// deck to draw from, so the answers have to match.
-#[test]
-fn test_the_two_ways_of_writing_a_draw_agree() -> Result<(), PokerError> {
-    use crate::cards::Card;
-    use crate::hand::Hand;
-    use crate::odds::EquityCalculator;
-    use crate::variants::DeuceSeven;
-
-    // Hero throws the king; villain throws the king.
-    let mut old = EquityCalculator::new(DeuceSeven, 200_000);
-    old.add_draw_player(
-        "Hero".to_string(),
-        Hand::from_str(DeuceSeven, "Th 8c Kd 4s 2h")?,
-        Some(Card::from_str("Kd")?),
-    )?;
-    old.add_draw_player(
-        "Villain".to_string(),
-        Hand::from_str(DeuceSeven, "9d 7h Ks 4h 2d")?,
-        Some(Card::from_str("Ks")?),
-    )?;
-    let old_result = old.calculate(drop)?;
-
-    // The same spot: what each keeps, with the discards dead.
-    let new = EquityRequest::from_text(
-        DeuceSeven,
-        &["Th8c4s2h", "9d7h4h2d"],
-        "",
-        "Kd Ks",
-    )?;
-    let new_result = run_exact(&new)?.expect("one card each is a small space");
-    let equities = new_result.equities();
-
-    assert!(
-        (old_result["Hero"] - equities[0].percent()).abs() < 0.5,
-        "the old API gave Hero {:.3}% and the new one {:.3}%",
-        old_result["Hero"],
-        equities[0].percent()
-    );
-
-    Ok(())
-}
-
 /// Stud works the same way: three cards known, four still to come.
 #[test]
 fn test_a_short_stud_hand_is_dealt_out() -> Result<(), PokerError> {

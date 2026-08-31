@@ -12,7 +12,6 @@ mod stud_hi_lo;
 
 pub use badugi::Badugi;
 pub use deuce_seven::DeuceSeven;
-pub(crate) use equity::CommunityCardGame;
 pub use equity::EquityCalculation;
 pub use equity::HasLow;
 pub use equity::{SeatIter, Seats};

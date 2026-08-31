@@ -2,7 +2,6 @@ use crate::{
     cards::{Card, Rank},
     error::PokerError,
     hand::Hand,
-    odds::EquityCalculator,
     variants::{Badugi, BadugiHandRank},
 };
 
@@ -78,31 +77,29 @@ fn test_badugi_hands_compare_by_size_then_by_height() -> Result<(), PokerError> 
 }
 
 /// End to end: a pat four-card badugi against a hand drawing one.
+///
+/// Villain throws a spade and takes one card from the forty-four left, so
+/// there is nothing to sample -- every deal is walked and the figure is
+/// exact.
 #[test]
 fn test_a_pat_badugi_beats_a_drawing_hand() -> Result<(), PokerError> {
-    let mut calculator = EquityCalculator::new(Badugi, 20_000);
+    use crate::odds::{run_exact, EquityRequest};
 
-    // Hero stands pat with a near-perfect badugi and discards nothing.
-    let hero = Hand::from_str(Badugi, "Ac 2d 3h 5s")?;
-    // Villain has two spades and throws one away.
-    let villain = Hand::from_str(Badugi, "4s 6s 7d 8h")?;
+    // Hero stands pat with a near-perfect badugi. Villain holds two spades
+    // and throws one away, which is named as a dead card.
+    let request = EquityRequest::from_text(Badugi, &["Ac2d3h5s", "4s7d8h"], "", "6s")?;
+    let result = run_exact(&request)?.expect("one card from forty-four");
+    let shares = result.equities();
 
-    calculator.add_draw_player("Hero".to_string(), hero, None)?;
-    calculator.add_draw_player(
-        "Villain".to_string(),
-        villain,
-        Some(Card::from_str("6s")?),
-    )?;
-
-    let results = calculator.calculate(std::mem::drop)?;
+    assert_eq!(result.samples, 44, "one deal per card left in the deck");
     assert!(
-        (results["Hero"] + results["Villain"] - 100.0).abs() < 0.001,
+        (shares[0].percent() + shares[1].percent() - 100.0).abs() < 1e-9,
         "equities must divide one pot"
     );
     assert!(
-        results["Hero"] > 90.0,
+        shares[0].percent() > 90.0,
         "a five-high badugi is a long way ahead of a one-card draw, got {:.2}%",
-        results["Hero"]
+        shares[0].percent()
     );
 
     Ok(())
