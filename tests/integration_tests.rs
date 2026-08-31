@@ -4,7 +4,7 @@
 //! items. This file cannot, so it is what catches something useful having been
 //! left unexported.
 
-use poker_calculator::{
+use poker_equity::{
     cards::CardSet,
     error::PokerError,
     notation::parse_hand,
@@ -73,7 +73,7 @@ fn test_a_question_can_be_asked_in_masks() -> Result<(), PokerError> {
 /// A refusal is a typed error a caller can match on, not a string.
 #[test]
 fn test_a_bad_question_comes_back_as_an_error() {
-    use poker_calculator::error::{EquityError, GameError};
+    use poker_equity::error::{EquityError, GameError};
 
     assert!(matches!(
         EquityRequest::from_text(Holdem, &["AhKh"], "", ""),

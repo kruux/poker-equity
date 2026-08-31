@@ -16,8 +16,8 @@
 
 use std::collections::HashMap;
 
-use poker_calculator::cards::{Card, CardSet, Rank, Suit};
-use poker_calculator::variants::{
+use poker_equity::cards::{Card, CardSet, Rank, Suit};
+use poker_equity::variants::{
     deuce_seven_score, high_score, low_a5_score, short_deck_score, DeuceSevenRank, HighHandRank,
     LowHandRank, PokerVariant, ShortDeck,
 };

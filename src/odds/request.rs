@@ -387,7 +387,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
     /// The same request, run over `threads` threads.
     ///
     /// ```no_run
-    /// # use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
+    /// # use poker_equity::{odds::{equity, EquityRequest, Target}, variants::Holdem};
     /// let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?
     ///     .with_threads(std::thread::available_parallelism()?.get());
     /// let result = equity(&request, Target::Samples(5_000_000))?;

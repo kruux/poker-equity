@@ -1,5 +1,5 @@
 [package]
-name = "poker-calculator"
+name = "poker-equity"
 version = "0.1.0"
 edition = "2021"
 description = "Equity for fourteen poker variants, sampled or enumerated exactly"
@@ -29,9 +29,10 @@ itertools = "0.14.0"
 rand = { version = "0.8.5", features = ["small_rng"] }
 rayon = "1.10.0"
 
-# One wheel per platform covering every future CPython. Free-threaded builds
-# are a separate wheel and are out of scope.
-pyo3 = { version = "0.29.2", features = ["abi3-py314", "extension-module"], optional = true }
+# One wheel per platform covering CPython 3.10 upward. abi3 names a floor
+# rather than a target, so the lowest version PyO3 offers is the widest reach;
+# free-threaded builds are a separate wheel and are out of scope.
+pyo3 = { version = "0.29.2", features = ["abi3-py310", "extension-module"], optional = true }
 
 # The equity tests run a hundred thousand Monte Carlo deals apiece, which is
 # minutes unoptimised and seconds optimised. Debug info is kept, so backtraces

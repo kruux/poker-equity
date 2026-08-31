@@ -22,7 +22,7 @@ pokerkit evaluates around eight thousand seven-card hands a second and there
 is no other way to get through a hundred and thirty million of them. Our own
 side scores seven million a second, so it never waits.
 
-    PYTHONPATH=<where poker_calculator.so is> \\
+    PYTHONPATH=<where poker_equity.so is> \\
         .venv/bin/python validation/exhaustive.py high
 
 Add `--limit N` to stop after roughly N hands, which is how to see that it
@@ -37,7 +37,7 @@ import sys
 import time
 from pathlib import Path
 
-import poker_calculator as pc
+import poker_equity as pc
 from pokerkit.hands import (
     BadugiHand,
     OmahaHoldemHand,

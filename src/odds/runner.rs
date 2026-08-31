@@ -65,7 +65,7 @@ pub fn default_threads() -> usize {
 /// expect.
 ///
 /// ```no_run
-/// # use poker_calculator::{odds::{run_batch, default_threads, ChunkResult, EquityRequest},
+/// # use poker_equity::{odds::{run_batch, default_threads, ChunkResult, EquityRequest},
 /// #                        variants::Holdem};
 /// # let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?;
 /// let mut total = ChunkResult::empty(2);
@@ -73,7 +73,7 @@ pub fn default_threads() -> usize {
 ///     total.merge(&run_batch(&request, 200_000, round, default_threads())?);
 ///     // repaint, and stop here if the user has had enough
 /// }
-/// # Ok::<(), poker_calculator::error::PokerError>(())
+/// # Ok::<(), poker_equity::error::PokerError>(())
 /// ```
 ///
 /// The work is split over the threads, so the same `seed` and the same
@@ -127,11 +127,11 @@ const MINIMUM_SAMPLES: u64 = CHUNK * 4;
 /// Runs a request until the target is met, and returns the answer.
 ///
 /// ```no_run
-/// # use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
+/// # use poker_equity::{odds::{equity, EquityRequest, Target}, variants::Holdem};
 /// # let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "", "")?;
 /// let result = equity(&request, Target::Samples(500_000))?;
 /// println!("{:.2}%", result.equities()[0].percent());
-/// # Ok::<(), poker_calculator::error::PokerError>(())
+/// # Ok::<(), poker_equity::error::PokerError>(())
 /// ```
 ///
 /// Use [`equity_with_progress`] to watch a long run as it goes, or
@@ -150,12 +150,12 @@ where
 /// cancelled. A batch is a few milliseconds, so it is a fine rate for both.
 ///
 /// ```no_run
-/// # use poker_calculator::{odds::{equity_with_progress, EquityRequest, Target}, variants::Holdem};
+/// # use poker_equity::{odds::{equity_with_progress, EquityRequest, Target}, variants::Holdem};
 /// # let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "", "")?;
 /// let result = equity_with_progress(&request, Target::Samples(500_000), |progress| {
 ///     println!("{} deals so far: {:.2}%", progress.samples, progress.equities[0].percent());
 /// })?;
-/// # Ok::<(), poker_calculator::error::PokerError>(())
+/// # Ok::<(), poker_equity::error::PokerError>(())
 /// ```
 ///
 /// The run spreads over [`EquityRequest::threads`], which starts at

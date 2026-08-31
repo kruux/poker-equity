@@ -3,7 +3,7 @@
 Build the module first:
 
     cargo build --release --features python
-    cp target/release/libpoker_calculator.so <somewhere>/poker_calculator.so
+    cp target/release/libpoker_equity.so <somewhere>/poker_equity.so
 
 then run this with that directory on PYTHONPATH:
 
@@ -17,7 +17,7 @@ symbols unresolved so a Rust test binary cannot link it.
 
 import sys
 
-import poker_calculator as pc
+import poker_equity as pc
 
 failures = []
 

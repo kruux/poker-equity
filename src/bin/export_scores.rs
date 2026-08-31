@@ -19,8 +19,8 @@ use std::fs::File;
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
-use poker_calculator::cards::{Card, CardSet};
-use poker_calculator::variants::{
+use poker_equity::cards::{Card, CardSet};
+use poker_equity::variants::{
     deuce_seven_score, high_score, low_a5_score, short_deck_score, Badugi, Omaha, PokerVariant,
 };
 

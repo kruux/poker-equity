@@ -66,7 +66,7 @@ through. Hands are checked and discarded, so memory is flat.
 
 ```sh
 cargo build --release --features python
-cp target/release/libpoker_calculator.so /tmp/pymod/poker_calculator.so
+cp target/release/libpoker_equity.so /tmp/pymod/poker_equity.so
 
 PYTHONPATH=/tmp/pymod .venv/bin/python validation/exhaustive.py seven_high
 ```

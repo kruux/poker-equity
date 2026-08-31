@@ -363,7 +363,7 @@ fn full_deck() -> u64 {
 }
 
 #[pymodule]
-fn poker_calculator(module: &Bound<'_, PyModule>) -> PyResult<()> {
+fn poker_equity(module: &Bound<'_, PyModule>) -> PyResult<()> {
     module.add_function(wrap_pyfunction!(variants, module)?)?;
     module.add_function(wrap_pyfunction!(chunk, module)?)?;
     module.add_function(wrap_pyfunction!(chunk_from_text, module)?)?;

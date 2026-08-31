@@ -4,7 +4,7 @@
 //! reader their trust in the rest of it. These are the same snippets, with
 //! the results printed so a change in the numbers shows up too.
 
-use poker_calculator::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
+use poker_equity::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
                        odds::{equity, equity_with_progress, run_chunk, ChunkResult,
                               EquityRequest, Target},
                        variants::{DeuceSeven, Holdem, Stud}};

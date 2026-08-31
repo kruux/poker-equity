@@ -1,4 +1,4 @@
-# poker-calculator
+# poker-equity
 
 An equity engine for poker. Give it a game, some hands, a board and some dead
 cards, and it tells you what share of the pot each player wins.
@@ -53,7 +53,7 @@ game being asked about.
 ### Hold'em: ace-king suited against a pair of queens
 
 ```rust
-use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::Holdem};
+use poker_equity::{odds::{equity, EquityRequest, Target}, variants::Holdem};
 
 let hero = "AhKh";        // one field per seat
 let villain = "QsQd";
@@ -77,7 +77,7 @@ Seats come back in the order they were passed in, so seat 0 is `hero`.
 Change the variant, and the fields mean what that game means by them:
 
 ```rust
-use poker_calculator::{odds::{equity, EquityRequest, Target}, variants::DeuceSeven};
+use poker_equity::{odds::{equity, EquityRequest, Target}, variants::DeuceSeven};
 
 let villain = "9s7d5c4h2s";   // five cards: a made nine-low, standing pat
 let hero = "8h6d4s3c";        // four cards, so one is still to come
@@ -260,7 +260,7 @@ table while it goes, and to notice if the user cancelled. Pass a function to
 be called after each batch:
 
 ```rust
-use poker_calculator::odds::equity_with_progress;
+use poker_equity::odds::equity_with_progress;
 
 let result = equity_with_progress(&request, Target::Samples(5_000_000), |progress| {
     println!("{} deals: {:.2}% (± {:.2}), keeping {:.0}% of deals",
@@ -288,7 +288,7 @@ results across machines is your business rather than the library's — the layer
 underneath is a single batch that returns sums:
 
 ```rust
-use poker_calculator::odds::{run_chunk, ChunkResult};
+use poker_equity::odds::{run_chunk, ChunkResult};
 
 let mut total = ChunkResult::empty(2);
 for seed in 0..10 {
@@ -328,7 +328,7 @@ Text is a convenience. Underneath, a card is a `u8` and a set of cards is a
 already holds masks can skip the parser entirely:
 
 ```rust
-use poker_calculator::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
+use poker_equity::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
                        odds::EquityRequest, variants::Holdem};
 
 assert_eq!(Card::new(Suit::Heart, Rank::Ace).index(), 50);   // rank * 4 + suit
@@ -412,11 +412,11 @@ to a single card equals naming that card.
 
 ```sh
 cargo build --release --features python
-cp target/release/libpoker_calculator.so somewhere/poker_calculator.so
+cp target/release/libpoker_equity.so somewhere/poker_equity.so
 ```
 
 ```python
-import poker_calculator as pc
+import poker_equity as pc
 
 r = pc.exact_from_text("holdem", ["AhAd", "KsKc"], "2c 7d 9h")
 print(r["players"][0]["equity"])        # 0.916161...

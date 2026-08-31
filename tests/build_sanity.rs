@@ -9,7 +9,7 @@
 
 use std::time::Instant;
 
-use poker_calculator::{
+use poker_equity::{
     cards::Card,
     variants::{Holdem, PokerVariant},
 };

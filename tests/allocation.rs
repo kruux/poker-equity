@@ -11,7 +11,7 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use poker_calculator::{
+use poker_equity::{
     odds::{run_chunk, EquityRequest},
     variants::{Badugi, Holdem, Omaha, OmahaHiLo, Razz},
 };
