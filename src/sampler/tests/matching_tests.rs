@@ -3,7 +3,7 @@ use crate::error::PokerError;
 use crate::sampler::{has_perfect_matching, is_feasible, maximum_matching};
 
 fn set(text: &str) -> CardSet {
-    CardSet::from_cards(&Card::from_str(text).unwrap())
+    CardSet::from_cards(&Card::parse_field(text).unwrap())
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn test_counting_is_not_enough_to_decide_feasibility() -> Result<(), PokerError>
 
 #[test]
 fn test_maximum_matching_seats_what_it_can() -> Result<(), PokerError> {
-    let cards: Vec<Card> = Card::from_str("Ah Ad Kh")?;
+    let cards: Vec<Card> = Card::parse_field("Ah Ad Kh")?;
 
     // Three slots, three cards, all compatible.
     let anything = vec![CardSet::FULL_DECK; 3];
@@ -51,7 +51,7 @@ fn test_maximum_matching_seats_what_it_can() -> Result<(), PokerError> {
 /// this.
 #[test]
 fn test_matching_reseats_earlier_slots() -> Result<(), PokerError> {
-    let cards = Card::from_str("Ah As")?;
+    let cards = Card::parse_field("Ah As")?;
     // The first slot could take either card; the second can only take Ah. A
     // greedy pass that gives Ah to the first slot has to hand it back.
     let slots = vec![CardSet::of_rank(Rank::Ace), set("Ah")];

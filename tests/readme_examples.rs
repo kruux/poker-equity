@@ -56,7 +56,7 @@ fn test_the_readme_still_works() {
     // mask API
     let ace_of_hearts = Card::new(Suit::Heart, Rank::Ace);
     assert_eq!(ace_of_hearts.index(), 50);
-    let queen_of_spades = CardSet::from_cards(&Card::from_str("Qs").unwrap());
+    let queen_of_spades = CardSet::from_cards(&Card::parse_field("Qs").unwrap());
     let masks = EquityRequest::from_masks(
         Holdem,
         &[

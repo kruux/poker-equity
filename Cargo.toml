@@ -2,6 +2,16 @@
 name = "poker-calculator"
 version = "0.1.0"
 edition = "2021"
+description = "Equity for fourteen poker variants, sampled or enumerated exactly"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+keywords = ["poker", "equity", "odds", "holdem", "omaha"]
+categories = ["games", "algorithms", "simulation"]
+# repository = "https://github.com/<you>/<repo>"
+
+# The published archive is the library and what proves it: the validation
+# scripts want pokerkit, and the throttling script is about this machine.
+exclude = ["/validation", "/scripts", "/.vscode"]
 
 # A cdylib so the Python extension can be built, an rlib so the crate stays a
 # normal Rust library. The core never depends on Python: the binding is one

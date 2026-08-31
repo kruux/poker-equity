@@ -7,7 +7,7 @@ use crate::error::PokerError;
 use crate::sampler::SlotSampler;
 
 fn set(text: &str) -> CardSet {
-    CardSet::from_cards(&Card::from_str(text).unwrap())
+    CardSet::from_cards(&Card::parse_field(text).unwrap())
 }
 
 /// Draws many deals and counts how often each *set* of cards came up.

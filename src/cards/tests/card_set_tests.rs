@@ -49,7 +49,7 @@ fn test_rank_and_suit_masks() -> Result<(), PokerError> {
     assert_eq!(ace_of_clubs.len(), 1);
     assert_eq!(
         ace_of_clubs.iter().next(),
-        Some(Card::from_str("Ac")?[0]),
+        Some(Card::parse_field("Ac")?[0]),
         "the ace of clubs"
     );
 
@@ -64,8 +64,8 @@ fn test_rank_and_suit_masks() -> Result<(), PokerError> {
 
 #[test]
 fn test_set_operations() -> Result<(), PokerError> {
-    let hand = CardSet::from_cards(&Card::from_str("Ah Kh")?);
-    let board = CardSet::from_cards(&Card::from_str("Qh Jh Th")?);
+    let hand = CardSet::from_cards(&Card::parse_field("Ah Kh")?);
+    let board = CardSet::from_cards(&Card::parse_field("Qh Jh Th")?);
 
     assert_eq!(hand.len(), 2);
     assert!(hand.is_disjoint(board));
@@ -78,10 +78,10 @@ fn test_set_operations() -> Result<(), PokerError> {
     }
 
     // Repeats collapse, and removing an absent card is harmless.
-    let doubled = CardSet::from_cards(&Card::from_str("Ah Ah Kh")?);
+    let doubled = CardSet::from_cards(&Card::parse_field("Ah Ah Kh")?);
     assert_eq!(doubled, hand);
     let mut set = hand;
-    set.remove(Card::from_str("2c")?[0]);
+    set.remove(Card::parse_field("2c")?[0]);
     assert_eq!(set, hand);
 
     Ok(())
@@ -112,18 +112,18 @@ fn test_nth_walks_the_set_in_order() {
 #[test]
 fn test_display_reads_highest_first() -> Result<(), PokerError> {
     assert_eq!(
-        CardSet::from_cards(&Card::from_str("Ah Kd")?).to_string(),
+        CardSet::from_cards(&Card::parse_field("Ah Kd")?).to_string(),
         "Ah Kd",
         "not Kd Ah, which is the order the bits are in"
     );
     assert_eq!(
-        CardSet::from_cards(&Card::from_str("2c 7d Ts Ah")?).to_string(),
+        CardSet::from_cards(&Card::parse_field("2c 7d Ts Ah")?).to_string(),
         "Ah Ts 7d 2c"
     );
     assert_eq!(CardSet::EMPTY.to_string(), "");
 
     // The set itself still walks lowest first; only the rendering differs.
-    let set = CardSet::from_cards(&Card::from_str("Ah Kd")?);
+    let set = CardSet::from_cards(&Card::parse_field("Ah Kd")?);
     let walked: Vec<String> = set.iter().map(|c| c.to_string()).collect();
     assert_eq!(walked, vec!["Kd", "Ah"]);
 

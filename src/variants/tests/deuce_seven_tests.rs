@@ -14,7 +14,7 @@ fn test_new_empty_hand() {
 #[test]
 fn test_add_card() -> Result<(), CardError> {
     let mut hand = Hand::new(DeuceSeven);
-    let card = Card::from_str("Ah")?[0];
+    let card = Card::parse_field("Ah")?[0];
     hand.add_card(card)?;
     assert_eq!(hand.num_cards(), 1);
     Ok(())

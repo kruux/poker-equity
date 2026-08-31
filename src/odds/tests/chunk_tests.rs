@@ -367,7 +367,7 @@ fn test_text_and_masks_are_the_same_request() -> Result<(), PokerError> {
     use crate::cards::{Card, CardSet};
     use crate::notation::HandSpec;
 
-    let card = |text: &str| CardSet::from_cards(&Card::from_str(text).unwrap());
+    let card = |text: &str| CardSet::from_cards(&Card::parse_field(text).unwrap());
 
     let by_text = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "2c 7d 9h", "3s")?;
     let by_masks = EquityRequest::from_masks(

@@ -148,7 +148,7 @@ fn test_the_rule_never_improves_a_hand() -> Result<(), PokerError> {
     // Held as hold'em these seven cards are a heart flush; in Omaha they are
     // not, because only one heart is in the hand.
     let restricted = evaluate("Ah 2c 3d 4s", "Kh Qh Jh 9h 2s")?;
-    let unrestricted = crate::variants::HighHandRank::evaluate(&crate::cards::Card::from_str(
+    let unrestricted = crate::variants::HighHandRank::evaluate(&crate::cards::Card::parse_field(
         "Ah 2c 3d 4s Kh Qh Jh 9h 2s",
     )?);
     assert!(

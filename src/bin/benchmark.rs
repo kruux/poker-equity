@@ -87,7 +87,7 @@ fn main() {
     // first; the second is what a person reads and what the tables are
     // checked against.
     println!("\nThe two answers, without dealing or pot splitting:");
-    let seven = Card::from_str("Ah Kh Qs Qd 2c 7d 9s").expect("valid cards");
+    let seven = Card::parse_field("Ah Kh Qs Qd 2c 7d 9s").expect("valid cards");
 
     let rounds = 2_000_000;
     let started = Instant::now();

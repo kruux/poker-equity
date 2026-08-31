@@ -40,10 +40,10 @@ impl Card {
 
     /// Reads a field of cards: `"AdKc"` and `"Ad Kc"` both give two cards.
     ///
-    /// Not `FromStr`, which reads one value from one string -- this reads a
-    /// whole field, so it returns however many cards were named.
-    #[allow(clippy::should_implement_trait)]
-    pub fn from_str(cards_str: &str) -> Result<Vec<Card>, CardError> {
+    /// A field is however many cards were named, which is why this is not
+    /// `FromStr` -- that reads one value from one string, and is implemented
+    /// separately so `"Ah".parse::<Card>()` means what it looks like.
+    pub fn parse_field(cards_str: &str) -> Result<Vec<Card>, CardError> {
         let cards_chars: Vec<char> = cards_str.chars().filter(|c| !c.is_whitespace()).collect();
         let mut cards: Vec<Card> = Vec::<Card>::new();
         // Make sure it's even to avoid breaking the for loop
@@ -53,7 +53,10 @@ impl Card {
                 "Uneven number of chars".to_string(),
             ));
         }
-        for i in (0..len - 1).step_by(2) {
+        // Stepping to `len` rather than `len - 1`: the length is even, so
+        // every step has its pair, and an empty field is nought cards rather
+        // than an underflow.
+        for i in (0..len).step_by(2) {
             let rank_char = cards_chars[i];
             let rank = Rank::from_char(rank_char)?;
             let suit_char = cards_chars[i + 1];
@@ -77,6 +80,26 @@ impl Card {
     /// Get suit of card
     pub fn suit(&self) -> Suit {
         Suit::from_index(self.0 % 4)
+    }
+}
+
+/// One card from one string, so `"Ah".parse::<Card>()` reads the way it looks.
+///
+/// Whitespace is ignored, as it is in a field, so `" Ah "` is the ace of
+/// hearts. Anything naming more than one card is an error here -- that is
+/// what [`Card::parse_field`] is for.
+impl std::str::FromStr for Card {
+    type Err = CardError;
+
+    fn from_str(text: &str) -> Result<Self, CardError> {
+        let cards = Card::parse_field(text)?;
+        match cards.len() {
+            1 => Ok(cards[0]),
+            found => Err(CardError::InvalidFormat(format!(
+                "{:?} names {} cards, not one",
+                text, found
+            ))),
+        }
     }
 }
 

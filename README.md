@@ -333,7 +333,7 @@ use poker_calculator::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
 
 assert_eq!(Card::new(Suit::Heart, Rank::Ace).index(), 50);   // rank * 4 + suit
 
-let queen_of_spades = CardSet::from_cards(&Card::from_str("Qs")?);
+let queen_of_spades = CardSet::from_cards(&["Qs".parse::<Card>()?]);
 
 let request = EquityRequest::from_masks(
     Holdem,

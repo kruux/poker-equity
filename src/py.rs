@@ -302,7 +302,7 @@ fn parse_dead_cards(text: &str) -> PyResult<u64> {
 /// The index of a named card, as `rank * 4 + suit`.
 #[pyfunction]
 fn card_index(text: &str) -> PyResult<u8> {
-    let cards = Card::from_str(text).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let cards = Card::parse_field(text).map_err(|error| PyValueError::new_err(error.to_string()))?;
     match cards.as_slice() {
         [card] => Ok(card.index()),
         _ => Err(PyValueError::new_err(format!(
@@ -350,7 +350,7 @@ fn score_batch(py: Python<'_>, kernel: &str, hands: Vec<String>) -> PyResult<Vec
     // Parsing and scoring are pure arithmetic, so the GIL is not needed.
     let parsed = hands
         .iter()
-        .map(|hand| Card::from_str(hand).map_err(|error| PyValueError::new_err(error.to_string())))
+        .map(|hand| Card::parse_field(hand).map_err(|error| PyValueError::new_err(error.to_string())))
         .collect::<PyResult<Vec<_>>>()?;
 
     Ok(py.detach(|| parsed.iter().map(|cards| score(cards)).collect()))

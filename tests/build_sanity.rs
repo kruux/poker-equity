@@ -22,7 +22,7 @@ const FLOOR: f64 = 1_000_000.0;
 
 #[test]
 fn test_the_build_was_optimised() {
-    let seven = Card::from_str("Ah Kh Qs Qd 2c 7d 9s").expect("valid cards");
+    let seven = Card::parse_field("Ah Kh Qs Qd 2c 7d 9s").expect("valid cards");
 
     // Warm the tables so the measurement is of evaluation, not of the first
     // page faults.

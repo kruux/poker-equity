@@ -264,8 +264,8 @@ fn seven_card_hands_sampled() {
 /// than burying it in a sweep.
 #[test]
 fn a_pair_above_a_straight_does_not_raise_it() {
-    let nine_high = Card::from_str("Ah As 9d 8c 7s 6h 5d").unwrap();
-    let ten_high = Card::from_str("Td 9c 8s 7h 6d 2c 3h").unwrap();
+    let nine_high = Card::parse_field("Ah As 9d 8c 7s 6h 5d").unwrap();
+    let ten_high = Card::parse_field("Td 9c 8s 7h 6d 2c 3h").unwrap();
 
     assert_eq!(
         HighHandRank::evaluate(&nine_high),
