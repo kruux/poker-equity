@@ -183,3 +183,31 @@ fn test_a_request_carries_its_own_thread_count() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// A precision target sampling can never reach is refused, rather than
+/// pursued forever.
+///
+/// Zero is the one a caller reaches for by accident, meaning "exactly right";
+/// NaN is worse, because every comparison against it is false, so the run
+/// cannot even be seen to be failing. Both used to sample until killed.
+#[test]
+fn test_an_unreachable_precision_is_refused() {
+    use crate::error::EquityError;
+
+    // A spot too large to walk, so the target is what decides when to stop.
+    let wide = request(&["AhKh", "QsQd", "**"], "");
+
+    for wanted in [0.0, -0.001, f64::NAN, f64::INFINITY] {
+        assert!(
+            matches!(
+                equity(&wide, Target::StandardError(wanted)),
+                Err(PokerError::Equity(EquityError::UnreachableTarget(_)))
+            ),
+            "a standard error target of {} should be refused",
+            wanted
+        );
+    }
+
+    // A positive, finite one is still perfectly ordinary.
+    assert!(equity(&request(&["AhKh", "QsQd"], "2c 7d 9h"), Target::StandardError(0.01)).is_ok());
+}

@@ -291,14 +291,19 @@ fn test_a_field_may_only_be_short_where_the_game_allows_it() -> Result<(), Poker
 #[test]
 fn test_a_card_outside_the_deck_says_so() -> Result<(), PokerError> {
     use crate::error::GameError;
-    use crate::variants::ShortDeck;
+    use crate::variants::{Holdem, ShortDeck};
 
-    for (label, hands, board) in [
-        ("a deuce in hand", &["2h3h", "QsQd"][..], ""),
-        ("a five in hand", &["5h6h", "QsQd"][..], ""),
-        ("a deuce on the board", &["AhKh", "QsQd"][..], "2c7d9h"),
+    for (label, hands, board, dead) in [
+        ("a deuce in hand", &["2h3h", "QsQd"][..], "", ""),
+        ("a five in hand", &["5h6h", "QsQd"][..], "", ""),
+        ("a deuce on the board", &["AhKh", "QsQd"][..], "2c7d9h", ""),
+        // Every field, including the one where it costs nothing to allow.
+        // Taking a deuce out of a deck that never held one is a no-op, so
+        // this is caught here or not at all -- and a caller who names one has
+        // made the same mistake about the game either way.
+        ("a deuce named dead", &["AhKh", "QsQd"][..], "", "2c"),
     ] {
-        let error = EquityRequest::from_text(ShortDeck, hands, board, "").unwrap_err();
+        let error = EquityRequest::from_text(ShortDeck, hands, board, dead).unwrap_err();
         assert!(
             matches!(error, PokerError::Game(GameError::NotInDeck(_))),
             "{} gave {:?}",
@@ -307,8 +312,10 @@ fn test_a_card_outside_the_deck_says_so() -> Result<(), PokerError> {
         );
     }
 
-    // Naming it dead is harmless: it was never in the deck to remove.
-    assert!(EquityRequest::from_text(ShortDeck, &["AhKh", "QsQd"], "", "2c").is_ok());
+    // A card the short deck does hold is dead in the ordinary way, and the
+    // full-deck games still take a deuce without complaint.
+    assert!(EquityRequest::from_text(ShortDeck, &["AhKh", "QsQd"], "", "7c").is_ok());
+    assert!(EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "2c").is_ok());
 
     // And a real duplicate is still a duplicate.
     let error = EquityRequest::from_text(ShortDeck, &["AhKh", "AhQd"], "", "").unwrap_err();
@@ -353,13 +360,18 @@ fn test_how_much_of_the_board_may_be_known() -> Result<(), PokerError> {
     // agree about that.
     assert!(matches!(
         EquityRequest::from_text(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "", ""),
-        Err(PokerError::Equity(EquityError::InvalidCommunityCards(0)))
+        Err(PokerError::Equity(EquityError::NotEnoughBoardCards { least: 1, found: 0 }))
     ));
     assert!(matches!(
         EquityRequest::from_text(CourchevelHiLo, &["Ah2c3d4s5c", "QsQdJsTd9h"], "", ""),
-        Err(PokerError::Equity(EquityError::InvalidCommunityCards(0)))
+        Err(PokerError::Equity(EquityError::NotEnoughBoardCards { least: 1, found: 0 }))
     ));
     assert!(EquityRequest::from_text(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "8s", "").is_ok());
+
+    // A wildcard satisfies the rule, and is meant to: the card has been
+    // dealt, it is simply not yet known. That is how "what was the turned
+    // card worth?" is asked -- the same spot with `*` in its place.
+    assert!(EquityRequest::from_text(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "*", "").is_ok());
 
     // Five-card Omaha is the same game without that rule, so it may show
     // nothing at all.

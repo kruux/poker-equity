@@ -90,6 +90,14 @@ pub enum EquityError {
     InvalidSimulationCount(usize),
     UnequalHandSizes,
     InvalidCommunityCards(usize),
+    /// A board shorter than the game's floor: how many it shows before the
+    /// betting, and how many were named. Only Courchevel has a floor at all.
+    NotEnoughBoardCards { least: usize, found: usize },
+    /// A precision no run can reach. A standard error falls as `1/sqrt(n)`,
+    /// so it approaches zero without arriving, and a target of zero -- or of
+    /// anything that is not a positive, finite number -- is a promise the
+    /// sampler cannot keep rather than a goal it can pursue.
+    UnreachableTarget(f64),
     /// More seats than the deck can deal: how many were asked for, and how
     /// many the game has room for.
     TooManyPlayers { asked: usize, room: usize },
@@ -118,6 +126,20 @@ impl EquityError {
             EquityError::InvalidCommunityCards(n) => {
                 format!("Invalid number of community cards: {n}")
             }
+            EquityError::NotEnoughBoardCards { least, found } => format!(
+                "this game turns {} board card{} face up before the betting, so a board \
+                 of {} is not a spot that occurs; write `*` for a card that has been \
+                 dealt and not yet seen",
+                least,
+                if *least == 1 { "" } else { "s" },
+                found
+            ),
+            EquityError::UnreachableTarget(wanted) => format!(
+                "a standard error target must be positive and finite, and {} is not; \
+                 sampling narrows the error as 1/sqrt(n), so it would never arrive. Ask \
+                 for Target::Exact if what you want is no error bar at all",
+                wanted
+            ),
         }
     }
 }

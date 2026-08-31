@@ -205,8 +205,29 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         }
         // Courchevel's first board card is face up before the betting, so a
         // Courchevel question with nothing showing is not one.
+        //
+        // A wildcard counts, and deliberately: `*` is a card that has been
+        // dealt and not yet seen, which is both a fair question and the way
+        // to ask what the turned card was worth -- run the spot with the card
+        // named, run it again with `*`, and the gap is the answer. It comes
+        // back as the five-card Omaha number, because that is what Courchevel
+        // with an unknown first card *is*. The error says as much, since the
+        // difference between `""` and `"*"` is otherwise invisible.
         if board.len() < variant.least_board_cards() {
-            return Err(EquityError::InvalidCommunityCards(board.len()).into());
+            return Err(EquityError::NotEnoughBoardCards {
+                least: variant.least_board_cards(),
+                found: board.len(),
+            }
+            .into());
+        }
+
+        // A dead card this game never dealt is a mistake about the game, and
+        // it has to be caught here or not at all: taking a card out of a deck
+        // that never held it is a no-op, so nothing downstream would notice.
+        // The hand and board fields already refuse a deuce in short deck, and
+        // the dead field should not be the one place it is welcome.
+        if let Some(card) = dead.without(variant.deck()).iter().next() {
+            return Err(GameError::NotInDeck(card).into());
         }
 
         // Anything in this game's deck and not dead is on offer. Known cards

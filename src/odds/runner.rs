@@ -1,7 +1,7 @@
 use rayon::prelude::*;
 
 use crate::{
-    error::PokerError,
+    error::{EquityError, PokerError},
     variants::{EquityCalculation, PokerVariant},
 };
 
@@ -171,6 +171,19 @@ where
     V: PokerVariant + EquityCalculation + Send + Sync,
     F: FnMut(&Progress),
 {
+    // A precision target is pursued by sampling until it is met, and nothing
+    // caps that loop but the target itself -- so a target sampling can never
+    // meet is not a slow run, it is a run that does not end. Zero is the one
+    // a caller reaches for by accident, meaning "exactly right"; that is
+    // `Target::Exact`, and the error says so. NaN is worse, since every
+    // comparison against it is false and the loop cannot even be seen to be
+    // failing.
+    if let Target::StandardError(wanted) = target {
+        if !(wanted.is_finite() && wanted > 0.0) {
+            return Err(EquityError::UnreachableTarget(wanted).into());
+        }
+    }
+
     if target == Target::Exact {
         if let Some(result) = run_exact(request)? {
             report(&mut on_progress, &result);

@@ -172,7 +172,7 @@ fn test_courchevel_starts_with_a_card_on_the_table() -> Result<(), PokerError> {
 
     assert!(matches!(
         EquityRequest::from_text(Courchevel, &hands, "", ""),
-        Err(PokerError::Equity(EquityError::InvalidCommunityCards(0)))
+        Err(PokerError::Equity(EquityError::NotEnoughBoardCards { least: 1, found: 0 }))
     ));
 
     // One card is exactly where Courchevel starts, and four board cards to

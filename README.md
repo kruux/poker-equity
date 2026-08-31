@@ -189,8 +189,16 @@ fair question with an exact answer. Courchevel is the one game with a floor:
 its first board card is face up before the betting, so a Courchevel request
 showing nothing is refused — that spot is five-card Omaha, not Courchevel.
 
+Write `"*"` there if the card has been dealt and you have not seen it. That
+is a fair question, and it is how to ask what the turned card was worth: run
+the spot with the card named, run it again with `*`, and the gap between them
+is the answer. It comes back as the five-card Omaha number, because that is
+what Courchevel with an unknown first card is.
+
 Dead cards must be exact, because "a club is dead" does not say *which* club
-and every reading changes the answer.
+and every reading changes the answer. They must also be cards the game
+actually deals — a deuce is not dead in short deck, it is a mistake about the
+game, and is refused in the dead field exactly as it would be in a hand.
 
 How many cards a field may name is three rules, not one, because the games
 deal differently:
