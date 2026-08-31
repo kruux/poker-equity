@@ -3,6 +3,12 @@
 An equity engine for poker. Give it a game, some hands, a board and some dead
 cards, and it tells you what share of the pot each player wins.
 
+**Early version.** This is 0.1, and it should be read as one. The hand
+rankings are checked hard — see [Correctness](#correctness) — but the API
+around them is not settled: names, signatures and the notation may all change
+before 1.0, and a few corners of the behaviour are still being decided. Pin an
+exact version rather than a range.
+
 ## Games
 
 Showdowns a second, per thread: dealing, evaluating and splitting the pot,
