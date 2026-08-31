@@ -249,3 +249,95 @@ fn test_filling_the_tightest_slot_first_would_bias_the_draw() {
         truth * 100.0
     );
 }
+
+/// A hand written the way a player writes it -- ranks named, suits left open
+/// -- is counted rather than searched for.
+///
+/// The two numbers that matter are different by orders of magnitude. Omaha's
+/// `AA**` covers 6,961 hands, which is nothing to hold, while the search that
+/// would find them by testing candidates is `C(52,4)` = 270,725. Bounding the
+/// second refuses a hand that the first says is trivial, which is what used
+/// to happen: `AA**` was drawn for blindly and, at two seats, gave up.
+#[test]
+fn test_open_suits_are_shaped_not_searched() {
+    let ace = CardSet::of_rank(Rank::Ace);
+    let any = CardSet::FULL_DECK;
+
+    // Omaha AA**: small enough to list, once the listing is of the answer.
+    let omaha = [ace, ace, any, any];
+    let sampler = SlotSampler::new(&omaha, CardSet::FULL_DECK);
+    assert_eq!(sampler.strategy(), "listed");
+    assert_eq!(
+        sampler.all_sets(CardSet::FULL_DECK, 1_000_000).map(|sets| sets.len()),
+        Some(6_961),
+        "AA** covers 6,961 hands"
+    );
+
+    // A razz hand of three named ranks covers 9,215,488, which is far too
+    // many to hold and no trouble to count -- so it is drawn from by shape.
+    let razz = [
+        ace,
+        CardSet::of_rank(Rank::Two),
+        CardSet::of_rank(Rank::Three),
+        any, any, any, any,
+    ];
+    assert_eq!(SlotSampler::new(&razz, CardSet::FULL_DECK).strategy(), "shaped");
+
+    // Naming the suits leaves nothing to decide, as it always did.
+    let named = [set("Ah"), set("2c"), set("3d"), any, any, any, any];
+    assert_eq!(SlotSampler::new(&named, CardSet::FULL_DECK).strategy(), "free");
+}
+
+/// Drawing by shape must give the same distribution as drawing and testing,
+/// which is the slow path it replaces.
+///
+/// Both are uniform over the same hands, so a long run of each should agree
+/// on how often every card turns up. This is the check that the weights are
+/// right: getting them wrong -- picking a shape evenly rather than in
+/// proportion to how many hands have it -- would over-represent the hands
+/// that pair a named rank, and show up here as a skew towards those ranks.
+#[test]
+fn test_shaped_draws_match_draw_and_test() {
+    let slots = [
+        CardSet::of_rank(Rank::Ace),
+        CardSet::of_rank(Rank::Two),
+        CardSet::FULL_DECK,
+        CardSet::FULL_DECK,
+        CardSet::FULL_DECK,
+    ];
+
+    let shaped = SlotSampler::new(&slots, CardSet::FULL_DECK);
+    assert_eq!(shaped.strategy(), "shaped", "this shape is too wide to list");
+    let tested = SlotSampler::forcing_draw_and_test(&slots, CardSet::FULL_DECK);
+
+    let count = |sampler: &SlotSampler, seed: u64| {
+        let mut rng = StdRng::seed_from_u64(seed);
+        let mut out = Vec::new();
+        let mut seen = [0u32; 52];
+        let mut drawn = 0;
+        while drawn < 200_000 {
+            if sampler.draw(CardSet::FULL_DECK, &mut rng, &mut out) {
+                for card in &out {
+                    seen[card.index() as usize] += 1;
+                }
+                drawn += 1;
+            }
+        }
+        seen
+    };
+
+    let by_shape = count(&shaped, 11);
+    let by_test = count(&tested, 12);
+
+    for card in 0..52 {
+        let a = by_shape[card] as f64;
+        let b = by_test[card] as f64;
+        // Five sigma on a count of this size, treating each as a binomial.
+        let slack = 5.0 * (a + b).sqrt();
+        assert!(
+            (a - b).abs() <= slack,
+            "card {} came up {} times by shape and {} by draw-and-test, {} apart against {:.0} of slack",
+            card, a, b, (a - b).abs(), slack
+        );
+    }
+}

@@ -718,9 +718,14 @@ where
     while result.samples < samples {
         attempts += 1;
         if attempts > attempt_limit {
-            return Err(EquityError::Infeasible(
-                "the request, which almost never yields a deal".to_string(),
-            )
+            // Not an infeasible request, and it must not say so: feasibility
+            // was proved at construction. The seats are competing for the
+            // same cards faster than a draw can find a deal that suits them
+            // all.
+            return Err(EquityError::SamplingStalled {
+                attempts,
+                found: result.samples,
+            }
             .into());
         }
 

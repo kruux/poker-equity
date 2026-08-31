@@ -529,3 +529,77 @@ fn test_each_game_seats_what_its_deck_allows() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// A hand written without suits must sample as well as one written with them,
+/// and must give the same answer.
+///
+/// Razz ranks on ranks alone, and `A23` against `A24` leaves the deck holding
+/// exactly the rank multiset that `Ah2c3d` against `As2d4c` leaves. So the
+/// two questions have one answer, and the named form is an independent check
+/// on the unsuited one rather than merely a second opinion.
+///
+/// This is the regression for a sampler that drew seven cards blind and kept
+/// the 0.4% that happened to hold an ace, a deuce and a three -- correct, and
+/// three hundred times slower than naming the suits.
+#[test]
+fn test_unsuited_fields_sample_as_well_as_named_ones() -> Result<(), PokerError> {
+    use crate::odds::run_batch;
+    use crate::variants::Razz;
+
+    let unsuited = EquityRequest::from_text(Razz, &["A23", "A24"], "", "")?;
+    let named = EquityRequest::from_text(Razz, &["Ah2c3d", "As2d4c"], "", "")?;
+
+    let loose = run_batch(&unsuited, 200_000, 9, 2)?;
+    let tight = run_batch(&named, 200_000, 9, 2)?;
+
+    assert!(
+        loose.acceptance() > 0.15,
+        "an unsuited razz hand kept only {:.4} of its draws",
+        loose.acceptance()
+    );
+
+    let gap = (loose.equities()[0].equity - tight.equities()[0].equity).abs();
+    let slack = 5.0 * (loose.equities()[0].std_error.powi(2)
+        + tight.equities()[0].std_error.powi(2))
+    .sqrt();
+    assert!(
+        gap <= slack,
+        "suits do not matter in razz, yet A23/A24 came to {:.5} and Ah2c3d/As2d4c to {:.5}",
+        loose.equities()[0].equity,
+        tight.equities()[0].equity
+    );
+
+    Ok(())
+}
+
+/// The shapes fix what a seat can be dealt, not how many seats can be dealt
+/// at once, so the games that used to refuse an ordinary question now answer
+/// it.
+#[test]
+fn test_open_suits_are_answerable_in_every_game() -> Result<(), PokerError> {
+    use crate::odds::run_batch;
+    use crate::variants::{Badugi, DeuceSeven, Omaha, OmahaFive, OmahaHiLo, Stud};
+
+    macro_rules! answers {
+        ($variant:expr, $hands:expr) => {{
+            let request = EquityRequest::from_text($variant, &$hands, "", "")?;
+            let result = run_batch(&request, 20_000, 5, 2)?;
+            assert!(
+                result.acceptance() > 0.1,
+                "{:?} kept only {:.5} of its draws",
+                $hands,
+                result.acceptance()
+            );
+        }};
+    }
+
+    // Every one of these used to give up and report the question impossible.
+    answers!(Omaha, ["AA**", "KK**"]);
+    answers!(OmahaHiLo, ["AA**", "KK**"]);
+    answers!(OmahaFive, ["AA***", "KK***"]);
+    answers!(Badugi, ["A23", "A24"]);
+    answers!(DeuceSeven, ["A234", "A235"]);
+    answers!(Stud, ["A23", "A24"]);
+
+    Ok(())
+}

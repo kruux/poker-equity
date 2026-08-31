@@ -6,6 +6,7 @@
 
 mod draw;
 mod matching;
+mod shape;
 
 pub use draw::SlotSampler;
 pub use matching::{has_perfect_matching, is_feasible, maximum_matching};

@@ -93,6 +93,14 @@ pub enum EquityError {
     /// A board shorter than the game's floor: how many it shows before the
     /// betting, and how many were named. Only Courchevel has a floor at all.
     NotEnoughBoardCards { least: usize, found: usize },
+    /// The sampler gave up looking for deals. How many draws it made, and
+    /// how many of them it could use.
+    ///
+    /// This is not [`Infeasible`](Self::Infeasible) and must never be worded
+    /// as though it were: feasibility is proved before sampling starts, so
+    /// the request certainly has deals. The seats simply want the same cards
+    /// too often for a draw to find them.
+    SamplingStalled { attempts: u64, found: u64 },
     /// A precision no run can reach. A standard error falls as `1/sqrt(n)`,
     /// so it approaches zero without arriving, and a target of zero -- or of
     /// anything that is not a positive, finite number -- is a promise the
@@ -133,6 +141,14 @@ impl EquityError {
                 least,
                 if *least == 1 { "" } else { "s" },
                 found
+            ),
+            EquityError::SamplingStalled { attempts, found } => format!(
+                "gave up after {} draws, of which only {} could be used. The request \
+                 is satisfiable -- that was settled before any card was dealt -- but \
+                 the seats want the same cards too often for sampling to keep up, so \
+                 this is a limit of the engine rather than of the question. Naming \
+                 more of the cards is what loosens it",
+                attempts, found
             ),
             EquityError::UnreachableTarget(wanted) => format!(
                 "a standard error target must be positive and finite, and {} is not; \
