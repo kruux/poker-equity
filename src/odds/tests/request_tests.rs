@@ -108,6 +108,7 @@ fn test_reserving_named_cards_does_not_bias_the_deal() -> Result<(), PokerError>
 /// twice, and the pot must come out whole.
 #[test]
 fn test_a_full_ring_of_stud_plays_out() -> Result<(), PokerError> {
+    use crate::error::EquityError;
     use crate::variants::{PokerVariant, Razz, Stud, StudHiLo};
 
     let eight = [
@@ -199,13 +200,18 @@ fn test_a_full_ring_of_stud_plays_out() -> Result<(), PokerError> {
         low
     );
 
-    // A seat may still be short of cards: stud fields arrive street by
-    // street, so a full ring on third street is three cards each.
-    let third_street = ["Ah", "4s", "7d", "Tc", "Kh", "4h", "7s", "Td"];
-    let early = EquityRequest::from_text(Stud, &third_street, "", "")?;
-    assert_eq!(early.hole_cards(), 6);
-    assert_eq!(early.board_cards(), 1);
-    assert_eq!(run_chunk(&early, 5_000, 2)?.samples, 5_000);
+    // A full ring is still short of cards on third street, and says so: six
+    // apiece rather than seven, with the seventh in the middle.
+    assert_eq!(request.hole_cards(), 6);
+    assert_eq!(request.board_cards(), 1);
+
+    // Third street is as early as a stud hand goes. Two cards is not an
+    // earlier street, it is a hand that was never dealt.
+    let two_each = ["Ah2c", "4s5h", "7d8s", "TcJd", "Kh2d", "4h5c", "7s8h", "TdJs"];
+    assert!(matches!(
+        EquityRequest::from_text(Stud, &two_each, "", ""),
+        Err(PokerError::Equity(EquityError::NotEnoughCards(2)))
+    ));
 
     // Nine seats cannot be dealt at all, shared card or not: nine sixes and
     // one in the middle is fifty-five.
@@ -357,6 +363,54 @@ fn test_how_much_of_the_board_may_be_known() -> Result<(), PokerError> {
     // Five-card Omaha is the same game without that rule, so it may show
     // nothing at all.
     assert!(EquityRequest::from_text(OmahaFive, &["AhKh7c2d3c", "QsQdJsTd4h"], "", "").is_ok());
+
+    Ok(())
+}
+
+/// Exact mode declines a spot it cannot walk, rather than trying.
+///
+/// The walk chooses a holding for each seat in turn and skips any that clashes
+/// with one already chosen. A skip is work done with no deal to show for it,
+/// so counting deals is no limit at all on a table whose seats want the same
+/// cards: six stud seats with four cards to come each is 211,876 holdings
+/// apiece, and sifting those combinations for the few that do not clash ran
+/// for as long as it was left to.
+///
+/// Counting the combinations first is what makes the answer immediate. It is
+/// an overcount, since it ignores the clashes, but it errs towards declining
+/// -- and declining means sampling, which answers the question anyway.
+#[test]
+fn test_a_spot_too_large_to_walk_is_declined_rather_than_attempted() -> Result<(), PokerError> {
+    use crate::variants::{Holdem, Stud, StudHiLo};
+
+    let crowded = EquityRequest::from_text(
+        StudHiLo,
+        &["KhKc9d", "QhQc8d", "Ah3c7d", "2h4c6d", "3h5c4d", "4h6c8h"],
+        "",
+        "",
+    )?;
+    assert!(
+        run_exact(&crowded)?.is_none(),
+        "six seats with four cards to come each cannot be walked"
+    );
+    // And it is still a question, just a sampled one.
+    assert_eq!(run_chunk(&crowded, 5_000, 5)?.samples, 5_000);
+
+    // Two stud seats two cards from home is 741,321 combinations at the
+    // outside, so that one is walked.
+    let settled = EquityRequest::from_text(Stud, &["AhKhQhJhTh", "AsKsQsJsTs"], "", "")?;
+    assert_eq!(
+        run_exact(&settled)?.expect("small enough to walk").samples,
+        671_580
+    );
+
+    // The board is counted separately from the seats, so a preflop hold'em
+    // spot with both hands named is walked however many boards there are.
+    let preflop = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?;
+    assert_eq!(
+        run_exact(&preflop)?.expect("one board at a time").samples,
+        1_712_304
+    );
 
     Ok(())
 }

@@ -74,6 +74,12 @@ fn certain_cards(alternatives: &[Vec<CardSet>]) -> CardSet {
         .unwrap_or(CardSet::EMPTY)
 }
 
+/// How many cards a stud hand holds on the street it starts from.
+///
+/// Two down and one up, and the game has no earlier street than that, so a
+/// shorter field is a miscount rather than a hand caught mid-deal.
+const THIRD_STREET: usize = 3;
+
 /// Whether this deal runs the deck out, so that the last card is shared.
 ///
 /// Seven-card stud gives every player seven cards, which is more than a deck
@@ -138,6 +144,11 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             let first = counts.next().flatten();
             if counts.any(|count| count != first) {
                 return Err(EquityError::UnequalHandSizes.into());
+            }
+            // And third street is where a stud hand starts. One or two cards
+            // is not an earlier street, it is a hand that was never dealt.
+            if let Some(count) = first.filter(|count| *count < THIRD_STREET) {
+                return Err(EquityError::NotEnoughCards(count).into());
             }
         }
 
@@ -487,7 +498,22 @@ where
 
     // Each seat's possible holdings, listed once. A seat whose hand is too
     // loose to list makes the whole request too large to enumerate.
+    //
+    // The running product is what decides that, and it has to be checked as
+    // the seats are listed rather than afterwards. The walk below skips a
+    // holding that clashes with one already chosen, and a skip is work done
+    // without a deal to show for it -- so on a table where the seats want the
+    // same cards, the budget below barely moves while the search runs for
+    // ever. Six stud seats with four cards to come each is 211,876 holdings
+    // apiece and 9 x 10^30 combinations to sift; counting them first turns
+    // that from a hang into an immediate "sample this instead".
+    //
+    // The product ignores those clashes, so it overstates the real number of
+    // deals. That is the safe direction: it can only decline a spot that
+    // could have been walked, and declining means sampling, which answers the
+    // question either way.
     let mut choices: Vec<Vec<Vec<Card>>> = Vec::with_capacity(seats);
+    let mut combinations: u128 = 1;
     for alternatives in &request.seats {
         let mut sets = Vec::new();
         for sampler in alternatives {
@@ -497,6 +523,10 @@ where
             }
         }
         if sets.is_empty() {
+            return Ok(None);
+        }
+        combinations = combinations.saturating_mul(sets.len() as u128);
+        if combinations > limit as u128 {
             return Ok(None);
         }
         choices.push(sets);
