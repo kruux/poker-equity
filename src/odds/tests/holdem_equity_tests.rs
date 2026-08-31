@@ -10,6 +10,7 @@
 //! confirmed every one of them to within its sampling error, and the exact
 //! value is what is asserted now.
 
+use super::support::assert_walked;
 use crate::{
     error::{EquityError, GameError, PokerError},
     notation::NotationErrorKind,
@@ -17,41 +18,19 @@ use crate::{
     variants::Holdem,
 };
 
-/// The exact equities of a spot, as percentages.
-fn walked(hands: &[&str], board: &str) -> Result<Vec<f64>, PokerError> {
-    let request = EquityRequest::from_text(Holdem, hands, board, "")?;
-    let result = run_exact(&request)?.expect("these spots are small enough to walk");
-    Ok(result
-        .equities()
-        .iter()
-        .map(|player| player.equity * 100.0)
-        .collect())
+/// A hold'em spot: the hands and however much of the board is known.
+fn spot(hands: &[&str], board: &str) -> Result<EquityRequest<Holdem>, PokerError> {
+    EquityRequest::from_text(Holdem, hands, board, "")
 }
 
-/// Asserts the walked equities are the expected ones, to a millionth of a
-/// percentage point -- which is the precision the figures below are written
-/// to, and some of them do not terminate: 890/990 is 89.898989...
-///
-/// An exact answer has no error bar, so this is not a tolerance for sampling.
-/// It is the width of the decimal the number is quoted at.
-fn assert_walked(hands: &[&str], board: &str, expected: &[f64]) -> Result<(), PokerError> {
-    let got = walked(hands, board)?;
-    assert_eq!(got.len(), expected.len(), "one share per seat");
-    for (seat, (found, want)) in got.iter().zip(expected).enumerate() {
-        assert!(
-            (found - want).abs() < 1e-6,
-            "{:?} on {:?}: seat {} took {:.6}%, expected {:.6}%",
-            hands,
-            board,
-            seat,
-            found,
-            want
-        );
-    }
-    // And the pot is handed out exactly once.
-    let total: f64 = got.iter().sum();
-    assert!((total - 100.0).abs() < 1e-9, "the shares summed to {}", total);
-    Ok(())
+/// Walks a spot and checks every seat's share, naming it by what was dealt.
+fn assert_holdem(hands: &[&str], board: &str, expected: &[f64]) -> Result<(), PokerError> {
+    let what = if board.is_empty() {
+        format!("{:?} preflop", hands)
+    } else {
+        format!("{:?} on {}", hands, board)
+    };
+    assert_walked(&spot(hands, board)?, expected, &what)
 }
 
 /// A request the engine cannot answer is refused when it is built, before any
@@ -115,11 +94,11 @@ fn test_a_bad_holdem_request_is_refused_with_a_reason() -> Result<(), PokerError
 fn test_holdem_equities_preflop() -> Result<(), PokerError> {
     // The coin flip that is not quite a coin flip: two overcards against the
     // smallest pair.
-    assert_walked(&["AhKh", "2h2d"], "", &[49.702389, 50.297611])?;
+    assert_holdem(&["AhKh", "2h2d"], "", &[49.702389, 50.297611])?;
 
     // A third hand takes from both, and not evenly: the queens beat the
     // deuces for most of what the deuces lose.
-    assert_walked(
+    assert_holdem(
         &["AhKh", "2h2d", "QcQd"],
         "",
         &[38.198271, 16.934208, 44.867521],
@@ -127,7 +106,7 @@ fn test_holdem_equities_preflop() -> Result<(), PokerError> {
 
     // Ace-ten offsuit against suited connectors, the classic "am I really
     // ahead" spot. Ahead, but by less than the ace suggests.
-    assert_walked(&["AcTs", "6c7c"], "", &[59.748911, 40.251089])?;
+    assert_holdem(&["AcTs", "6c7c"], "", &[59.748911, 40.251089])?;
 
     Ok(())
 }
@@ -137,18 +116,18 @@ fn test_holdem_equities_preflop() -> Result<(), PokerError> {
 fn test_holdem_equities_with_a_board() -> Result<(), PokerError> {
     // Two pair against a pair of deuces: 990 run-outs, and the deuces need
     // one of the two left.
-    assert_walked(&["AhKh", "2h2d"], "AcKcQc", &[89.898990, 10.101010])?;
+    assert_holdem(&["AhKh", "2h2d"], "AcKcQc", &[89.898990, 10.101010])?;
 
     // One card to come, forty-four of them, seven of which save the deuces.
-    assert_walked(&["AhKh", "2h2d"], "AcKcQcJc", &[84.090909, 15.909091])?;
+    assert_holdem(&["AhKh", "2h2d"], "AcKcQcJc", &[84.090909, 15.909091])?;
 
     // A wet flop turns the ace-high hand from a favourite into a coin flip:
     // the flush draw and the open-ender together are worth almost exactly
     // what the ace was worth.
-    assert_walked(&["AcTs", "6c7c"], "Jc8c3h", &[51.010101, 48.989899])?;
+    assert_holdem(&["AcTs", "6c7c"], "Jc8c3h", &[51.010101, 48.989899])?;
 
     // Three ways, where the draw is the favourite and the made pair is not.
-    assert_walked(
+    assert_holdem(
         &["AhKd", "JsTs", "5h5c"],
         "Qc9h4s",
         &[11.849391, 50.387597, 37.763012],
