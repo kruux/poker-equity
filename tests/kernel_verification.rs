@@ -178,7 +178,7 @@ fn five_card_hands_exhaustive() {
     assert_eq!(hands.len(), 2_598_960, "C(52,5)");
     let checked = hands.len();
     report(
-        disagreements(hands.into_iter(), |h| HighHandRank::evaluate(h), high_score),
+        disagreements(hands.into_iter(), HighHandRank::evaluate, high_score),
         checked,
         "five-card hands",
     );
@@ -218,7 +218,7 @@ fn seven_card_hands_from_a_reduced_deck() {
     }
     let checked = hands.len();
     report(
-        disagreements(hands.into_iter(), |h| HighHandRank::evaluate(h), high_score),
+        disagreements(hands.into_iter(), HighHandRank::evaluate, high_score),
         checked,
         "seven-card hands from a reduced deck",
     );
@@ -253,7 +253,7 @@ fn seven_card_hands_sampled() {
     }
     let checked = hands.len();
     report(
-        disagreements(hands.into_iter(), |h| HighHandRank::evaluate(h), high_score),
+        disagreements(hands.into_iter(), HighHandRank::evaluate, high_score),
         checked,
         "sampled seven-card hands",
     );
@@ -291,7 +291,7 @@ fn deuce_seven_hands_exhaustive() {
     report(
         disagreements(
             hands.into_iter(),
-            |cards| DeuceSevenRank::evaluate(cards),
+            DeuceSevenRank::evaluate,
             deuce_seven_score,
         ),
         checked,
@@ -333,7 +333,7 @@ fn low_hands_exhaustive() {
     report(
         disagreements(
             hands.into_iter(),
-            |cards| LowHandRank::evaluate(cards),
+            LowHandRank::evaluate,
             low_a5_score,
         ),
         checked,
@@ -372,7 +372,7 @@ fn every_kernel_agrees_on_seven_card_hands() {
     report(
         disagreements(
             hands.iter().cloned(),
-            |cards| HighHandRank::evaluate(cards),
+            HighHandRank::evaluate,
             high_score,
         ),
         checked,
@@ -381,7 +381,7 @@ fn every_kernel_agrees_on_seven_card_hands() {
     report(
         disagreements(
             hands.iter().cloned(),
-            |cards| LowHandRank::evaluate(cards),
+            LowHandRank::evaluate,
             low_a5_score,
         ),
         checked,

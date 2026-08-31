@@ -1,3 +1,3 @@
-pub mod hand;
+mod hand;
 
 pub use hand::Hand;
