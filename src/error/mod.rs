@@ -90,6 +90,9 @@ pub enum EquityError {
     InvalidSimulationCount(usize),
     UnequalHandSizes,
     InvalidCommunityCards(usize),
+    /// More seats than the deck can deal: how many were asked for, and how
+    /// many the game has room for.
+    TooManyPlayers { asked: usize, room: usize },
     /// No deal satisfies the request, with the field at fault named.
     Infeasible(String),
     /// A notation field could not be read.
@@ -104,6 +107,10 @@ impl EquityError {
             EquityError::NotEnoughCards(n) => format!("Not enough cards in hand: {}", n),
             EquityError::InvalidSimulationCount(n) => format!("Invalid number of simulations: {n}"),
             EquityError::UnequalHandSizes => "Starting hands with different sizes".to_string(),
+            EquityError::TooManyPlayers { asked, room } => format!(
+                "{} players is more than this game can deal; the deck seats {}",
+                asked, room
+            ),
             EquityError::Infeasible(field) => {
                 format!("No deal can satisfy {}", field)
             }

@@ -438,7 +438,7 @@ Nothing is published to crates.io or PyPI yet.
 ## Building
 
 ```sh
-cargo test                              # 215 tests, about ten seconds
+cargo test                              # 220 tests, about ten seconds
 cargo test --release -- --ignored       # the exhaustive sweeps
 cargo run --release --bin benchmark     # speed, per game
 ```

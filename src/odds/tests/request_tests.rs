@@ -1,7 +1,8 @@
 //! What a request works out before any card is dealt.
 
 use crate::{
-    cards::Card,
+    cards::{Card, CardSet},
+    variants::{EquityCalculation, PokerType, PokerVariant},
     error::PokerError,
     odds::{run_chunk, run_exact, EquityRequest},
 };
@@ -411,6 +412,108 @@ fn test_a_spot_too_large_to_walk_is_declined_rather_than_attempted() -> Result<(
         run_exact(&preflop)?.expect("one board at a time").samples,
         1_712_304
     );
+
+    Ok(())
+}
+
+/// How many seats each game can actually deal, and what it says past that.
+///
+/// The deck is the limit and it is not the same limit twice: hold'em seats
+/// twenty-three because two cards and a five-card board leave room for
+/// twenty-three, six-card Omaha seats seven, and stud seats eight only
+/// because the eighth seat is what triggers the shared last card.
+///
+/// A caller asking for more than that has almost always looped one time too
+/// many, so the refusal names the count rather than the cards. It used to
+/// come back as "no deal satisfies this request", which sends the reader to
+/// look at their hands when the mistake is in their seat count.
+#[test]
+fn test_each_game_seats_what_its_deck_allows() -> Result<(), PokerError> {
+    use crate::error::EquityError;
+    use crate::variants::{
+        Badugi, Courchevel, DeuceSeven, Holdem, Omaha, OmahaFive, OmahaHiLo, OmahaSix, Razz,
+        ShortDeck, Stud, StudHiLo,
+    };
+
+    /// Deals `seats` distinct fields from this game's own deck, plus whatever
+    /// board it insists on, so the only thing under test is the seat count.
+    fn table<V: PokerVariant + EquityCalculation>(
+        variant: V,
+        seats: usize,
+    ) -> (Vec<String>, String) {
+        let mut deck = variant.deck().iter();
+        let board: String = (0..variant.least_board_cards())
+            .filter_map(|_| deck.next())
+            .map(|card| card.to_string())
+            .collect();
+        // A field is however many cards the game deals, except where the deck
+        // runs out and the last card is shared instead.
+        let hole = variant.hole_cards()
+            - usize::from(
+                matches!(variant.poker_type(), PokerType::Stud)
+                    && seats * variant.hole_cards() > variant.deck().len() as usize,
+            );
+        let hands = (0..seats)
+            .map(|_| (0..hole).filter_map(|_| deck.next()).map(|c| c.to_string()).collect())
+            .collect();
+        (hands, board)
+    }
+
+    macro_rules! seats {
+        ($variant:expr, $room:expr) => {{
+            let (hands, board) = table($variant, $room);
+            let refs: Vec<&str> = hands.iter().map(|h| h.as_str()).collect();
+            let full = EquityRequest::from_text($variant, &refs, &board, "")?;
+            assert_eq!(full.players(), $room, "{} seats {}", $variant.key(), $room);
+            // A full table still deals, rather than merely being accepted.
+            assert_eq!(run_chunk(&full, 200, 5)?.samples, 200);
+
+            // One seat more than there is room for cannot be written out in
+            // text at all -- there are not enough distinct cards to name, so
+            // the notation refuses the empty field first. The masks are where
+            // a caller can actually express it, by handing over the same
+            // holding more times than the deck can seat.
+            let one_more = vec![
+                crate::notation::parse_hand(refs[0], full.hole_cards())?;
+                $room + 1
+            ];
+            let board_masks = crate::notation::parse_board(&board, $variant.board_cards())?;
+            let over = EquityRequest::from_masks($variant, &one_more, &board_masks, CardSet::EMPTY);
+            assert!(
+                matches!(
+                    over,
+                    Err(PokerError::Equity(EquityError::TooManyPlayers { asked, room }))
+                        if asked == $room + 1 && room == $room
+                ),
+                "{} should refuse {} seats by name, got {:?}",
+                $variant.key(),
+                $room + 1,
+                over.map(|_| "accepted")
+            );
+        }};
+    }
+
+    // Two hole cards and a five-card board: (52 - 5) / 2.
+    seats!(Holdem, 23);
+    // The same game on thirty-six cards.
+    seats!(ShortDeck, 15);
+    // Omaha, by how many cards a seat holds.
+    seats!(Omaha, 11);
+    seats!(OmahaFive, 9);
+    seats!(OmahaSix, 7);
+    seats!(OmahaHiLo, 11);
+    // Courchevel holds five like five-card Omaha; its face-up card is part of
+    // the same five-card board.
+    seats!(Courchevel, 9);
+    // Stud would seat seven at seven cards each. The eighth seat is exactly
+    // what makes the last card shared, and six each plus one in the middle is
+    // forty-nine.
+    seats!(Stud, 8);
+    seats!(StudHiLo, 8);
+    seats!(Razz, 8);
+    // Draw games have no board at all.
+    seats!(DeuceSeven, 10);
+    seats!(Badugi, 13);
 
     Ok(())
 }

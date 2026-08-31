@@ -128,6 +128,23 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         // rather than dealt: six cards a seat and one in the middle.
         let shared_last = last_card_is_shared(variant, hands.len());
         let hole = variant.hole_cards() - usize::from(shared_last);
+        let shared = variant.board_cards() + usize::from(shared_last);
+
+        // More seats than the deck can cover is a miscount, and almost always
+        // a loop that ran one turn long. It is checked before anything is
+        // asked about the fields, because the seat count is knowable without
+        // reading them and it is the more useful thing to be told: a caller
+        // who passed twenty-four hold'em hands wants to hear about the
+        // twenty-four, not that their cards do not fit.
+        let room = (variant.deck().len() as usize).saturating_sub(shared) / hole.max(1);
+        if hands.len() > room {
+            return Err(EquityError::TooManyPlayers {
+                asked: hands.len(),
+                room,
+            }
+            .into());
+        }
+
         let cards_arrive_over_time = matches!(
             variant.poker_type(),
             PokerType::Draw | PokerType::Stud
@@ -182,7 +199,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             }
         }
 
-        let board_slots = variant.board_cards() + usize::from(shared_last);
+        let board_slots = shared;
         if board.len() > board_slots {
             return Err(EquityError::InvalidCommunityCards(board.len()).into());
         }
