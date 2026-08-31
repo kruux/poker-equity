@@ -1,22 +1,13 @@
 
-use crate::{cards::Deck, error::PokerError, hand::Hand, odds::EquityCalculator};
+use crate::{error::PokerError, hand::Hand};
 
-use super::{LowHandRank, PokerVariant};
+use super::{
+    Badugi, DeuceSeven, Holdem, LowHandRank, PokerVariant, Razz, ShortDeck, Stud,
+};
 
-mod badugi;
-mod community_base;
-mod deuce_seven;
-mod holdem;
 mod omaha;
 mod omaha_hi_lo;
-mod razz;
-mod short_deck;
-mod stud;
-mod stud_base;
 mod stud_hi_lo;
-
-pub(crate) use community_base::CommunityCardGame;
-pub(crate) use stud_base::StudCardGame;
 
 /// Implemented by hand ranks that carry a low half, so that split games can
 /// ask for it without knowing the concrete rank type.
@@ -25,35 +16,17 @@ pub trait HasLow {
     fn low(&self) -> Option<&LowHandRank>;
 }
 
-/// What the equity engine needs from a game beyond how to score a hand:
-/// how to check a request makes sense, how to deal one hand, and how to split
-/// the pot afterwards.
+/// How a game splits the pot once the cards are out.
 ///
-/// Most of it has a default that suits every game that awards the whole pot
-/// to one hand; a split game overrides the awarding.
+/// Everything else about a variant is in [`PokerVariant`]; this is only the
+/// awarding. Every method has a default that suits a game handing the whole
+/// pot to the best hand, so a game that does exactly that implements this
+/// with an empty block. What is overridden is a split pot, and Omaha, which
+/// can find its winners faster than the general loop can.
 pub trait EquityCalculation: PokerVariant
 where
     Self: Sized,
 {
-    /// Rejects a request this variant cannot simulate, before any sampling
-    /// starts. Each variant checks its own hand sizes and board rules on top
-    /// of the shared checks in `EquityCalculator::validate_base`.
-    fn validate(&self, calculator: &EquityCalculator<Self>) -> Result<(), PokerError>;
-
-    /// Deals one complete hand from `deck` and *adds* each player's share of
-    /// the pot to `shares`, which is indexed by seat in the order players were
-    /// added. The shares from one deal sum to one, and a split game may add
-    /// fractions other than halves.
-    ///
-    /// Adding rather than assigning lets the caller accumulate a whole chunk
-    /// in one buffer, so nothing is allocated per deal.
-    fn run_single_simulation(
-        &self,
-        deck: Deck,
-        calculator: &EquityCalculator<Self>,
-        shares: &mut [f64],
-    ) -> Result<(), PokerError>;
-
     /// Adds each player's share of one deal's pot to `shares`, by seat.
     ///
     /// The default gives the whole pot to the best hand, split evenly among
@@ -170,6 +143,14 @@ where
         winners
     }
 }
+
+/// The games that split no pot and take every default above.
+impl EquityCalculation for Holdem {}
+impl EquityCalculation for ShortDeck {}
+impl EquityCalculation for Stud {}
+impl EquityCalculation for Razz {}
+impl EquityCalculation for DeuceSeven {}
+impl EquityCalculation for Badugi {}
 
 /// A set of seats at one table, as one bit each.
 ///

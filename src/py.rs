@@ -17,7 +17,7 @@ use crate::cards::{Card, CardSet};
 use crate::error::PokerError;
 use crate::notation::{parse_dead, parse_hand, parse_hand_up_to, HandSpec};
 use crate::odds::{
-    default_threads, run_batch, run_chunk, run_exact, ChunkResult, EquityRequest,
+    default_threads, run_batch, run_exact, ChunkResult, EquityRequest,
 };
 use crate::variants::*;
 

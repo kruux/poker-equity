@@ -1,9 +1,7 @@
-mod calculator;
 mod chunk;
 mod request;
 mod runner;
 
-pub use calculator::{EquityCalculator, SimulationProgress};
 pub use chunk::{ChunkResult, PlayerEquity};
 pub use request::{run_chunk, run_exact, run_exact_within, EquityRequest, EXACT_DEAL_LIMIT};
 pub use runner::{
