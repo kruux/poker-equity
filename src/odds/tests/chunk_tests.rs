@@ -578,11 +578,17 @@ fn test_a_deal_that_cannot_be_filled_is_drawn_again() -> Result<(), PokerError> 
 
     // A seat taking any card alongside one that wants a five: dealing the
     // fussier seat first means the wildcard cannot take its card first.
+    //
+    // Not quite everything is kept, and the shortfall is not competition. A
+    // seat written `5 *` draws its five first and its open card after, so a
+    // hand holding two fives is reachable twice -- either could have been the
+    // named one -- and is dropped half the time to make up for it. Both fives
+    // is 3 cards in 51, so it costs about three deals in a hundred.
     for hands in [["* *", "5 *"], ["5 *", "* *"]] {
         let request = EquityRequest::from_text(Holdem, &hands, "", "")?;
         let kept = run_chunk(&request, 20_000, 2)?.acceptance();
         assert!(
-            kept > 0.99,
+            kept > 0.95,
             "{:?} kept only {:.1}% of deals; the fussier seat should be dealt first",
             hands,
             kept * 100.0

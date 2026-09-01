@@ -61,8 +61,27 @@ pub struct SlotSampler {
     fixed: Vec<Card>,
     /// What is left to draw for once the forced slots are settled.
     slots: Vec<CardSet>,
+    /// The slots that want particular cards, drawn for by `strategy`.
+    ///
+    /// Empty when every slot takes anything, which is the ordinary case.
+    constrained: Vec<CardSet>,
+    /// How many slots take anything at all, drawn from whatever is left once
+    /// the constrained ones have chosen.
+    open: usize,
+    /// Whether no two constrained slots want the same card, which is true of
+    /// every field the notation can write -- named ranks do not overlap, nor
+    /// do named suits. It makes the multiplicity a product rather than a
+    /// walk over subsets.
+    disjoint: bool,
     strategy: Strategy,
 }
+
+/// The most slots that will be split into constrained and open.
+///
+/// The multiplicity below walks the subsets of a drawn hand, so the width has
+/// to be bounded. No game deals more than seven cards, and a wider slot list
+/// falls back to drawing the hand whole.
+const MOST_SPLIT_SLOTS: usize = 8;
 
 /// Pulls out the slots that admit exactly one card.
 ///
@@ -101,13 +120,46 @@ impl SlotSampler {
         let (fixed, slots) = extract_forced(slots, available);
         let free = available.without(CardSet::from_cards(&fixed));
 
-        let pool = slots
+        // Nothing to decide when every slot takes anything still on offer.
+        let unconstrained = slots.iter().all(|slot| free.without(*slot).is_empty());
+
+        // The slots that want particular cards are drawn for separately from
+        // the ones that will take anything, and that split is what makes a
+        // multi-way spot workable. A seat's picky cards are few -- three, for
+        // a razz hand written as three ranks -- and only those have to be
+        // drawn against the whole deck and thrown away when an earlier seat
+        // has taken one. The four cards that take anything are drawn from
+        // what is actually left, so they never collide with anybody.
+        //
+        // Drawing them from what is left is safe precisely because it is not
+        // renormalised: the draw is uniform over `C(cards left, open slots)`,
+        // and every seat takes the same number of cards whatever they are, so
+        // that count is the same down every branch of the deal. It is
+        // dividing by the number of hands a seat has left -- not drawing from
+        // them -- that would favour the deals following a card-hungry seat.
+        let constrained: Vec<CardSet> = if unconstrained || slots.len() > MOST_SPLIT_SLOTS {
+            Vec::new()
+        } else {
+            slots
+                .iter()
+                .filter(|slot| !free.without(**slot).is_empty())
+                .copied()
+                .collect()
+        };
+        let open = slots.len() - constrained.len();
+        let disjoint = constrained.iter().enumerate().all(|(index, slot)| {
+            constrained[index + 1..]
+                .iter()
+                .all(|other| slot.is_disjoint(*other))
+        });
+
+        // What the picky slots are drawn from. Falls back to the whole slot
+        // list when the split was refused, which keeps the old behaviour.
+        let planned: &[CardSet] = if constrained.is_empty() { &slots } else { &constrained };
+        let pool = planned
             .iter()
             .fold(CardSet::EMPTY, |all, slot| all.union(*slot))
             .intersection(free);
-
-        // Nothing to decide when every slot takes anything still on offer.
-        let unconstrained = slots.iter().all(|slot| free.without(*slot).is_empty());
 
         // Counting comes before listing, and settles which of the two the
         // slots want. The shapes give the exact number of valid sets without
@@ -117,7 +169,7 @@ impl SlotSampler {
         // nobody has to do.
         let strategy = if unconstrained {
             Strategy::Free
-        } else if let Some(plan) = ShapePlan::build(&slots, pool) {
+        } else if let Some(plan) = ShapePlan::build(planned, pool) {
             // No hand at all is a listable answer -- the empty list -- and
             // says so at every draw. Seven slots wanting an ace apiece is
             // the shape of it.
@@ -135,8 +187,58 @@ impl SlotSampler {
         Self {
             fixed,
             slots,
+            constrained,
+            open,
+            disjoint,
             strategy,
         }
+    }
+
+    /// How many ways the constrained slots could have been filled from
+    /// `cards`, which is what the split has to be corrected for.
+    ///
+    /// Drawing the picky cards and then the open ones reaches a hand once per
+    /// way of splitting it. A razz hand holding two aces could have had
+    /// either as its named ace and the other among the open cards, so it
+    /// arrives twice as often as it should. Keeping it with probability
+    /// `1/multiplicity` puts that right, and the correction almost never
+    /// fires: a hand with exactly one of each named rank counts one.
+    ///
+    /// No two constrained slots overlap in anything the notation can write,
+    /// and then the count is just how many of the drawn cards each slot
+    /// wants, multiplied. The general form walks the subsets instead.
+    fn multiplicity(&self, cards: &[Card]) -> u32 {
+        if self.disjoint {
+            return self
+                .constrained
+                .iter()
+                .map(|slot| cards.iter().filter(|card| slot.contains(**card)).count() as u32)
+                .product();
+        }
+
+        // Sets, not assignments. Two slots both wanting an ace can be filled
+        // from one pair of aces two ways round, and that is one way to have
+        // drawn the hand, not two -- counting the orderings would throw away
+        // half of every `AA**` for nothing.
+        let width = cards.len();
+        let mut chosen = [cards[0]; MOST_SPLIT_SLOTS];
+        let mut ways = 0;
+        for mask in 0..(1u32 << width) {
+            if mask.count_ones() as usize != self.constrained.len() {
+                continue;
+            }
+            let mut taken = 0;
+            for (index, card) in cards.iter().enumerate() {
+                if mask >> index & 1 == 1 {
+                    chosen[taken] = *card;
+                    taken += 1;
+                }
+            }
+            if has_perfect_matching(&self.constrained, &chosen[..taken]) {
+                ways += 1;
+            }
+        }
+        ways
     }
 
     /// The same sampler, forced to draw and test.
@@ -153,6 +255,9 @@ impl SlotSampler {
         Self {
             fixed: Vec::new(),
             slots,
+            constrained: Vec::new(),
+            open: 0,
+            disjoint: true,
             strategy: Strategy::DrawAndTest { pool },
         }
     }
@@ -240,8 +345,31 @@ impl SlotSampler {
 
         if !filled {
             out.clear();
+            return false;
         }
-        filled
+
+        // The slots that take anything are filled last, from what is left
+        // rather than from the whole deck, so they never clash with a seat
+        // that has already drawn.
+        if self.open > 0 && !self.constrained.is_empty() {
+            for &card in &out[drawn_from..] {
+                available.remove(card);
+            }
+            if !draw_subset(available, self.open, rng, out) {
+                out.clear();
+                return false;
+            }
+
+            // A hand reachable several ways arrives that many times too
+            // often, so it is kept one time in that many.
+            let ways = self.multiplicity(&out[drawn_from..]);
+            if ways > 1 && rng.gen_range(0..ways) != 0 {
+                out.clear();
+                return false;
+            }
+        }
+
+        true
     }
 }
 

@@ -273,15 +273,23 @@ fn test_open_suits_are_shaped_not_searched() {
         "AA** covers 6,961 hands"
     );
 
-    // A razz hand of three named ranks covers 9,215,488, which is far too
-    // many to hold and no trouble to count -- so it is drawn from by shape.
+    // A razz hand of three named ranks covers 9,215,488 in full, which is far
+    // too many to hold. Only the three picky slots are planned for, though,
+    // and those cover 64 -- so the plan is listed and the four open cards are
+    // drawn from whatever is left when the other seats have taken theirs.
     let razz = [
         ace,
         CardSet::of_rank(Rank::Two),
         CardSet::of_rank(Rank::Three),
         any, any, any, any,
     ];
-    assert_eq!(SlotSampler::new(&razz, CardSet::FULL_DECK).strategy(), "shaped");
+    let sampler = SlotSampler::new(&razz, CardSet::FULL_DECK);
+    assert_eq!(sampler.strategy(), "listed");
+    assert_eq!(
+        sampler.all_sets(CardSet::FULL_DECK, 20_000_000).map(|sets| sets.len()),
+        Some(9_215_488),
+        "the whole hand is still 9,215,488, counted without building one"
+    );
 
     // Naming the suits leaves nothing to decide, as it always did.
     let named = [set("Ah"), set("2c"), set("3d"), any, any, any, any];
@@ -307,7 +315,6 @@ fn test_shaped_draws_match_draw_and_test() {
     ];
 
     let shaped = SlotSampler::new(&slots, CardSet::FULL_DECK);
-    assert_eq!(shaped.strategy(), "shaped", "this shape is too wide to list");
     let tested = SlotSampler::forcing_draw_and_test(&slots, CardSet::FULL_DECK);
 
     let count = |sampler: &SlotSampler, seed: u64| {
