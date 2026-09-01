@@ -41,11 +41,6 @@ than greedy: several calculators may be open at once and one must not starve
 the others. `EquityRequest::with_threads` takes as many as you want to give
 it, and nothing needs passing to get the default.
 
-Courchevel is not a variant of its own: it is five-card Omaha with the first
-board card face up before the betting, so it is the same evaluation plus one
-rule about what a legal board looks like — which is why it runs at the same
-speed as the game it is.
-
 Both draw games model **one** draw. Equity in triple draw is undefined without
 a drawing strategy — a made eight-low and a four-card draw are not comparable
 until you say how the draw resolves — so one draw is modelled and said so,
@@ -148,6 +143,42 @@ makes the count wrong, the error says so.
 "2c"        // the deuce of clubs — one card
 "AA**"      // two aces and two unknowns (Omaha)
 ```
+
+### What a wildcard costs
+
+A card you name exactly gets dealt. A card you only describe -- `A`, `c`, `*`
+-- has to be *found*: the engine deals, checks the cards fit every seat, and
+deals again if they do not. A single simulation can take several tries. The
+answer is the same either way; only the time changes.
+
+It gets slower the more seats are being vague at once, and it is worst in the
+stud family, where each player holds seven private cards -- four-handed stud
+claims twenty-eight of the fifty-two before anything is scored.
+
+| Spot | Deals tried per simulation |
+|---|---|
+| `AA` vs `KK`, hold'em | 1 |
+| `AA**` vs `KK**`, Omaha | 1.2 |
+| `A23` vs `456`, stud | 3 |
+| `AA**` six-handed, Omaha | 7 |
+| `A23` four-handed, stud | 42 |
+| `A23` any number of ways, razz | 1 |
+
+Every result carries `acceptance`, the share of deals that were usable, so what
+a question cost is always on the answer.
+
+**Razz needs no suits.** It has no flushes and never looks at a suit, so `A23`
+and `Ah2h3h` ask the same question -- and the engine pins the suits for you
+when you leave them off. Razz runs at one deal per simulation however many
+players are in the hand, so writing suits there buys nothing.
+
+Everywhere else, writing the suits you actually mean is what turns a search
+back into a deal. A real hand has suits; naming them is both more faithful to
+the spot and far quicker to answer.
+
+The underlying problem, if you want to read about it, is rejection sampling for
+a uniformly random bipartite matching -- one deal that satisfies every seat at
+once, drawn without favouring any of them.
 
 ### Ranges
 
