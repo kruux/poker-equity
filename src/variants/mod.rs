@@ -106,6 +106,23 @@ pub trait PokerVariant: Clone + Copy {
         None
     }
 
+    /// Whether a card's suit can change how a hand scores.
+    ///
+    /// True almost everywhere, and it has to be: hold'em, stud and the Omaha
+    /// family all have flushes, deuce-to-seven counts them against you, and
+    /// badugi is decided on suits being distinct. Razz is the one game that
+    /// never looks at a suit.
+    ///
+    /// Where it is false, a field that names a rank and leaves the suit open
+    /// can be pinned to one particular card of that rank without changing the
+    /// answer -- whichever card is chosen, the deck is left holding the same
+    /// ranks, and ranks are all the game can see. That turns the hardest
+    /// fields to sample into the easiest. This is a fact about the game's
+    /// scoring, so it is declared here rather than guessed at from a field.
+    fn suits_matter(&self) -> bool {
+        true
+    }
+
     /// The variant's display name.
     fn to_string(&self) -> String;
 

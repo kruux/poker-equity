@@ -34,6 +34,13 @@ impl PokerVariant for Razz {
         "razz"
     }
 
+    /// Razz is the one game here that never reads a suit: no flushes, and
+    /// nothing about which suits a hand holds. `low_a5_score` is handed no
+    /// flush table at all, which is the same fact stated in code.
+    fn suits_matter(&self) -> bool {
+        false
+    }
+
     fn score(&self, cards: &[Card]) -> u32 {
         low_a5_score(cards) as u32
     }

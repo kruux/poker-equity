@@ -7,7 +7,7 @@
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 
 use crate::{
-    cards::{Card, CardSet},
+    cards::{Card, CardSet, Rank},
     error::{EquityError, GameError, PokerError},
     hand::Hand,
     notation::{parse_board, parse_dead, parse_hand, parse_hand_up_to, HandSpec},
@@ -72,6 +72,78 @@ fn certain_cards(alternatives: &[Vec<CardSet>]) -> CardSet {
         })
         .reduce(|all, alternative| all.intersection(alternative))
         .unwrap_or(CardSet::EMPTY)
+}
+
+/// Whether a slot is a whole rank with the suit left open -- `A`, and not
+/// `Ah` or `c` or `*`.
+fn names_only_a_rank(slot: CardSet) -> bool {
+    Rank::all().iter().any(|rank| CardSet::of_rank(*rank) == slot)
+}
+
+/// Gives every open-suit rank slot one particular card of that rank.
+///
+/// Only sound where suits cannot affect scoring -- see
+/// [`PokerVariant::suits_matter`] -- and there it costs nothing and saves a
+/// great deal. `A23` in razz means an ace, a deuce and a three of no
+/// particular suit, and sampling it means drawing three cards that are free
+/// to be any of four apiece, then correcting for the hand that draws a second
+/// ace among its open cards. Pinning them to `Ah 2c 3d` instead leaves the
+/// deck holding exactly the same ranks in exactly the same numbers, so razz
+/// cannot tell the difference -- and the slots become single cards, which the
+/// sampler settles before it draws anything.
+///
+/// Returns `None` when the request should be left alone: a seat offering
+/// several holdings, where the pinning would have to be consistent across
+/// alternatives that are meant to be exclusive; or a rank with no card left
+/// to give, which is a request the feasibility check should report in its own
+/// words rather than one this should quietly mangle.
+fn pin_open_suits(
+    hands: &[HandSpec],
+    board: &[CardSet],
+    available: CardSet,
+) -> Option<(Vec<HandSpec>, Vec<CardSet>)> {
+    if hands.iter().any(|spec| spec.alternatives.len() != 1) {
+        return None;
+    }
+
+    // A card named outright is already spoken for and cannot be handed to a
+    // rank slot as well.
+    let mut taken = CardSet::EMPTY;
+    for slot in hands
+        .iter()
+        .flat_map(|spec| spec.alternatives[0].iter())
+        .chain(board.iter())
+    {
+        if slot.len() == 1 {
+            taken = taken.union(*slot);
+        }
+    }
+
+    let pin = |slot: &mut CardSet, taken: &mut CardSet| -> Option<()> {
+        if !names_only_a_rank(*slot) {
+            return Some(());
+        }
+        let card = slot.intersection(available).without(*taken).iter().next()?;
+        taken.insert(card);
+        *slot = CardSet::from_cards(&[card]);
+        Some(())
+    };
+
+    let mut pinned: Vec<HandSpec> = Vec::with_capacity(hands.len());
+    for spec in hands {
+        let mut slots = spec.alternatives[0].clone();
+        for slot in slots.iter_mut() {
+            pin(slot, &mut taken)?;
+        }
+        pinned.push(HandSpec::from_alternatives(vec![slots]));
+    }
+
+    let mut shared = board.to_vec();
+    for slot in shared.iter_mut() {
+        pin(slot, &mut taken)?;
+    }
+
+    Some((pinned, shared))
 }
 
 /// How many cards a stud hand holds on the street it starts from.
@@ -239,6 +311,23 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         // as a full one, which is how a flop and a river spot share a path.
         let mut board_masks = board.to_vec();
         board_masks.resize(board_slots, CardSet::FULL_DECK);
+
+        // Where suits cannot change the answer, a rank written without one is
+        // given a suit here and stops being a choice at all. Razz is the only
+        // game this fires for, and it is the game that needed it most: `A23`
+        // against `A24` went from keeping a quarter of its deals to keeping
+        // all of them, and four-handed razz from refusing the question to
+        // answering it.
+        let pinned;
+        let hands = if variant.suits_matter() {
+            hands
+        } else if let Some((seats, shared)) = pin_open_suits(hands, &board_masks, available) {
+            pinned = seats;
+            board_masks = shared;
+            &pinned[..]
+        } else {
+            hands
+        };
 
         // Which cards are already spoken for. This does two jobs: it names a
         // card that two participants both claim, which is a mistake worth a

@@ -530,43 +530,63 @@ fn test_each_game_seats_what_its_deck_allows() -> Result<(), PokerError> {
     Ok(())
 }
 
-/// A hand written without suits must sample as well as one written with them,
-/// and must give the same answer.
+/// Pinning a razz field's suits must not move the answer.
 ///
-/// Razz ranks on ranks alone, and `A23` against `A24` leaves the deck holding
-/// exactly the rank multiset that `Ah2c3d` against `As2d4c` leaves. So the
-/// two questions have one answer, and the named form is an independent check
-/// on the unsuited one rather than merely a second opinion.
+/// Razz ranks on ranks alone, so `A23` may be dealt as any ace, any deuce and
+/// any three -- whichever three cards are chosen, the deck is left holding the
+/// same ranks. The request therefore pins them and the seat is dealt without a
+/// single wasted draw.
+///
+/// Checking that needs an unpinned razz to compare against, and writing the
+/// same holding twice is how to get one: `A23, A23` is two alternatives, and
+/// pinning declines a seat offering more than one, since alternatives are
+/// meant to be exclusive. Two identical alternatives are the same question, so
+/// the same spot is asked twice, once down each path.
 ///
 /// This is the regression for a sampler that drew seven cards blind and kept
-/// the 0.4% that happened to hold an ace, a deuce and a three -- correct, and
-/// three hundred times slower than naming the suits.
+/// the few that happened to hold an ace, a deuce and a three.
 #[test]
-fn test_unsuited_fields_sample_as_well_as_named_ones() -> Result<(), PokerError> {
+fn test_pinning_razz_suits_does_not_move_the_answer() -> Result<(), PokerError> {
     use crate::odds::run_batch;
     use crate::variants::Razz;
 
-    let unsuited = EquityRequest::from_text(Razz, &["A23", "A24"], "", "")?;
-    let named = EquityRequest::from_text(Razz, &["Ah2c3d", "As2d4c"], "", "")?;
+    let pinned = EquityRequest::from_text(Razz, &["A23", "A24"], "", "")?;
+    let unpinned = EquityRequest::from_text(Razz, &["A23, A23", "A24, A24"], "", "")?;
 
-    let loose = run_batch(&unsuited, 200_000, 9, 2)?;
-    let tight = run_batch(&named, 200_000, 9, 2)?;
+    let fast = run_batch(&pinned, 200_000, 9, 2)?;
+    let slow = run_batch(&unpinned, 200_000, 9, 2)?;
 
-    assert!(
-        loose.acceptance() > 0.15,
-        "an unsuited razz hand kept only {:.4} of its draws",
-        loose.acceptance()
+    assert_eq!(
+        fast.acceptance(),
+        1.0,
+        "a pinned razz field has nothing left to reject"
     );
 
-    let gap = (loose.equities()[0].equity - tight.equities()[0].equity).abs();
-    let slack = 5.0 * (loose.equities()[0].std_error.powi(2)
-        + tight.equities()[0].std_error.powi(2))
-    .sqrt();
+    let gap = (fast.equities()[0].equity - slow.equities()[0].equity).abs();
+    let slack = 5.0
+        * (fast.equities()[0].std_error.powi(2) + slow.equities()[0].std_error.powi(2)).sqrt();
     assert!(
         gap <= slack,
-        "suits do not matter in razz, yet A23/A24 came to {:.5} and Ah2c3d/As2d4c to {:.5}",
-        loose.equities()[0].equity,
-        tight.equities()[0].equity
+        "pinning moved the answer: {:.5} pinned against {:.5} unpinned",
+        fast.equities()[0].equity,
+        slow.equities()[0].equity
+    );
+
+    // Four seats each wanting an ace and a deuce is four of each, which is
+    // exactly the deck -- unanswerable before, and now dealt every time.
+    let four = EquityRequest::from_text(Razz, &["A23", "A24", "A25", "A26"], "", "")?;
+    assert_eq!(run_batch(&four, 20_000, 3, 2)?.acceptance(), 1.0);
+
+    // A fifth seat wanting an ace is a fifth ace, and is still refused.
+    assert!(EquityRequest::from_text(Razz, &["A23", "A24", "A25", "A26", "A27"], "", "").is_err());
+
+    // Stud deals the same cards and does not get this: it has flushes, so a
+    // suit left open is a real choice and has to be sampled.
+    use crate::variants::Stud;
+    let stud = EquityRequest::from_text(Stud, &["A23", "A24"], "", "")?;
+    assert!(
+        run_batch(&stud, 20_000, 3, 2)?.acceptance() < 1.0,
+        "stud cannot pin a suit, so it must still be drawing for one"
     );
 
     Ok(())
