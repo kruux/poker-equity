@@ -2,8 +2,6 @@ use std::{cmp::Ordering, collections::HashMap, fmt};
 
 use crate::cards::{Card, Rank, Suit};
 
-use super::FastHandRank;
-
 /// Used for many of the usual game types, like hold em and stud
 #[derive(Clone, Debug, Eq, PartialEq, Hash)]
 pub enum HighHandRank {
@@ -354,14 +352,6 @@ impl HighHandRank {
             HighHandRank::HighCard(_) => 1,
             HighHandRank::Incomplete(_) => 0,
         }
-    }
-}
-
-impl From<FastHandRank> for HighHandRank {
-    fn from(_fast_rank: FastHandRank) -> Self {
-        // We can't convert from FastHandRank to HighHandRank anymore since FastHandRank
-        // only contains a score. Instead, we'll need to evaluate the hand directly.
-        unimplemented!("Cannot convert from FastHandRank to HighHandRank - use evaluate() instead")
     }
 }
 
