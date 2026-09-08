@@ -1,6 +1,6 @@
 use crate::error::{EquityError, GameError, PokerError};
 use crate::odds::{run_chunk, run_exact, ChunkResult, EquityRequest};
-use crate::variants::Holdem;
+use crate::variants::{Holdem, Stud};
 
 /// Enumerates a spot exactly, panicking if it is too large.
 fn exact(hands: &[&str], board: &str, dead: &str) -> ChunkResult {
@@ -632,5 +632,41 @@ fn test_dealing_order_does_not_move_the_answer() -> Result<(), PokerError> {
             );
         }
     }
+    Ok(())
+}
+
+/// A sample the engine cannot find says so, and does not call the question
+/// impossible.
+///
+/// Four stud seats each asking for the seven lowest ranks want all twenty-eight
+/// of those cards between them: twenty-eight slots and exactly twenty-eight
+/// cards, so the deals that fit are the perfect partitions and nothing else.
+/// Construction proves one exists -- the request is accepted -- and then a
+/// draw is left hunting for it, and gives up.
+///
+/// The distinction is the whole point of the error. `Infeasible` is a fact
+/// about the question; this is a limit of the engine, and the two must never
+/// be worded as one. If cross-seat contention is ever dealt rather than
+/// rejected, this spot will start answering and this test should be revisited.
+#[test]
+fn test_a_stalled_sample_is_not_called_impossible() -> Result<(), PokerError> {
+    let request = EquityRequest::from_text(Stud, &["A 2 3 4 5 6 7"; 4], "", "")?;
+
+    match run_chunk(&request, 1, 0) {
+        Err(PokerError::Equity(EquityError::SamplingStalled { attempts, found })) => {
+            assert!(attempts > found, "a stall is draws that found nothing");
+            let said = EquityError::SamplingStalled { attempts, found }.description();
+            assert!(
+                !said.contains("impossible") && !said.contains("cannot be satisfied"),
+                "a stall must not be worded as an impossible question: {}",
+                said
+            );
+        }
+        other => panic!(
+            "four fussy stud seats should stall the sampler, got {:?}",
+            other.map(|result| (result.samples, result.attempts))
+        ),
+    }
+
     Ok(())
 }
