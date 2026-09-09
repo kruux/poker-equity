@@ -646,11 +646,16 @@ fn test_dealing_order_does_not_move_the_answer() -> Result<(), PokerError> {
 ///
 /// The distinction is the whole point of the error. `Infeasible` is a fact
 /// about the question; this is a limit of the engine, and the two must never
-/// be worded as one. If cross-seat contention is ever dealt rather than
-/// rejected, this spot will start answering and this test should be revisited.
+/// be worded as one.
+///
+/// This spot no longer stalls on its own: cross-seat contention is now dealt
+/// by weighting rather than rejected, and it answers. So the rejecting path
+/// is asked for by name, because the error it raises still has to be right
+/// for every request that path still handles.
 #[test]
 fn test_a_stalled_sample_is_not_called_impossible() -> Result<(), PokerError> {
-    let request = EquityRequest::from_text(Stud, &["A 2 3 4 5 6 7"; 4], "", "")?;
+    let mut request = EquityRequest::from_text(Stud, &["A 2 3 4 5 6 7"; 4], "", "")?;
+    request.force_rejecting();
 
     match run_chunk(&request, 1, 0) {
         Err(PokerError::Equity(EquityError::SamplingStalled { attempts, found })) => {

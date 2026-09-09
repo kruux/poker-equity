@@ -11,7 +11,7 @@ use crate::{
     error::{EquityError, GameError, PokerError},
     hand::Hand,
     notation::{parse_board, parse_dead, parse_hand, parse_hand_up_to, HandSpec},
-    sampler::{is_feasible, SlotSampler},
+    sampler::{is_feasible, shape::ShapePlan, SlotSampler},
     variants::{EquityCalculation, PokerType, PokerVariant},
 };
 
@@ -47,9 +47,71 @@ pub struct EquityRequest<V: PokerVariant + EquityCalculation> {
     certain: Vec<CardSet>,
     /// Every card spoken for by somebody, which is the union of the above.
     spoken_for: CardSet,
+    /// The raw slots behind `seats`, plus the board's last, in `order`'s
+    /// numbering. The samplers above were built against the opening deck;
+    /// weighted dealing needs the slots themselves so it can count what a
+    /// participant may take from a deck that has already been dealt from.
+    slots: Vec<Vec<Vec<CardSet>>>,
+    /// `ln` of how many holdings each alternative had against the opening
+    /// deck, in the same numbering. The weight of a deal is measured against
+    /// this, which keeps every weight in `0..=1` and, more importantly, keeps
+    /// alternatives weighted against each other exactly as they are today.
+    opening: Vec<Vec<f64>>,
+    /// One shape plan per alternative, built once. Which groups the slots cut
+    /// the deck into never changes as the deal goes on, so the plan is built
+    /// here and only re-weighed against the live deck, which is what makes a
+    /// weighted deal affordable at all.
+    plans: Vec<Vec<Option<ShapePlan>>>,
+    dealing: Dealing,
     players: usize,
     threads: usize,
 }
+
+/// Buffers a weighted deal reuses, so the sampling loop allocates nothing.
+#[derive(Debug, Default)]
+pub(crate) struct WeighingScratch {
+    groups: Vec<CardSet>,
+    cumulative: Vec<u128>,
+}
+
+/// How a request's deals are drawn.
+///
+/// The choice is made once, when the request is built, and never revisited:
+/// chunks merge by addition and two chunks drawn different ways do not merge
+/// at all, so a request that changed its mind halfway would silently corrupt
+/// the sums it was pouring into.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Dealing {
+    /// Draw every participant against the opening deck and throw the whole
+    /// deal away when they clash. Uniform by rejection, and what almost every
+    /// request uses.
+    Rejecting,
+    /// Draw each participant from what is actually left, and weight the deal
+    /// to undo the bias that introduces. Reserved for the spots where
+    /// rejection has all but stopped working.
+    Weighted,
+}
+
+/// The acceptance below which weighted dealing may be considered at all.
+///
+/// A hard floor rather than a comparison, and deliberately so. Weighting is
+/// newer and subtler than rejection, so it is kept away from every spot that
+/// already works well: a bug in the weighted path can then never reach a
+/// hand anybody actually holds.
+///
+/// Where the floor sits is measured rather than chosen -- see
+/// `measure_both_paths` in the tests, which times the two paths against each
+/// other spot by spot. Below a twentieth, weighting wins by between two and
+/// eleven times. Above it the two are within a fifth of each other or
+/// rejection is ahead outright, and a fifth is not worth moving a spot that
+/// already works onto a newer path.
+const WEIGHTING_FLOOR: f64 = 0.05;
+
+/// How much better weighted dealing must be before it is worth the change.
+const WEIGHTING_MARGIN: f64 = 1.5;
+
+/// How many draws the two paths are each given when deciding between them.
+const CALIBRATION_DRAWS: u32 = 2_000;
 
 /// The cards a participant holds in *every* deal the request admits.
 ///
@@ -399,7 +461,68 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             }
         });
 
-        Ok(Self {
+        // The slots themselves, kept alongside the samplers so a weighted
+        // deal can count what is still takeable from a part-dealt deck. The
+        // board goes last, in `order`'s numbering.
+        let mut slot_lists: Vec<Vec<Vec<CardSet>>> = hands
+            .iter()
+            .map(|spec| spec.alternatives.clone())
+            .collect();
+        slot_lists.push(vec![board_masks.clone()]);
+
+        // One plan per alternative, built here and only re-weighed later.
+        let plans: Vec<Vec<Option<ShapePlan>>> = slot_lists
+            .iter()
+            .enumerate()
+            .map(|(which, alternatives)| {
+                let pool = available
+                    .without(spoken_for)
+                    .union(certain[which].intersection(available));
+                alternatives
+                    .iter()
+                    .map(|slots| {
+                        // A participant with no slots -- the board of a game
+                        // that deals none -- has nothing to plan.
+                        if slots.is_empty() {
+                            None
+                        } else {
+                            ShapePlan::build(slots, pool)
+                        }
+                    })
+                    .collect()
+            })
+            .collect();
+
+        // How many holdings each alternative had before a card was dealt.
+        // Every weight is measured against this, which does two things: it
+        // keeps weights in `0..=1`, where they cannot overflow; and it holds
+        // the alternatives in the same proportion to each other that
+        // rejection puts them in. Weighting by the live count alone would
+        // quietly re-weight a range from per-alternative to per-combination,
+        // which is a different answer rather than a faster one.
+        //
+        // A participant with no slots has exactly one way to take nothing, so
+        // it contributes nothing. A plan that could not be built, or one
+        // admitting no holding at all, leaves the weight undefined; both come
+        // back as something that is not finite, which is what keeps weighting
+        // away from this request altogether.
+        let opening: Vec<Vec<f64>> = plans
+            .iter()
+            .zip(slot_lists.iter())
+            .map(|(alternatives, slot_lists)| {
+                alternatives
+                    .iter()
+                    .zip(slot_lists.iter())
+                    .map(|(plan, slots)| match plan {
+                        None if slots.is_empty() => 0.0,
+                        None => f64::NAN,
+                        Some(plan) => (plan.total() as f64).ln(),
+                    })
+                    .collect()
+            })
+            .collect();
+
+        let mut request = Self {
             variant,
             seats,
             order,
@@ -408,9 +531,191 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             available,
             certain,
             spoken_for,
+            slots: slot_lists,
+            opening,
+            plans,
+            dealing: Dealing::Rejecting,
             players: hands.len(),
             threads: default_threads(),
-        })
+        };
+        request.dealing = request.choose_dealing();
+        Ok(request)
+    }
+
+    /// Forces weighted dealing on, whatever the calibration decided.
+    ///
+    /// For tests that check the weighted path itself. The policy that picks
+    /// between the two is worth testing separately from the arithmetic it
+    /// picks, and a test of the arithmetic should not break when the policy
+    /// is retuned.
+    #[cfg(test)]
+    pub(crate) fn force_weighted(&mut self) -> bool {
+        if self.opening.iter().flatten().any(|ln| !ln.is_finite()) {
+            return false;
+        }
+        self.dealing = Dealing::Weighted;
+        true
+    }
+
+    /// Forces rejection dealing on, whatever the calibration decided.
+    ///
+    /// For tests of the rejecting path in spots that would now be weighted.
+    #[cfg(test)]
+    pub(crate) fn force_rejecting(&mut self) {
+        self.dealing = Dealing::Rejecting;
+    }
+
+    /// Whether deals are drawn against the live deck and weighted, rather
+    /// than drawn against the opening deck and rejected when they clash.
+    ///
+    /// Almost always false. It turns true only for a request whose seats
+    /// compete for the same cards so hard that rejection has nearly stopped
+    /// working, and it is worth showing a caller alongside
+    /// [`ChunkResult::effective_samples`], which is what such a run costs.
+    pub fn is_weighted(&self) -> bool {
+        self.dealing == Dealing::Weighted
+    }
+
+    /// The pool a participant draws from: everything still available, less
+    /// the cards other participants have named, plus its own.
+    ///
+    /// Keeping another seat's named cards out of this pool removes no deal
+    /// that counts -- a card one seat holds in every valid deal is held by no
+    /// other seat in any of them -- so it costs nothing and saves a great
+    /// deal of rejection.
+    fn pool_for(&self, which: usize, available: CardSet) -> CardSet {
+        available
+            .without(self.spoken_for)
+            .union(self.certain[which].intersection(available))
+    }
+
+    /// The slots one participant is drawing with this deal, and where they go.
+    fn alternative_for(&self, which: usize, rng: &mut SmallRng) -> usize {
+        let count = self.slots[which].len();
+        if count <= 1 {
+            0
+        } else {
+            rng.gen_range(0..count)
+        }
+    }
+
+    /// Deals every participant from what is left, reporting what the deal is
+    /// worth.
+    ///
+    /// `None` is a rejection, exactly as a `false` from [`deal`](Self::deal)
+    /// is: a participant found nothing it could still take. That happens far
+    /// less often here, but it does happen, and the deal is thrown away
+    /// whole. Nothing about the discard may depend on the weight -- it is the
+    /// weight's independence from the discard that lets the completion rate
+    /// cancel and keeps the answer honest.
+    ///
+    /// The weight is how many holdings each participant had to choose from,
+    /// relative to what it had before any card was dealt. A participant that
+    /// still had all its choices contributes one; one that was squeezed by
+    /// the seats ahead of it contributes less, and the deal counts for less
+    /// in proportion. That is exactly the bias drawing from a live deck
+    /// introduces, undone.
+    fn deal_weighted(
+        &self,
+        rng: &mut SmallRng,
+        holes: &mut [Vec<Card>],
+        board: &mut Vec<Card>,
+        scratch: &mut WeighingScratch,
+    ) -> Option<f64> {
+        let mut available = self.available;
+        board.clear();
+        let mut ln_weight: f64 = 0.0;
+
+        for &which in &self.order {
+            let is_board = which == self.seats.len();
+            if is_board && self.board_slots == 0 {
+                continue;
+            }
+
+            let alternative = self.alternative_for(which, rng);
+            let plan = self.plans[which][alternative].as_ref()?;
+            let pool = self.pool_for(which, available);
+
+            // Only the group sizes have changed, so the plan is re-weighed
+            // rather than rebuilt. Rebuilding here is what made a weighted
+            // deal cost hundreds of microseconds instead of hundreds of
+            // nanoseconds.
+            let total = plan.weigh(pool, &mut scratch.groups, &mut scratch.cumulative);
+            if total == 0 {
+                return None;
+            }
+            ln_weight += (total as f64).ln() - self.opening[which][alternative];
+
+            let out = if is_board {
+                &mut *board
+            } else {
+                &mut holes[which]
+            };
+            out.clear();
+            plan.draw_weighed(&scratch.groups, &scratch.cumulative, total, rng, out);
+            for &card in out.iter() {
+                available.remove(card);
+            }
+        }
+
+        Some(ln_weight.exp())
+    }
+
+    /// Decides how this request will be dealt, once and for all.
+    ///
+    /// Rejection is the default and keeps every spot it already handles. Two
+    /// things have to be true before weighting takes over: acceptance must
+    /// have fallen through the floor, and weighting must actually be better
+    /// by a clear margin. Both are measured rather than guessed, from a fixed
+    /// seed, so a given request always decides the same way.
+    fn choose_dealing(&self) -> Dealing {
+        // A plan that could not be built is a slot list too finely cut to
+        // count, and weighting has no way to weigh it.
+        if self.opening.iter().flatten().any(|ln| !ln.is_finite()) {
+            return Dealing::Rejecting;
+        }
+
+        let mut rng = SmallRng::seed_from_u64(0x5EED_CA11);
+        let mut holes: Vec<Vec<Card>> = vec![Vec::new(); self.players];
+        let mut board: Vec<Card> = Vec::new();
+        let mut scratch = WeighingScratch::default();
+
+        let kept = (0..CALIBRATION_DRAWS)
+            .filter(|_| self.deal(&mut rng, &mut holes, &mut board))
+            .count();
+        let acceptance = kept as f64 / CALIBRATION_DRAWS as f64;
+        if acceptance >= WEIGHTING_FLOOR {
+            return Dealing::Rejecting;
+        }
+
+        // What weighting would yield: how often a deal completes, times how
+        // much a completed deal is really worth. A pile of weighted deals in
+        // which a few carry most of the total says less than its count
+        // suggests, and that has to be paid for here, not discovered later.
+        let mut weight_sum = 0.0;
+        let mut weight_square_sum = 0.0;
+        let mut completed = 0u32;
+        for _ in 0..CALIBRATION_DRAWS {
+            let Some(weight) = self.deal_weighted(&mut rng, &mut holes, &mut board, &mut scratch)
+            else {
+                continue;
+            };
+            completed += 1;
+            weight_sum += weight;
+            weight_square_sum += weight * weight;
+        }
+        if completed == 0 || weight_square_sum <= 0.0 {
+            return Dealing::Rejecting;
+        }
+
+        let effective = weight_sum * weight_sum / weight_square_sum;
+        let yielded = effective / CALIBRATION_DRAWS as f64;
+
+        if yielded > acceptance * WEIGHTING_MARGIN {
+            Dealing::Weighted
+        } else {
+            Dealing::Rejecting
+        }
     }
 
     /// Builds a request from the library's notation.
@@ -797,6 +1102,7 @@ where
     // hand is built once, with room for the most cards this game deals, and
     // written over deal by deal.
     let mut hands: Vec<Hand<V>> = (0..seats).map(|_| Hand::new(request.variant)).collect();
+    let mut scratch = WeighingScratch::default();
 
     // Feasibility was settled at construction, so a rejected draw is only
     // ever bad luck. The cap keeps a pathological request from spinning
@@ -819,12 +1125,22 @@ where
         }
 
         result.attempts += 1;
-        if !request.deal(&mut rng, &mut holes, &mut board) {
-            // The cards drawn could not fill every slot, so the whole deal
-            // goes back. Rejecting the deal entire rather than re-drawing one
-            // seat is what keeps the result uniform over deals.
-            continue;
-        }
+        let weight = match request.dealing {
+            Dealing::Rejecting => {
+                if !request.deal(&mut rng, &mut holes, &mut board) {
+                    // The cards drawn could not fill every slot, so the whole
+                    // deal goes back. Rejecting the deal entire rather than
+                    // re-drawing one seat is what keeps the result uniform
+                    // over deals.
+                    continue;
+                }
+                1.0
+            }
+            Dealing::Weighted => match request.deal_weighted(&mut rng, &mut holes, &mut board, &mut scratch) {
+                Some(weight) => weight,
+                None => continue,
+            },
+        };
 
         for (hand, hole) in hands.iter_mut().zip(holes.iter()) {
             hand.refill(hole, &board)?;
@@ -835,7 +1151,7 @@ where
         request
             .variant
             .award_detailed(&hands, &mut shares, &mut low_shares)?;
-        result.record(&shares, &low_shares);
+        result.record_weighted(&shares, &low_shares, weight);
     }
 
     Ok(result)

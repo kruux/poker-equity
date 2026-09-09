@@ -38,7 +38,19 @@ pub struct Progress {
     /// One in the ordinary case. It falls when hands compete for scarce
     /// cards, and a low figure is worth showing: it is the difference between
     /// a slow answer and one that looks stuck.
+    ///
+    /// A request the sampler chose to weight rather than reject throws hardly
+    /// any deal away, so this stays near one there however hard the seats are
+    /// competing. Read [`effective_samples`](Self::effective_samples) for
+    /// those runs instead.
     pub acceptance: f64,
+    /// How many independent deals the run is worth so far.
+    ///
+    /// Equal to [`samples`](Self::samples) unless the deals were weighted,
+    /// and below it when they were unevenly weighted. This, not the deal
+    /// count, is what the error bar is divided by, so it is the honest thing
+    /// to show beside a progress figure.
+    pub effective_samples: f64,
 }
 
 /// How many threads to spread a batch over when the caller does not say.
@@ -258,5 +270,6 @@ fn report<F: FnMut(&Progress)>(on_progress: &mut F, result: &ChunkResult) {
         equities: result.equities(),
         worst_std_error: worst_error(result),
         acceptance: result.acceptance(),
+        effective_samples: result.effective_samples(),
     });
 }

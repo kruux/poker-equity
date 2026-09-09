@@ -13,6 +13,7 @@ mod tests {
     mod calibration;
     mod support;
     mod chunk_tests;
+    mod weighted_tests;
     mod request_tests;
     mod runner_tests;
     mod deuce_equity_tests;
