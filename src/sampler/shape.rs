@@ -43,7 +43,7 @@ struct Shape {
 
 /// The groups a slot list cuts the deck into, and every shape it admits.
 #[derive(Debug, Clone)]
-pub(super) struct ShapePlan {
+pub(crate) struct ShapePlan {
     /// The groups, in a fixed order. Every card in one is interchangeable
     /// with every other as far as these slots are concerned.
     atoms: Vec<CardSet>,
@@ -110,7 +110,7 @@ impl ShapePlan {
     /// wanting an ace apiece, against four aces. `None` means something
     /// different, that the shapes could not be listed and the caller should
     /// fall back to searching.
-    pub(super) fn build(slots: &[CardSet], pool: CardSet) -> Option<Self> {
+    pub(crate) fn build(slots: &[CardSet], pool: CardSet) -> Option<Self> {
         let size = slots.len();
         if size == 0 {
             return None;
@@ -138,8 +138,15 @@ impl ShapePlan {
         })
     }
 
+    /// How many groups the slots cut the deck into, and how many shapes
+    /// those groups admit. For measuring where a plan's cost goes.
+    #[cfg(test)]
+    pub(crate) fn size_hint(&self) -> (usize, usize) {
+        (self.atoms.len(), self.shapes.len())
+    }
+
     /// How many distinct hands the slots admit, counted without listing them.
-    pub(super) fn total(&self) -> u128 {
+    pub(crate) fn total(&self) -> u128 {
         self.total
     }
 
@@ -185,14 +192,81 @@ impl ShapePlan {
     /// A shape is picked in proportion to how many hands have it, and then
     /// that many cards are taken from each group. Every hand is reachable
     /// exactly one way, so the result is uniform with nothing rejected.
-    pub(super) fn draw(&self, rng: &mut impl Rng, out: &mut Vec<Card>) {
-        debug_assert!(self.total > 0, "a plan with no hands should never be drawn from");
-        let wanted = rng.gen_range(0..self.total);
-        let index = self.cumulative.partition_point(|reached| *reached <= wanted);
+    pub(crate) fn draw(&self, rng: &mut impl Rng, out: &mut Vec<Card>) {
+        self.draw_from(&self.atoms, &self.cumulative, self.total, rng, out);
+    }
+
+    /// Re-weighs the shapes against a deck that has been dealt from, and
+    /// reports how many hands are left.
+    ///
+    /// Which groups exist, and which shapes can fill the slots, are settled
+    /// by the *slots* alone: two cards sit in the same group when the same
+    /// slots accept them, and dealing a card out moves no other card between
+    /// groups. So a plan built once stays structurally right all the way down
+    /// the deal, and only the group sizes change. That is the whole reason
+    /// this is cheap: no walk, no matching, just a binomial per group per
+    /// shape. A shape that has outrun its group weighs nothing and drops out
+    /// on its own, since `C(fewer than we need, count)` is zero.
+    ///
+    /// `groups` and `cumulative` are scratch space owned by the caller, so a
+    /// sampling loop allocates nothing per deal.
+    pub(crate) fn weigh(
+        &self,
+        pool: CardSet,
+        groups: &mut Vec<CardSet>,
+        cumulative: &mut Vec<u128>,
+    ) -> u128 {
+        groups.clear();
+        groups.extend(self.atoms.iter().map(|atom| atom.intersection(pool)));
+
+        cumulative.clear();
+        let mut total: u128 = 0;
+        for shape in &self.shapes {
+            let weight = groups
+                .iter()
+                .zip(shape.counts.iter())
+                .fold(1u128, |all, (group, &count)| {
+                    if all == 0 {
+                        0
+                    } else {
+                        all.saturating_mul(binomial(group.len(), count as u32))
+                    }
+                });
+            total = total.saturating_add(weight);
+            cumulative.push(total);
+        }
+        total
+    }
+
+    /// Draws one hand from groups and weights worked out by [`weigh`].
+    ///
+    /// [`weigh`]: Self::weigh
+    pub(crate) fn draw_weighed(
+        &self,
+        groups: &[CardSet],
+        cumulative: &[u128],
+        total: u128,
+        rng: &mut impl Rng,
+        out: &mut Vec<Card>,
+    ) {
+        self.draw_from(groups, cumulative, total, rng, out);
+    }
+
+    fn draw_from(
+        &self,
+        groups: &[CardSet],
+        cumulative: &[u128],
+        total: u128,
+        rng: &mut impl Rng,
+        out: &mut Vec<Card>,
+    ) {
+        debug_assert!(total > 0, "a plan with no hands should never be drawn from");
+        let wanted = rng.gen_range(0..total);
+        let index = cumulative.partition_point(|reached| *reached <= wanted);
         let shape = &self.shapes[index];
 
-        for (atom, &count) in self.atoms.iter().zip(shape.counts.iter()) {
-            let mut left = *atom;
+        for (group, &count) in groups.iter().zip(shape.counts.iter()) {
+            let mut left = *group;
             for _ in 0..count {
                 let picked = rng.gen_range(0..left.len());
                 if let Some(card) = left.nth(picked) {
@@ -244,6 +318,14 @@ fn walk_shapes(
                 });
             }
         }
+        return Some(());
+    }
+
+    // Nothing below can supply more than the groups left hold, so a branch
+    // that still needs more than that has nowhere to go. Without this the
+    // walk descends into every shortfall and only notices at the leaf.
+    let reachable: usize = atoms[atom..].iter().map(|group| group.len() as usize).sum();
+    if reachable < left {
         return Some(());
     }
 

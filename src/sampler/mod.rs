@@ -6,7 +6,7 @@
 
 mod draw;
 mod matching;
-mod shape;
+pub(crate) mod shape;
 
 pub use draw::SlotSampler;
 pub use matching::{has_perfect_matching, is_feasible, maximum_matching};
@@ -15,4 +15,5 @@ pub use matching::{has_perfect_matching, is_feasible, maximum_matching};
 mod tests {
     mod draw_tests;
     mod matching_tests;
+    mod weighting_tests;
 }
