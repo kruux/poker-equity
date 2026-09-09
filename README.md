@@ -152,34 +152,62 @@ A card you name exactly gets dealt. A card you only describe -- `A`, `c`, `*`
 deals again if they do not. A single simulation can take several tries. The
 answer is the same either way; only the time changes.
 
-It gets slower the more seats are being vague at once, and it is worst in the
-stud family, where each player holds seven private cards -- four-handed stud
-claims twenty-eight of the fifty-two before anything is scored.
+It gets slower the more seats are vague at once, and it is worst in the stud
+family, where each player holds seven private cards -- four-handed stud claims
+twenty-eight of the fifty-two before anything is scored.
 
-| Spot | Deals tried per simulation |
-|---|---|
-| `AA` vs `KK`, hold'em | 1 |
-| `AA**` vs `KK**`, Omaha | 1.2 |
-| `A23` vs `456`, stud | 3 |
-| `AA**` six-handed, Omaha | 7 |
-| `A23` four-handed, stud | 42 |
-| `A23` any number of ways, razz | 1 |
+| Spot | Deals tried per simulation | |
+|---|---|---|
+| `AA` vs `KK`, hold'em | 1 | |
+| `AA**` vs `KK**`, Omaha | 1.2 | |
+| `A23` vs `456`, stud | 2.9 | |
+| two `AA**` at a six-handed Omaha table | 6.5 | |
+| `A23` any number of ways, razz | 1 | |
+| four stud seats naming three ranks each | 1 | *dealt the other way* |
+| five or six hold'em seats all on `c c` | 1 | *dealt the other way* |
 
-Every result carries `acceptance`, the share of deals that were usable, so what
-a question cost is always on the answer.
+The last two rows are spots where deal-and-check had all but stopped: they
+threw away between forty and a hundred thousand deals for every one they
+kept, and the widest of them could not be answered at all. Where that
+happens the engine stops searching and deals differently instead -- each seat
+from the cards actually left, with the deal weighted to undo the bias that
+introduces. Same answer, between two and eleven times sooner, and the spots
+that used to be refused now come back.
+
+That switch is made once, when the request is built, and only for a spot
+keeping fewer than one deal in twenty. Everything above that line is dealt
+exactly as it always was, down to the last decimal place: the ordinary path is
+not merely equivalent to the weighted one, it is the same arithmetic with
+every weight at one. `EquityRequest::is_weighted` says which way a request
+went.
+
+**What it costs to be weighed.** Weighted deals are not all worth the same,
+and a pile where a few carry most of the total says less than its count
+suggests. `ChunkResult::effective_samples` is how many independent deals the
+pile is really worth, and it is what the error bar is divided by -- so a
+weighted answer's `± ` is honest rather than flattering. It equals the deal
+count exactly when nothing was weighted. Of the spots above, the worst sits
+at 83%, meaning a million deals carry the precision of eight hundred and
+thirty thousand; most are at 100%.
+
+`acceptance` is still the share of deals that were usable, but it says less
+than it used to: a weighted request throws hardly any deal away, so it comes
+back near one however hard the seats are competing. Read
+`effective_samples` for those, and `is_weighted` to know which applies.
 
 **Razz needs no suits.** It has no flushes and never looks at a suit, so `A23`
 and `Ah2h3h` ask the same question -- and the engine pins the suits for you
 when you leave them off. Razz runs at one deal per simulation however many
 players are in the hand, so writing suits there buys nothing.
 
-Everywhere else, writing the suits you actually mean is what turns a search
-back into a deal. A real hand has suits; naming them is both more faithful to
-the spot and far quicker to answer.
+Everywhere else, writing the suits you actually mean is still the cheapest
+thing you can do. A real hand has suits; naming them is both more faithful to
+the spot and quicker to answer than either way of dealing it.
 
-The underlying problem, if you want to read about it, is rejection sampling for
-a uniformly random bipartite matching -- one deal that satisfies every seat at
-once, drawn without favouring any of them.
+The underlying problem, if you want to read about it, is sampling a uniformly
+random bipartite matching -- one deal that satisfies every seat at once, drawn
+without favouring any of them. Rejection does it by throwing away what does
+not fit; weighting does it by correcting for what it took.
 
 ### Ranges
 
@@ -327,6 +355,12 @@ is 1.0 unless hands are competing for the same cards — several seats all
 wanting a five when only two are left — and a low figure is the difference
 between an answer that is slow and one that looks stuck.
 
+`progress.effective_samples` is how many independent deals the run is worth so
+far. It equals `progress.samples` for every ordinary spot, and falls below it
+only where the engine chose to weigh deals rather than throw them away — see
+[What a wildcard costs](#what-a-wildcard-costs). It is what the error bar is
+divided by, so it is the honest number to show next to a deal count.
+
 ### Driving the loop yourself
 
 If you want to own the loop — because cancelling, or threading, or merging
@@ -347,7 +381,12 @@ for seed in 0..10 {
 `run_chunk` is pure and stateless: no callbacks, no cancellation token, no
 shared state. Everything in `ChunkResult` is a **sum**, so batches merge by
 addition, and the sums of squares are carried too — which is what makes the
-error bar free rather than something to compute separately.
+error bar free rather than something to compute separately. The deals' weights
+are summed the same way, so `effective_samples` merges as cleanly as the rest.
+
+Chunks of one request always merge, because how a request deals is settled
+when it is built and never changes mid-run. Chunks of *different* requests
+never did merge and still do not.
 
 ### What comes back
 
@@ -454,6 +493,16 @@ uniform over the wrong thing. Equities sum to one; permuting seats permutes
 the answer; a hand against its own mirror splits exactly; a wildcard narrowed
 to a single card equals naming that card.
 
+Weighted dealing — see [What a wildcard costs](#what-a-wildcard-costs) — is
+held to the same standard and needs it more, because a wrong weight moves the
+answer without moving anything a reader would notice. It is walked against
+enumeration where the spot is small enough to walk, and checked by symmetry
+where it is not: seats asking for exactly the same thing must be given exactly
+the same equity, which is the true answer known without enumerating anything,
+and it is the spots too large to walk that are worth knowing it for. The
+counting the weights rest on is checked against the slower code it replaced,
+over decks with anything from no cards dealt to forty-four.
+
 ## Python
 
 ```sh
@@ -479,12 +528,39 @@ is released around sampling. `pc.variants()` lists every game with how it
 deals, so a caller needs no table of its own, and `pc.parse_hand_field` hands
 back masks so another parser can be checked against this one.
 
+**Averaging the sums yourself: divide by `weight_sum`, not by `samples`.**
+`pc.chunk` and `pc.chunk_from_text` hand back the raw sums as well as the
+worked-out figures, because sums are what merge across batches. `samples` is
+how many deals there were; `weight_sum` is what they are worth, and it is the
+divisor for every sum in the dict. They are equal for almost every request,
+which is exactly what makes the wrong one dangerous — it costs nothing until
+the sampler meets a spot contended enough to weigh its deals, and then the
+equities come back hundreds of times too small without looking wrong.
+
+```python
+r = pc.chunk_from_text("stud", ["A23", "456", "789", "TJQ"], samples=200_000)
+equity = [total / r["weight_sum"] for total in r["share_sum"]]   # not / samples
+
+spread = (r["share_square_sum"][0]
+          - 2 * equity[0] * r["square_weight_share_sum"][0]
+          + equity[0] ** 2 * r["weight_square_sum"])
+std_error = max(spread, 0.0) ** 0.5 / r["weight_sum"]
+
+r["weighted"], r["effective_samples"]     # True, ~165500 of 200000
+```
+
+`r["weighted"]` says whether the sampler weighed this request's deals, and
+`r["effective_samples"]` is what the run is worth — read that rather than
+`acceptance`, which comes back near one on a weighted spot however hard the
+seats were competing. `tests/python/test_binding.py` checks that averaging the
+exported sums this way reproduces the engine's own figures exactly.
+
 Nothing is published to crates.io or PyPI yet.
 
 ## Building
 
 ```sh
-cargo test                              # 221 tests, about ten seconds
+cargo test                              # 228 tests, about ten seconds
 cargo test --release -- --ignored       # the exhaustive sweeps
 cargo run --release --bin benchmark     # speed, per game
 ```
