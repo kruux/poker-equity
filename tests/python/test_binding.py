@@ -128,6 +128,54 @@ try:
 except ValueError as error:
     check("no game called" in str(error), "an unknown game names itself")
 
+print("\nthe exported sums rebuild the answer the engine gives")
+# A caller that merges batches on this side averages the sums itself, so the
+# sums and the engine must agree about the divisor. They do not agree if the
+# caller reaches for `samples`: that is the deal count, and what the deals are
+# worth is `weight_sum`. The two are equal for almost every request, which is
+# what makes the mistake worth a test -- it costs nothing until a spot is
+# contended enough for the sampler to weigh its deals, and then the equities
+# come back hundreds of times too small without anything looking wrong.
+for label, game, hands in [
+    ("hold'em, nothing contended", "holdem", ["AhKh", "QsQd"]),
+    ("stud, mildly contended", "stud", ["A23", "456"]),
+    ("stud, weighted", "stud", ["A23", "456", "789", "TJQ"]),
+    ("hold'em, weighted", "holdem", ["c c"] * 5),
+]:
+    result = pc.chunk_from_text(game, hands, samples=100_000, seed=5)
+    engine = [seat["equity"] for seat in result["players"]]
+    divisor = result["weight_sum"]
+    rebuilt = [total / divisor for total in result["share_sum"]]
+    check(
+        all(abs(a - b) < 1e-12 for a, b in zip(engine, rebuilt)),
+        f"{label}: share_sum / weight_sum is the engine's equity",
+    )
+    close(sum(engine), 1.0, 1e-9, f"{label}: equities sum to one")
+
+    # And the error bar, which needs the other two sums and cannot be
+    # recovered from the shares alone.
+    for seat, mean in enumerate(rebuilt):
+        spread = (
+            result["share_square_sum"][seat]
+            - 2.0 * mean * result["square_weight_share_sum"][seat]
+            + mean * mean * result["weight_square_sum"]
+        )
+        check(
+            abs(max(spread, 0.0) ** 0.5 / divisor - result["players"][seat]["std_error"]) < 1e-15,
+            f"{label}: seat {seat}'s error bar rebuilds from the sums",
+        )
+
+    check("weighted" in result, f"{label}: says whether it was weighted")
+    check(
+        result["effective_samples"] <= result["samples"] + 1e-9,
+        f"{label}: effective samples never exceed the deal count",
+    )
+    if not result["weighted"]:
+        check(
+            abs(result["weight_sum"] - result["samples"]) < 1e-9,
+            f"{label}: an unweighted run weighs one per deal",
+        )
+
 print()
 if failures:
     print(f"{len(failures)} checks failed")

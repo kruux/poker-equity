@@ -75,16 +75,35 @@ fn hand_spec(alternatives: Vec<Vec<u64>>) -> HandSpec {
 /// not -- and `share_square_sum` in particular is what a standard error is
 /// computed from, so dropping it would mean a caller that merges its own
 /// batches could not put an error bar on the result.
-fn to_dict(py: Python<'_>, result: &ChunkResult) -> PyResult<Py<PyDict>> {
+///
+/// **A caller averaging these itself must divide by `weight_sum`, never by
+/// `samples`.** The two are equal for almost every request, which is exactly
+/// what makes the mistake dangerous: it costs nothing until the sampler meets
+/// a spot contended enough to weigh its deals, and then the equities come back
+/// a few hundred times too small rather than wrong in any way that announces
+/// itself. `samples` is how many deals there were; `weight_sum` is what they
+/// are worth, and it is the divisor for every sum here.
+fn to_dict(py: Python<'_>, result: &ChunkResult, weighted: bool) -> PyResult<Py<PyDict>> {
     let out = PyDict::new(py);
     out.set_item("samples", result.samples)?;
     out.set_item("exact", result.exact)?;
     out.set_item("attempts", result.attempts)?;
     out.set_item("acceptance", result.acceptance())?;
+    // Whether the sampler drew against the live deck and weighed the deals.
+    // False for almost every request. Where it is true `acceptance` comes
+    // back near one however hard the seats were competing, so it is
+    // `effective_samples` that says what the run cost.
+    out.set_item("weighted", weighted)?;
+    // What the deals are worth, as against how many there were. Equal unless
+    // the deals were weighted; the divisor for every sum below either way.
+    out.set_item("weight_sum", result.weight_sum)?;
+    out.set_item("weight_square_sum", result.weight_square_sum)?;
+    out.set_item("effective_samples", result.effective_samples())?;
 
     // The raw sums, one entry per seat. These add across batches.
     out.set_item("share_sum", result.share_sum.clone())?;
     out.set_item("share_square_sum", result.share_square_sum.clone())?;
+    out.set_item("square_weight_share_sum", result.square_weight_share_sum.clone())?;
     out.set_item("low_share_sum", result.low_share_sum.clone())?;
     out.set_item("win_count", result.win_count.clone())?;
     out.set_item("tie_count", result.tie_count.clone())?;
@@ -171,11 +190,14 @@ fn chunk(
     let result = with_variant!(variant, |game| {
         let request =
             EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
+        let weighted = request.is_weighted();
         py.detach(|| run_batch(&request, samples, seed, threads))
+            .map(|result| (result, weighted))
             .map_err(to_py)
     })?;
+    let (result, weighted) = result;
 
-    to_dict(py, &result)
+    to_dict(py, &result, weighted)
 }
 
 /// Walks every deal, taking masks, or returns `None` when there are too many.
@@ -200,11 +222,15 @@ fn exact(
     let result = with_variant!(variant, |game| {
         let request =
             EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
-        py.detach(|| run_exact(&request)).map_err(to_py)
+        let weighted = request.is_weighted();
+        py.detach(|| run_exact(&request))
+            .map(|result| (result, weighted))
+            .map_err(to_py)
     })?;
+    let (result, weighted) = result;
 
     match result {
-        Some(result) => Ok(Some(to_dict(py, &result)?)),
+        Some(result) => Ok(Some(to_dict(py, &result, weighted)?)),
         None => Ok(None),
     }
 }
@@ -237,11 +263,14 @@ fn chunk_from_text(
 
     let result = with_variant!(variant, |game| {
         let request = EquityRequest::from_text(game, &fields, board, dead).map_err(to_py)?;
+        let weighted = request.is_weighted();
         py.detach(|| run_batch(&request, samples, seed, threads))
+            .map(|result| (result, weighted))
             .map_err(to_py)
     })?;
+    let (result, weighted) = result;
 
-    to_dict(py, &result)
+    to_dict(py, &result, weighted)
 }
 
 /// Walks every deal instead of sampling, or returns `None` when there are too
@@ -262,11 +291,15 @@ fn exact_from_text(
 
     let result = with_variant!(variant, |game| {
         let request = EquityRequest::from_text(game, &fields, board, dead).map_err(to_py)?;
-        py.detach(|| run_exact(&request)).map_err(to_py)
+        let weighted = request.is_weighted();
+        py.detach(|| run_exact(&request))
+            .map(|result| (result, weighted))
+            .map_err(to_py)
     })?;
+    let (result, weighted) = result;
 
     match result {
-        Some(result) => Ok(Some(to_dict(py, &result)?)),
+        Some(result) => Ok(Some(to_dict(py, &result, weighted)?)),
         None => Ok(None),
     }
 }
