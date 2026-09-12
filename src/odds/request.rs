@@ -110,8 +110,28 @@ const WEIGHTING_FLOOR: f64 = 0.05;
 /// How much better weighted dealing must be before it is worth the change.
 const WEIGHTING_MARGIN: f64 = 1.5;
 
-/// How many draws the two paths are each given when deciding between them.
-const CALIBRATION_DRAWS: u32 = 2_000;
+/// How many draws rejection is given to show what it can do.
+///
+/// Enough to see a rate at the floor: a spot keeping one deal in twenty
+/// produces [`SETTLED_DRAWS`] usable ones in this many attempts.
+const CALIBRATION_DRAWS: u32 = 800;
+
+/// How many usable deals settle it, so the calibration can stop early.
+///
+/// This many successes inside [`CALIBRATION_DRAWS`] *is* the floor rate, so
+/// reaching it means rejection is already keeping more than a twentieth and
+/// nothing further need be measured. It is what keeps the ordinary case
+/// cheap: a spot that keeps every deal is decided in forty draws rather than
+/// eight hundred, and building a request stays the microsecond affair it was
+/// before any of this.
+const SETTLED_DRAWS: u32 = (CALIBRATION_DRAWS as f64 * WEIGHTING_FLOOR) as u32;
+
+/// How many draws weighting is given to show what it yields.
+///
+/// Fewer, because a weighted draw costs more than a rejected one and the
+/// question it answers is coarse: whether the yield clears acceptance by half
+/// again. That does not need a precise figure.
+const WEIGHTED_CALIBRATION_DRAWS: u32 = 400;
 
 /// The cards a participant holds in *every* deal the request admits.
 ///
@@ -680,9 +700,17 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         let mut board: Vec<Card> = Vec::new();
         let mut scratch = WeighingScratch::default();
 
-        let kept = (0..CALIBRATION_DRAWS)
-            .filter(|_| self.deal(&mut rng, &mut holes, &mut board))
-            .count();
+        // Stopped as soon as rejection has proved itself, which is almost
+        // always long before the budget runs out.
+        let mut kept = 0u32;
+        for _ in 0..CALIBRATION_DRAWS {
+            if self.deal(&mut rng, &mut holes, &mut board) {
+                kept += 1;
+                if kept >= SETTLED_DRAWS {
+                    return Dealing::Rejecting;
+                }
+            }
+        }
         let acceptance = kept as f64 / CALIBRATION_DRAWS as f64;
         if acceptance >= WEIGHTING_FLOOR {
             return Dealing::Rejecting;
@@ -695,7 +723,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         let mut weight_sum = 0.0;
         let mut weight_square_sum = 0.0;
         let mut completed = 0u32;
-        for _ in 0..CALIBRATION_DRAWS {
+        for _ in 0..WEIGHTED_CALIBRATION_DRAWS {
             let Some(weight) = self.deal_weighted(&mut rng, &mut holes, &mut board, &mut scratch)
             else {
                 continue;
@@ -709,7 +737,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         }
 
         let effective = weight_sum * weight_sum / weight_square_sum;
-        let yielded = effective / CALIBRATION_DRAWS as f64;
+        let yielded = effective / WEIGHTED_CALIBRATION_DRAWS as f64;
 
         if yielded > acceptance * WEIGHTING_MARGIN {
             Dealing::Weighted
