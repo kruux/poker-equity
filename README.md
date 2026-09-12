@@ -11,6 +11,55 @@ against [pokerkit](https://github.com/uoftcprg/pokerkit) for the games whose
 hand spaces are small enough to check — see [Correctness](#correctness) — but
 nothing here has been used in anger yet.
 
+## Install
+
+Nothing is published to crates.io or PyPI yet, so both sides come from a
+clone.
+
+```sh
+git clone https://github.com/<you>/poker-equity && cd poker-equity
+```
+
+**Rust.** Point a dependency at the clone, or at the repository:
+
+```toml
+poker-equity = { path = "../poker-equity" }
+# or        = { git = "https://github.com/<you>/poker-equity" }
+```
+
+Then a whole program is:
+
+```rust
+use poker_equity::{odds::{equity, EquityRequest, Target}, variants::Holdem};
+
+fn main() -> Result<(), poker_equity::error::PokerError> {
+    let request = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "")?;
+    let result = equity(&request, Target::Samples(500_000))?;
+    println!("{:.2}%", result.equities()[0].percent());   // about 46.2%
+    Ok(())
+}
+```
+
+**Python.** Build the extension module and put it where the interpreter looks.
+The copy must be named `poker_equity` — `.so` on Linux, `.dylib` on macOS,
+`.dll` on Windows:
+
+```sh
+cargo build --release --features python
+cp target/release/libpoker_equity.so ~/lib/poker_equity.so
+export PYTHONPATH=~/lib
+```
+
+```python
+import poker_equity as pc
+
+r = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=500_000)
+for seat in r["players"]:
+    print(f"{seat['equity']:.4f} +/- {seat['std_error']:.4f}")
+```
+
+More of it in [Python](#python).
+
 ## Games
 
 Showdowns a second, per thread: dealing, evaluating and splitting the pot,
@@ -149,51 +198,26 @@ makes the count wrong, the error says so.
 
 A card you name exactly gets dealt. A card you only describe -- `A`, `c`, `*`
 -- has to be *found*: the engine deals, checks the cards fit every seat, and
-deals again if they do not. A single simulation can take several tries. The
-answer is the same either way; only the time changes.
+deals again if they do not. The answer is the same either way; only the time changes.
 
-It gets slower the more seats are vague at once, and it is worst in the stud
-family, where each player holds seven private cards -- four-handed stud claims
-twenty-eight of the fifty-two before anything is scored.
+It is worst in stud, where each player holds seven private cards -- four-handed
+stud claims twenty-eight of the fifty-two before anything is scored.
 
-| Spot | Deals tried per simulation | |
-|---|---|---|
-| `AA` vs `KK`, hold'em | 1 | |
-| `AA**` vs `KK**`, Omaha | 1.2 | |
-| `A23` vs `456`, stud | 2.9 | |
-| two `AA**` at a six-handed Omaha table | 6.5 | |
-| `A23` any number of ways, razz | 1 | |
-| four stud seats naming three ranks each | 1 | *dealt the other way* |
-| five or six hold'em seats all on `c c` | 1 | *dealt the other way* |
+| Spot | Deals tried per simulation |
+|---|---|
+| `AA` vs `KK`, hold'em | 1 |
+| `AA**` vs `KK**`, Omaha | 1.2 |
+| `A23` vs `456`, stud | 2.9 |
+| two `AA**` at a six-handed Omaha table | 6.5 |
+| `A23` any number of ways, razz | 1 |
 
-The last two rows are spots where deal-and-check had all but stopped: they
-threw away between forty and a hundred thousand deals for every one they
-kept, and the widest of them could not be answered at all. Where that
-happens the engine stops searching and deals differently instead -- each seat
-from the cards actually left, with the deal weighted to undo the bias that
-introduces. Same answer, between two and eleven times sooner, and the spots
-that used to be refused now come back.
-
-That switch is made once, when the request is built, and only for a spot
-keeping fewer than one deal in twenty. Everything above that line is dealt
-exactly as it always was, down to the last decimal place: the ordinary path is
-not merely equivalent to the weighted one, it is the same arithmetic with
-every weight at one. `EquityRequest::is_weighted` says which way a request
-went.
-
-**What it costs to be weighed.** Weighted deals are not all worth the same,
-and a pile where a few carry most of the total says less than its count
-suggests. `ChunkResult::effective_samples` is how many independent deals the
-pile is really worth, and it is what the error bar is divided by -- so a
-weighted answer's `± ` is honest rather than flattering. It equals the deal
-count exactly when nothing was weighted. Of the spots above, the worst sits
-at 83%, meaning a million deals carry the precision of eight hundred and
-thirty thousand; most are at 100%.
-
-`acceptance` is still the share of deals that were usable, but it says less
-than it used to: a weighted request throws hardly any deal away, so it comes
-back near one however hard the seats are competing. Read
-`effective_samples` for those, and `is_weighted` to know which applies.
+**Where searching stops working** -- below one kept deal in twenty -- the
+engine deals each seat from what is left instead, and weights the deal to undo
+the bias that introduces. Same answer, sooner, and spots that were refused
+outright now answer. Read `effective_samples` there rather than `acceptance`:
+it is what the error bar is divided by, and `is_weighted` says which applies.
+Such an average is consistent rather than exactly unbiased, by a `1/n` term
+under the bar's `1/√n`.
 
 **Razz needs no suits.** It has no flushes and never looks at a suit, so `A23`
 and `Ah2h3h` ask the same question -- and the engine pins the suits for you
@@ -206,8 +230,7 @@ the spot and quicker to answer than either way of dealing it.
 
 The underlying problem, if you want to read about it, is sampling a uniformly
 random bipartite matching -- one deal that satisfies every seat at once, drawn
-without favouring any of them. Rejection does it by throwing away what does
-not fit; weighting does it by correcting for what it took.
+without favouring any of them.
 
 ### Ranges
 
@@ -285,20 +308,6 @@ EquityRequest::from_text(DeuceSeven, &["7h5c4d3s", "9h8c6d5h2c"], "", "Kd")?;
 //                        Hero draws one; the king he threw is dead. Villain stands pat.
 ```
 
-Eight seats is more stud than a deck holds — eight sevens is fifty-six — so
-the last card is not dealt to each player at all. One goes face up in the
-middle and everyone counts it as their seventh, which is a rule most players
-never see used. The request reshapes itself to match, and says so:
-
-```rust
-let request = EquityRequest::from_text(Stud, &eight_fields, "", "")?;
-request.hole_cards();    // 6, not 7
-request.board_cards();   // 1 -- the shared card, which may be named or not
-```
-
-Razz and stud hi/lo deal the same way, so they do the same thing. Seven seats
-is forty-nine cards and needs none of it.
-
 A community game wants every hole card, because they are all dealt at once:
 there is no moment at which a hold'em player holds one card. So a short field
 there is a miscount and is rejected. To say "an ace and something I cannot
@@ -355,11 +364,9 @@ is 1.0 unless hands are competing for the same cards — several seats all
 wanting a five when only two are left — and a low figure is the difference
 between an answer that is slow and one that looks stuck.
 
-`progress.effective_samples` is how many independent deals the run is worth so
-far. It equals `progress.samples` for every ordinary spot, and falls below it
-only where the engine chose to weigh deals rather than throw them away — see
-[What a wildcard costs](#what-a-wildcard-costs). It is what the error bar is
-divided by, so it is the honest number to show next to a deal count.
+`progress.effective_samples` is what the run is worth so far — equal to
+`progress.samples` unless the deals were weighted, and what the error bar is
+divided by.
 
 ### Driving the loop yourself
 
@@ -383,10 +390,6 @@ shared state. Everything in `ChunkResult` is a **sum**, so batches merge by
 addition, and the sums of squares are carried too — which is what makes the
 error bar free rather than something to compute separately. The deals' weights
 are summed the same way, so `effective_samples` merges as cleanly as the rest.
-
-Chunks of one request always merge, because how a request deals is settled
-when it is built and never changes mid-run. Chunks of *different* requests
-never did merge and still do not.
 
 ### What comes back
 
@@ -493,22 +496,22 @@ uniform over the wrong thing. Equities sum to one; permuting seats permutes
 the answer; a hand against its own mirror splits exactly; a wildcard narrowed
 to a single card equals naming that card.
 
-Weighted dealing — see [What a wildcard costs](#what-a-wildcard-costs) — is
-held to the same standard and needs it more, because a wrong weight moves the
-answer without moving anything a reader would notice. It is walked against
-enumeration where the spot is small enough to walk, and checked by symmetry
-where it is not: seats asking for exactly the same thing must be given exactly
-the same equity, which is the true answer known without enumerating anything,
-and it is the spots too large to walk that are worth knowing it for. The
-counting the weights rest on is checked against the slower code it replaced,
-over decks with anything from no cards dealt to forty-four.
+Weighted dealing needs this most, since a wrong weight moves the answer
+without moving anything a reader would notice. Where a spot is too large to
+walk it is checked by symmetry: seats asking for the same thing must be given
+the same equity.
 
 ## Python
 
-```sh
-cargo build --release --features python
-cp target/release/libpoker_equity.so somewhere/poker_equity.so
-```
+Four ways in — two that parse the notation, two that take masks. Building the
+module is under [Install](#install).
+
+| Call | Does |
+|---|---|
+| `chunk_from_text(variant, hands, board="", dead="", samples=100_000, seed=0, threads=0)` | samples that many deals |
+| `exact_from_text(variant, hands, board="", dead="")` | walks every deal, or returns `None` when there are too many |
+| `chunk(variant, hands, board, dead, samples, seed=0, threads=0)` | the same by mask |
+| `exact(variant, hands, board, dead)` | likewise |
 
 ```python
 import poker_equity as pc
@@ -517,25 +520,28 @@ r = pc.exact_from_text("holdem", ["AhAd", "KsKc"], "2c 7d 9h")
 print(r["players"][0]["equity"])        # 0.916161...
 print(r["exact"], r["samples"])         # True 990
 
-# or masks, skipping the parser
+# or masks, skipping the parser: hands[seat][alternative][slot]
 hands = [[[1 << pc.card_index("Ah"), 1 << pc.card_index("Kh")]],
          [[1 << pc.card_index("Qs"), 1 << pc.card_index("Qd")]]]
 r = pc.chunk("holdem", hands, [], 0, 200_000, seed=3)
 ```
 
-`abi3-py314`, so one wheel per platform covers every future CPython. The GIL
-is released around sampling. `pc.variants()` lists every game with how it
-deals, so a caller needs no table of its own, and `pc.parse_hand_field` hands
-back masks so another parser can be checked against this one.
+Every seat in `r["players"]` carries `equity`, `win`, `tie`, `low_equity`,
+`scoop` and `std_error`. Beside them sit the run's own totals — `samples`,
+`weight_sum`, `share_sum`, `acceptance`, `effective_samples`, `weighted` —
+which are sums rather than averages, so calling again with another seed and
+adding them is how you sample further. There is no precision target here as
+there is in Rust: ask for a count.
 
-**Averaging the sums yourself: divide by `weight_sum`, not by `samples`.**
-`pc.chunk` and `pc.chunk_from_text` hand back the raw sums as well as the
-worked-out figures, because sums are what merge across batches. `samples` is
-how many deals there were; `weight_sum` is what they are worth, and it is the
-divisor for every sum in the dict. They are equal for almost every request,
-which is exactly what makes the wrong one dangerous — it costs nothing until
-the sampler meets a spot contended enough to weigh its deals, and then the
-equities come back hundreds of times too small without looking wrong.
+`abi3-py310`, so one wheel per platform covers CPython 3.10 upward. The GIL is
+released around sampling, so a long batch does not block the interpreter.
+`pc.variants()` lists every game with how it deals, so a caller needs no table
+of its own, and `pc.parse_hand_field` hands back masks so another parser can
+be checked against this one.
+
+**Averaging the sums yourself: divide by `weight_sum`, not `samples`.** The two
+are equal for almost every request, so the wrong one costs nothing until a
+spot is weighted, then returns equities hundreds of times too small.
 
 ```python
 r = pc.chunk_from_text("stud", ["A23", "456", "789", "TJQ"], samples=200_000)
@@ -545,22 +551,15 @@ spread = (r["share_square_sum"][0]
           - 2 * equity[0] * r["square_weight_share_sum"][0]
           + equity[0] ** 2 * r["weight_square_sum"])
 std_error = max(spread, 0.0) ** 0.5 / r["weight_sum"]
-
-r["weighted"], r["effective_samples"]     # True, ~165500 of 200000
 ```
 
-`r["weighted"]` says whether the sampler weighed this request's deals, and
-`r["effective_samples"]` is what the run is worth — read that rather than
-`acceptance`, which comes back near one on a weighted spot however hard the
-seats were competing. `tests/python/test_binding.py` checks that averaging the
-exported sums this way reproduces the engine's own figures exactly.
-
-Nothing is published to crates.io or PyPI yet.
+`r["weighted"]` and `r["effective_samples"]` are that run's own figures;
+`tests/python/test_binding.py` checks this rebuild against the engine's.
 
 ## Building
 
 ```sh
-cargo test                              # 228 tests, about ten seconds
+cargo test                              # 233 tests, about ten seconds
 cargo test --release -- --ignored       # the exhaustive sweeps
 cargo run --release --bin benchmark     # speed, per game
 ```
