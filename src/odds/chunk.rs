@@ -94,14 +94,20 @@ impl ChunkResult {
     /// Folds `other` into this one.
     ///
     /// The merged result is exact only when both parts were, since mixing a
-    /// sample into an enumeration makes the whole thing an estimate.
+    /// sample into an enumeration makes the whole thing an estimate. A part
+    /// with no deals in it is neither, so it does not vote -- which is what
+    /// lets a caller start a loop of its own from [`empty`](Self::empty).
     pub fn merge(&mut self, other: &ChunkResult) {
         debug_assert_eq!(self.seats(), other.seats(), "chunks must cover the same seats");
+        if self.samples == 0 {
+            self.exact = other.exact;
+        } else if other.samples > 0 {
+            self.exact = self.exact && other.exact;
+        }
         self.samples += other.samples;
         self.attempts += other.attempts;
         self.weight_sum += other.weight_sum;
         self.weight_square_sum += other.weight_square_sum;
-        self.exact = self.exact && other.exact;
         for seat in 0..self.seats() {
             self.share_sum[seat] += other.share_sum[seat];
             self.share_square_sum[seat] += other.share_square_sum[seat];

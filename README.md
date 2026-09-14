@@ -559,7 +559,7 @@ std_error = max(spread, 0.0) ** 0.5 / r["weight_sum"]
 ## Building
 
 ```sh
-cargo test                              # 233 tests, about ten seconds
+cargo test                              # 234 tests, about ten seconds
 cargo test --release -- --ignored       # the exhaustive sweeps
 cargo run --release --bin benchmark     # speed, per game
 ```

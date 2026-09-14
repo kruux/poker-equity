@@ -675,3 +675,29 @@ fn test_a_stalled_sample_is_not_called_impossible() -> Result<(), PokerError> {
 
     Ok(())
 }
+
+/// An empty accumulator must not turn an enumeration into an estimate.
+///
+/// `empty` plus `merge` is the loop a caller drives itself, so what it starts
+/// from has to be neutral -- while a real sample folded in afterwards must
+/// still make the whole an estimate, which is the rule this cannot break.
+#[test]
+fn test_an_empty_accumulator_keeps_an_exact_answer_exact() {
+    let walked = exact(&["AhAd", "KsKc"], "2c 7d 9h", "");
+    assert!(walked.exact, "990 run-outs is an enumeration");
+
+    let mut total = ChunkResult::empty(2);
+    total.merge(&walked);
+    assert!(total.exact, "an enumeration folded into nothing is still an enumeration");
+    assert_eq!(
+        total.equities()[0].std_error,
+        0.0,
+        "an exact answer carries no error bar"
+    );
+    assert_eq!(total.equities()[0].equity, walked.equities()[0].equity);
+
+    let drawn = sampled(&["AhAd", "KsKc"], "2c 7d 9h", "", 10_000, 4);
+    total.merge(&drawn);
+    assert!(!total.exact, "a sample mixed into an enumeration makes the whole an estimate");
+    assert!(total.equities()[0].std_error > 0.0, "and an estimate carries an error bar");
+}
