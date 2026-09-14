@@ -119,7 +119,7 @@ impl EquityError {
     /// What went wrong, in a sentence.
     pub fn description(&self) -> String {
         match self {
-            EquityError::NoPlayers => "Need atleast 2 players for a simulation".to_string(),
+            EquityError::NoPlayers => "a spot needs at least two seats to have an answer".to_string(),
             EquityError::NotEnoughCards(n) => format!("Not enough cards in hand: {}", n),
             EquityError::InvalidSimulationCount(n) => format!("Invalid number of simulations: {n}"),
             EquityError::UnequalHandSizes => "Starting hands with different sizes".to_string(),
