@@ -1,0 +1,83 @@
+name: Rust
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      # Tests build at opt-level 2 already, so there is no second release
+      # build to pay for here.
+      - name: Test
+        run: cargo test --verbose
+
+      # The kernel sweeps: a minute or two of work, and the only tests that
+      # walk every hand in a space rather than sampling it.
+      - name: Exhaustive sweeps
+        run: cargo test --verbose -- --ignored
+
+  lint:
+    name: Format and lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Formatting
+        run: cargo fmt --check
+
+      # --all-features reaches the Python module, which is not compiled
+      # otherwise and so would go unlinted.
+      - name: Clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+  python:
+    name: Python binding on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      # The oldest interpreter the abi3-py310 build claims to serve. If the
+      # module loads here it loads on everything above it.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Build the extension module
+        run: cargo build --release --features python
+
+      # Exactly the copy the README tells a reader to make, per platform:
+      # macOS renames a .dylib to .so, Windows a .dll to .pyd.
+      - name: Install it where Python looks
+        shell: bash
+        run: |
+          mkdir -p pymod
+          case "$RUNNER_OS" in
+            macOS)   cp target/release/libpoker_equity.dylib pymod/poker_equity.so  ;;
+            Windows) cp target/release/poker_equity.dll      pymod/poker_equity.pyd ;;
+            *)       cp target/release/libpoker_equity.so    pymod/poker_equity.so  ;;
+          esac
+
+      - name: Check the binding against the engine
+        shell: bash
+        run: PYTHONPATH=pymod python tests/python/test_binding.py

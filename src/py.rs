@@ -213,6 +213,10 @@ fn variants(py: Python<'_>) -> PyResult<Py<PyList>> {
 ///
 /// The sampling runs with the GIL released, so a caller can keep repainting
 /// while it works.
+// Seven arguments of the eight are the Python signature, and the eighth is
+// the GIL token, which no caller passes. Shortening this would mean
+// narrowing the API.
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (variant, hands, board, dead, samples, seed=0, threads=0))]
 fn chunk(
@@ -291,6 +295,10 @@ fn default_thread_count() -> usize {
 /// The convenience form: `["AhKh", "QsQd"]` for hold'em, `"Kh Qh Jh"` for a
 /// flop. The mask form is the one to reach for from a program that already
 /// holds masks; this one is for everything else.
+// Seven arguments of the eight are the Python signature, and the eighth is
+// the GIL token, which no caller passes. Shortening this would mean
+// narrowing the API.
+#[allow(clippy::too_many_arguments)]
 #[pyfunction]
 #[pyo3(signature = (variant, hands, board="", dead="", samples=100_000, seed=0, threads=0))]
 fn chunk_from_text(
