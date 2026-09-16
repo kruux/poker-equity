@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["poker", "equity", "odds", "holdem", "omaha"]
 categories = ["games", "algorithms", "simulation"]
-# repository = "https://github.com/<you>/<repo>"
+repository = "https://github.com/kruux/poker-equity"
 
 # The published archive is the library and what proves it: the validation
 # scripts want pokerkit, and the throttling script is about this machine.

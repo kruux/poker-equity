@@ -17,14 +17,14 @@ Nothing is published to crates.io or PyPI yet, so both sides come from a
 clone.
 
 ```sh
-git clone https://github.com/<you>/poker-equity && cd poker-equity
+git clone https://github.com/kruux/poker-equity && cd poker-equity
 ```
 
 **Rust.** Point a dependency at the clone, or at the repository:
 
 ```toml
 poker-equity = { path = "../poker-equity" }
-# or        = { git = "https://github.com/<you>/poker-equity" }
+# or        = { git = "https://github.com/kruux/poker-equity" }
 ```
 
 Then a whole program is:
@@ -40,15 +40,36 @@ fn main() -> Result<(), poker_equity::error::PokerError> {
 }
 ```
 
-**Python.** Build the extension module and put it where the interpreter looks.
-The copy must be named `poker_equity` — `.so` on Linux, `.dylib` on macOS,
-`.dll` on Windows:
+**Python.** The binding is real and works — it is the wheel that is missing, so
+the module gets built from the clone and put where the interpreter looks. Any
+CPython from 3.10 up, since the extension is `abi3-py310`:
 
 ```sh
 cargo build --release --features python
+```
+
+Cargo leaves it in `target/release` under a name Python will not import, so the
+copy is what matters. It must be called `poker_equity`, and the extension
+Python wants is not always the one Cargo wrote:
+
+| Platform | Cargo writes | Copy it to |
+|---|---|---|
+| Linux | `libpoker_equity.so` | `poker_equity.so` |
+| macOS | `libpoker_equity.dylib` | `poker_equity.so` |
+| Windows | `poker_equity.dll` | `poker_equity.pyd` |
+
+macOS is the one that catches people out: CPython loads extension modules named
+`.so` there too, and ignores a `.dylib`. Then, on Linux:
+
+```sh
+mkdir -p ~/lib
 cp target/release/libpoker_equity.so ~/lib/poker_equity.so
 export PYTHONPATH=~/lib
+python3 -c "import poker_equity; print(len(poker_equity.variants()))"   # 14
 ```
+
+Copying it into a virtualenv's `site-packages`, or into the directory you run
+from, works just as well — `PYTHONPATH` is only the least invasive of them.
 
 ```python
 import poker_equity as pc
