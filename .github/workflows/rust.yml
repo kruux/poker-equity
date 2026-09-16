@@ -81,3 +81,32 @@ jobs:
       - name: Check the binding against the engine
         shell: bash
         run: PYTHONPATH=pymod python tests/python/test_binding.py
+
+  benchmarks:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+
+    # OIDC: GitHub mints a short-lived token for this job and CodSpeed
+    # verifies it, so there is no secret to store or rotate. Scoped to the one
+    # job rather than the workflow, which is GitHub's guidance for it.
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-codspeed
+        run: cargo install cargo-codspeed --locked
+
+      - name: Build the benchmarks
+        run: cargo codspeed build
+
+      # Runs them under callgrind and counts instructions. CodSpeed measures
+      # the base commit the same way in the same run, so the comparison never
+      # depends on the runner, and comments the difference on the pull
+      # request.
+      - uses: CodSpeedHQ/action@v5
+        with:
+          run: cargo codspeed run

@@ -586,7 +586,13 @@ std_error = max(spread, 0.0) ** 0.5 / r["weight_sum"]
 cargo test                              # 234 tests, about ten seconds
 cargo test --release -- --ignored       # the exhaustive sweeps
 cargo run --release --bin benchmark     # speed, per game
+cargo bench                             # the paths a refactor could slow
 ```
+
+`benches/engine.rs` runs locally as ordinary criterion timings. CI runs the
+same definitions under callgrind, where what is counted is instructions rather
+than seconds, so a pull request's figures can be compared with the branch it
+came from without either number depending on the machine that produced it.
 
 The tests spread across every core, which is not always what you want on the
 machine you are also using. `scripts/quiet` runs the same commands pinned to

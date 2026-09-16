@@ -45,3 +45,15 @@ opt-level = 2
 
 [dev-dependencies]
 indicatif = "0.17.9"
+
+# The compatibility layer, not CodSpeed itself: `cargo bench` runs these as
+# ordinary criterion benchmarks, and CI runs the same definitions under
+# callgrind. No plotting or HTML, which is most of criterion's dependency
+# tree and none of its use here.
+codspeed-criterion-compat = { version = "5.0.1", default-features = false, features = ["cargo_bench_support"] }
+
+# Instruction counts, not wall clock, so the numbers mean the same thing on
+# any machine. See benches/engine.rs.
+[[bench]]
+name = "engine"
+harness = false
