@@ -19,7 +19,10 @@ fn tally(sampler: &SlotSampler, available: CardSet, draws: usize) -> HashMap<Str
 
     while counts.values().sum::<usize>() < draws {
         attempts += 1;
-        assert!(attempts < draws * 1000, "sampler is rejecting almost everything");
+        assert!(
+            attempts < draws * 1000,
+            "sampler is rejecting almost everything"
+        );
         if !sampler.draw(available, &mut rng, &mut out) {
             continue;
         }
@@ -78,7 +81,10 @@ fn test_uniformity_holds_with_a_wider_overlap() {
     // Sets: {2c,2d}, {2c,2h}, {2c,2s}, {2d,2h}, {2d,2s}. Not {2h,2s}: the
     // second slot cannot take either.
     assert_eq!(counts.len(), 5, "{:?}", counts);
-    assert!(!counts.contains_key("2h 2s"), "neither card fits the second slot");
+    assert!(
+        !counts.contains_key("2h 2s"),
+        "neither card fits the second slot"
+    );
     for (cards, &count) in &counts {
         let share = count as f64 / draws as f64;
         assert!(
@@ -146,11 +152,18 @@ fn test_cards_already_dealt_are_not_drawn_again() {
         if sampler.draw(available, &mut rng, &mut out) {
             successes += 1;
             let drawn: CardSet = out.iter().copied().collect();
-            assert!(drawn.is_disjoint(taken), "drew a card already gone: {:?}", out);
+            assert!(
+                drawn.is_disjoint(taken),
+                "drew a card already gone: {:?}",
+                out
+            );
             assert_eq!(drawn, set("As Ks"), "only one ace and one king are left");
         }
     }
-    assert!(successes > 0, "the only remaining pair should still be drawable");
+    assert!(
+        successes > 0,
+        "the only remaining pair should still be drawable"
+    );
 }
 
 /// A group of slots no deal can fill never yields one.
@@ -180,7 +193,10 @@ fn test_small_constrained_spaces_are_listed() {
 
     // A wildcard opens the space back up to the whole deck.
     let wide = [CardSet::of_rank(Rank::Ace); 7];
-    assert_eq!(SlotSampler::new(&wide, CardSet::FULL_DECK).strategy(), "listed");
+    assert_eq!(
+        SlotSampler::new(&wide, CardSet::FULL_DECK).strategy(),
+        "listed"
+    );
 }
 
 /// Filling the tightest slot first is a tempting way to sample, and it is
@@ -268,7 +284,9 @@ fn test_open_suits_are_shaped_not_searched() {
     let sampler = SlotSampler::new(&omaha, CardSet::FULL_DECK);
     assert_eq!(sampler.strategy(), "listed");
     assert_eq!(
-        sampler.all_sets(CardSet::FULL_DECK, 1_000_000).map(|sets| sets.len()),
+        sampler
+            .all_sets(CardSet::FULL_DECK, 1_000_000)
+            .map(|sets| sets.len()),
         Some(6_961),
         "AA** covers 6,961 hands"
     );
@@ -281,19 +299,27 @@ fn test_open_suits_are_shaped_not_searched() {
         ace,
         CardSet::of_rank(Rank::Two),
         CardSet::of_rank(Rank::Three),
-        any, any, any, any,
+        any,
+        any,
+        any,
+        any,
     ];
     let sampler = SlotSampler::new(&razz, CardSet::FULL_DECK);
     assert_eq!(sampler.strategy(), "listed");
     assert_eq!(
-        sampler.all_sets(CardSet::FULL_DECK, 20_000_000).map(|sets| sets.len()),
+        sampler
+            .all_sets(CardSet::FULL_DECK, 20_000_000)
+            .map(|sets| sets.len()),
         Some(9_215_488),
         "the whole hand is still 9,215,488, counted without building one"
     );
 
     // Naming the suits leaves nothing to decide, as it always did.
     let named = [set("Ah"), set("2c"), set("3d"), any, any, any, any];
-    assert_eq!(SlotSampler::new(&named, CardSet::FULL_DECK).strategy(), "free");
+    assert_eq!(
+        SlotSampler::new(&named, CardSet::FULL_DECK).strategy(),
+        "free"
+    );
 }
 
 /// Drawing by shape must give the same distribution as drawing and testing,

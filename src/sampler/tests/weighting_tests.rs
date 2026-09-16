@@ -88,10 +88,16 @@ where
 
     let seats: Vec<Vec<Vec<CardSet>>> = fields.iter().map(|f| seat_slots(f, hole)).collect();
     let mut rng = SmallRng::seed_from_u64(11);
-    let ln_weights: Vec<f64> = (0..trials).filter_map(|_| deal_weighted(&seats, &mut rng)).collect();
+    let ln_weights: Vec<f64> = (0..trials)
+        .filter_map(|_| deal_weighted(&seats, &mut rng))
+        .collect();
 
     if ln_weights.is_empty() {
-        println!("{:<38} today {:>7.3}%  |  no deal completed", label, 100.0 * acceptance);
+        println!(
+            "{:<38} today {:>7.3}%  |  no deal completed",
+            label,
+            100.0 * acceptance
+        );
         return;
     }
 
@@ -142,18 +148,54 @@ fn measure_where_weighting_pays() {
     measure("stud A23 vs 456", Stud, &["A23", "456"], 7, 4000);
 
     println!("\nBorderline: slow today, but they do answer\n");
-    measure("stud A23/456/789/TJQ", Stud, &["A23", "456", "789", "TJQ"], 7, 4000);
+    measure(
+        "stud A23/456/789/TJQ",
+        Stud,
+        &["A23", "456", "789", "TJQ"],
+        7,
+        4000,
+    );
     measure("stud 4x 'A**'", Stud, &["A**"; 4], 7, 4000);
-    measure("stud A23/A23/***/***", Stud, &["A23", "A23", "***", "***"], 7, 4000);
-    measure("stud A23/A23/A23/***", Stud, &["A23", "A23", "A23", "***"], 7, 4000);
-    measure("omaha 2x AA** + 4x ****", Omaha, &["AA**", "AA**", "****", "****", "****", "****"], 4, 4000);
+    measure(
+        "stud A23/A23/***/***",
+        Stud,
+        &["A23", "A23", "***", "***"],
+        7,
+        4000,
+    );
+    measure(
+        "stud A23/A23/A23/***",
+        Stud,
+        &["A23", "A23", "A23", "***"],
+        7,
+        4000,
+    );
+    measure(
+        "omaha 2x AA** + 4x ****",
+        Omaha,
+        &["AA**", "AA**", "****", "****", "****", "****"],
+        4,
+        4000,
+    );
     measure("omaha 6x 'c***'", Omaha, &["c***"; 6], 4, 4000);
-    measure("holdem 'A c' + 3x 'c c'", Holdem, &["A c", "c c", "c c", "c c"], 2, 4000);
+    measure(
+        "holdem 'A c' + 3x 'c c'",
+        Holdem,
+        &["A c", "c c", "c c", "c c"],
+        2,
+        4000,
+    );
     measure("holdem 5x 'c c'", Holdem, &["c c"; 5], 2, 4000);
 
     println!("\nStalls today\n");
     measure("stud 4x 'A23'", Stud, &["A23"; 4], 7, 4000);
-    measure("stud 4x 'A 2 3 4 5 6 7'", Stud, &["A 2 3 4 5 6 7"; 4], 7, 1000);
+    measure(
+        "stud 4x 'A 2 3 4 5 6 7'",
+        Stud,
+        &["A 2 3 4 5 6 7"; 4],
+        7,
+        1000,
+    );
     measure("holdem 6x 'c c'", Holdem, &["c c"; 6], 2, 4000);
     measure("omaha 6x 'cc**'", Omaha, &["cc**"; 6], 4, 4000);
     println!();
@@ -171,9 +213,7 @@ fn measure_plan_cost() {
 
     use crate::cards::Rank;
 
-    let ranks = |rs: &[Rank]| -> Vec<CardSet> {
-        rs.iter().map(|&r| CardSet::of_rank(r)).collect()
-    };
+    let ranks = |rs: &[Rank]| -> Vec<CardSet> { rs.iter().map(|&r| CardSet::of_rank(r)).collect() };
     let pad = |mut slots: Vec<CardSet>, to: usize| {
         while slots.len() < to {
             slots.push(CardSet::FULL_DECK);
@@ -183,9 +223,18 @@ fn measure_plan_cost() {
 
     use Rank::*;
     let cases: Vec<(&str, Vec<CardSet>)> = vec![
-        ("holdem 'c c'", vec![CardSet::of_suit(crate::cards::Suit::Club); 2]),
-        ("stud 'A23' padded to seven", pad(ranks(&[Ace, Two, Three]), 7)),
-        ("stud 'A 2 3 4 5 6 7'", ranks(&[Ace, Two, Three, Four, Five, Six, Seven])),
+        (
+            "holdem 'c c'",
+            vec![CardSet::of_suit(crate::cards::Suit::Club); 2],
+        ),
+        (
+            "stud 'A23' padded to seven",
+            pad(ranks(&[Ace, Two, Three]), 7),
+        ),
+        (
+            "stud 'A 2 3 4 5 6 7'",
+            ranks(&[Ace, Two, Three, Four, Five, Six, Seven]),
+        ),
     ];
 
     println!();
@@ -244,10 +293,19 @@ fn test_reweighing_matches_rebuilding() {
     let cases: Vec<(&str, Vec<CardSet>)> = vec![
         ("two clubs", vec![CardSet::of_suit(Suit::Club); 2]),
         ("A23 padded to seven", pad(ranks(&[Ace, Two, Three]), 7)),
-        ("the seven low ranks", ranks(&[Ace, Two, Three, Four, Five, Six, Seven])),
-        ("an ace and a club", vec![CardSet::of_rank(Ace), CardSet::of_suit(Suit::Club)]),
+        (
+            "the seven low ranks",
+            ranks(&[Ace, Two, Three, Four, Five, Six, Seven]),
+        ),
+        (
+            "an ace and a club",
+            vec![CardSet::of_rank(Ace), CardSet::of_suit(Suit::Club)],
+        ),
         ("AA** in Omaha", pad(ranks(&[Ace, Ace]), 4)),
-        ("a named card among wildcards", pad(vec![CardSet::from_cards(&["Ah".parse().unwrap()])], 5)),
+        (
+            "a named card among wildcards",
+            pad(vec![CardSet::from_cards(&["Ah".parse().unwrap()])], 5),
+        ),
     ];
 
     let mut rng = SmallRng::seed_from_u64(7);
@@ -268,7 +326,9 @@ fn test_reweighing_matches_rebuilding() {
             }
 
             let reweighed = plan.weigh(pool, &mut groups, &mut cumulative);
-            let rebuilt = ShapePlan::build(&slots, pool).map(|fresh| fresh.total()).unwrap_or(0);
+            let rebuilt = ShapePlan::build(&slots, pool)
+                .map(|fresh| fresh.total())
+                .unwrap_or(0);
 
             assert_eq!(
                 reweighed, rebuilt,

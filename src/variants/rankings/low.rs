@@ -47,7 +47,10 @@ fn low_key(ranks: &[Rank]) -> u64 {
     // Everything below stays on the stack. Naming a hand runs this over
     // every candidate five, so one allocation here is twenty-one a hand, and
     // it is the sweeps that check the lookup tables which pay for them.
-    debug_assert!(ranks.len() <= MOST_RANKS, "more ranks than a deck holds one of");
+    debug_assert!(
+        ranks.len() <= MOST_RANKS,
+        "more ranks than a deck holds one of"
+    );
 
     let mut groups = [0u8; MOST_RANKS];
     let mut distinct = 0;

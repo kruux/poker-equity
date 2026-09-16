@@ -2,8 +2,8 @@ use super::EquityCalculation;
 use crate::{
     hand::Hand,
     variants::{
-        omaha::best_seats, rankings::high_score_from_parts, Courchevel, Omaha, OmahaFive,
-        OmahaSix, PokerVariant, Seats,
+        omaha::best_seats, rankings::high_score_from_parts, Courchevel, Omaha, OmahaFive, OmahaSix,
+        PokerVariant, Seats,
     },
 };
 

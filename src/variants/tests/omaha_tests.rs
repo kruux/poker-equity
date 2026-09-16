@@ -272,7 +272,6 @@ fn test_courchevel_evaluates_as_five_card_omaha() -> Result<(), PokerError> {
     Ok(())
 }
 
-
 /// The equity path works the board out once for the whole table; scoring a
 /// hand on its own works it out again. They must name the same winners, or
 /// sharing the board has changed an answer -- which is the one thing an
@@ -324,15 +323,19 @@ fn test_sharing_the_board_names_the_same_winners() -> Result<(), PokerError> {
     ) -> Result<Vec<Hand<V>>, PokerError> {
         (0..seats)
             .map(|seat| {
-                let mut cards: Vec<Card> =
-                    chosen[seat * 4..seat * 4 + 4].iter().map(|&i| deck[i]).collect();
+                let mut cards: Vec<Card> = chosen[seat * 4..seat * 4 + 4]
+                    .iter()
+                    .map(|&i| deck[i])
+                    .collect();
                 cards.extend_from_slice(board);
                 Ok(Hand::new_with_cards(variant, cards)?)
             })
             .collect()
     }
 
-    let deck: Vec<Card> = (0..52).map(|i| Card::from_index(i).expect("a card")).collect();
+    let deck: Vec<Card> = (0..52)
+        .map(|i| Card::from_index(i).expect("a card"))
+        .collect();
 
     let mut state: u64 = 0x9E37_79B9_7F4A_7C15;
     let mut next = move || {

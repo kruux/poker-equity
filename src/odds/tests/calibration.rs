@@ -41,8 +41,16 @@ fn report<V: PokerVariant + EquityCalculation + Send + Sync>(
         "{} {:?}{}{}",
         variant.key(),
         hands,
-        if board.is_empty() { String::new() } else { format!(" board {}", board) },
-        if dead.is_empty() { String::new() } else { format!(" dead {}", dead) },
+        if board.is_empty() {
+            String::new()
+        } else {
+            format!(" board {}", board)
+        },
+        if dead.is_empty() {
+            String::new()
+        } else {
+            format!(" dead {}", dead)
+        },
     );
 
     match run_exact_within(&request, TRUTH_DEALS as usize)? {
@@ -111,7 +119,12 @@ fn recompute_every_expectation() -> Result<(), PokerError> {
     report(StudHiLo, &["8h7h4h3h2h", "KhKc9d8c7c"], "", "")?;
     report(StudHiLo, &["KhKd8c7d6h3s2c", "KsKc8d7h6s5c3d"], "", "")?;
     report(StudHiLo, &["8h6c4d3h2cKhKd", "8d6h4c3d2hQhQd"], "", "")?;
-    report(StudHiLo, &["AhAcAdKhQc", "8h6c4d3h2c", "7h4c3d2hAs"], "", "")?;
+    report(
+        StudHiLo,
+        &["AhAcAdKhQc", "8h6c4d3h2c", "7h4c3d2hAs"],
+        "",
+        "",
+    )?;
     report(
         StudHiLo,
         &["KhKc9d", "QhQc8d", "Ah3c7d", "2h4c6d", "3h5c4d", "4h6c8h"],
@@ -121,7 +134,12 @@ fn recompute_every_expectation() -> Result<(), PokerError> {
 
     // 2-7 lowball, single draw -- all walked, since there is no board.
     report(DeuceSeven, &["7d5h4c3s2h", "7c5s4h3d2c"], "", "")?;
-    report(DeuceSeven, &["7d5h4c3s2h", "7c5s4h3d2c", "7s5d4d3h2s"], "", "")?;
+    report(
+        DeuceSeven,
+        &["7d5h4c3s2h", "7c5s4h3d2c", "7s5d4d3h2s"],
+        "",
+        "",
+    )?;
     report(DeuceSeven, &["7d5h4c3s2h", "7c6s4h3d2c"], "", "")?;
     report(DeuceSeven, &["7d5h4c3s2h", "5s4h3d2c"], "", "Ad")?;
     report(DeuceSeven, &["7d5h4c3s2h", "5s4h3d2c"], "", "Ad 7h 7s")?;

@@ -63,8 +63,14 @@ fn test_a_bad_holdem_request_is_refused_with_a_reason() -> Result<(), PokerError
         "got {:?}",
         one_card
     );
-    assert!(build(&["AhKhQh", "2h2d"], "", "").is_err(), "three is too many");
-    assert!(build(&["", "AhKh"], "", "").is_err(), "an empty field is not a hand");
+    assert!(
+        build(&["AhKhQh", "2h2d"], "", "").is_err(),
+        "three is too many"
+    );
+    assert!(
+        build(&["", "AhKh"], "", "").is_err(),
+        "an empty field is not a hand"
+    );
 
     // A card is in one place or none. Whichever two places claim it, the
     // error names the card rather than saying the request cannot be met.
@@ -144,7 +150,11 @@ fn test_a_settled_board_is_one_deal() -> Result<(), PokerError> {
 
     assert_eq!(result.samples, 1, "a full board is one deal");
     assert!(result.exact);
-    assert_eq!(result.equities()[0].std_error, 0.0, "no error bar on a certainty");
+    assert_eq!(
+        result.equities()[0].std_error,
+        0.0,
+        "no error bar on a certainty"
+    );
 
     // The board plays: a royal flush in clubs, which neither player improves
     // on, so they split it.

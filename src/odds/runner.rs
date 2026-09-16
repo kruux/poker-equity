@@ -110,7 +110,10 @@ where
             let count = each + u64::from(piece < remainder);
             // A distinct seed per piece, derived so that the same call gives
             // the same deals whatever the thread count.
-            (count, seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(piece))
+            (
+                count,
+                seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(piece),
+            )
         })
         .collect();
 

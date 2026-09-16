@@ -11,7 +11,10 @@ fn test_counting_is_not_enough_to_decide_feasibility() -> Result<(), PokerError>
     // Five deuces is caught by counting: only four exist.
     let five_deuces = vec![CardSet::of_rank(Rank::Two); 5];
     assert!(!is_feasible(&five_deuces, CardSet::FULL_DECK));
-    assert!(is_feasible(&[CardSet::of_rank(Rank::Two); 4], CardSet::FULL_DECK));
+    assert!(is_feasible(
+        &[CardSet::of_rank(Rank::Two); 4],
+        CardSet::FULL_DECK
+    ));
 
     // Two slots that both admit only the ace of hearts is not caught by
     // counting -- two slots and fifty-two cards available -- but no deal
@@ -35,7 +38,11 @@ fn test_maximum_matching_seats_what_it_can() -> Result<(), PokerError> {
     assert!(has_perfect_matching(&anything, &cards));
 
     // Two slots want an ace and one wants a king: all three seat.
-    let mixed = vec![CardSet::of_rank(Rank::Ace), CardSet::of_rank(Rank::Ace), set("Kh")];
+    let mixed = vec![
+        CardSet::of_rank(Rank::Ace),
+        CardSet::of_rank(Rank::Ace),
+        set("Kh"),
+    ];
     assert!(has_perfect_matching(&mixed, &cards));
 
     // Three slots all wanting a king, with one king on offer.

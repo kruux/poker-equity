@@ -159,7 +159,9 @@ fn certain_cards(alternatives: &[Vec<CardSet>]) -> CardSet {
 /// Whether a slot is a whole rank with the suit left open -- `A`, and not
 /// `Ah` or `c` or `*`.
 fn names_only_a_rank(slot: CardSet) -> bool {
-    Rank::all().iter().any(|rank| CardSet::of_rank(*rank) == slot)
+    Rank::all()
+        .iter()
+        .any(|rank| CardSet::of_rank(*rank) == slot)
 }
 
 /// Gives every open-suit rank slot one particular card of that rank.
@@ -299,10 +301,8 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
             .into());
         }
 
-        let cards_arrive_over_time = matches!(
-            variant.poker_type(),
-            PokerType::Draw | PokerType::Stud
-        );
+        let cards_arrive_over_time =
+            matches!(variant.poker_type(), PokerType::Draw | PokerType::Stud);
 
         // In stud every live player is on the same street: third street is
         // three cards for everyone at the table, fourth is four. So fields of
@@ -484,10 +484,8 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
         // The slots themselves, kept alongside the samplers so a weighted
         // deal can count what is still takeable from a part-dealt deck. The
         // board goes last, in `order`'s numbering.
-        let mut slot_lists: Vec<Vec<Vec<CardSet>>> = hands
-            .iter()
-            .map(|spec| spec.alternatives.clone())
-            .collect();
+        let mut slot_lists: Vec<Vec<Vec<CardSet>>> =
+            hands.iter().map(|spec| spec.alternatives.clone()).collect();
         slot_lists.push(vec![board_masks.clone()]);
 
         // One plan per alternative, built here and only re-weighed later.
@@ -876,12 +874,7 @@ impl<V: PokerVariant + EquityCalculation> EquityRequest<V> {
     /// Deals once, writing each seat's cards into `holes` and the shared
     /// cards into `board`. Returns false when the draw failed and should be
     /// retried.
-    fn deal(
-        &self,
-        rng: &mut SmallRng,
-        holes: &mut [Vec<Card>],
-        board: &mut Vec<Card>,
-    ) -> bool {
+    fn deal(&self, rng: &mut SmallRng, holes: &mut [Vec<Card>], board: &mut Vec<Card>) -> bool {
         let mut available = self.available;
         board.clear();
 
@@ -1030,7 +1023,9 @@ where
     V: PokerVariant + EquityCalculation,
 {
     if seat == choices.len() {
-        return walk_boards(request, available, holes, shares, low_shares, result, budget);
+        return walk_boards(
+            request, available, holes, shares, low_shares, result, budget,
+        );
     }
 
     for holding in &choices[seat] {
@@ -1095,9 +1090,7 @@ where
 
         shares.iter_mut().for_each(|share| *share = 0.0);
         low_shares.iter_mut().for_each(|share| *share = 0.0);
-        request
-            .variant
-            .award_detailed(&hands, shares, low_shares)?;
+        request.variant.award_detailed(&hands, shares, low_shares)?;
         result.record(shares, low_shares);
     }
     Ok(true)
@@ -1164,10 +1157,12 @@ where
                 }
                 1.0
             }
-            Dealing::Weighted => match request.deal_weighted(&mut rng, &mut holes, &mut board, &mut scratch) {
-                Some(weight) => weight,
-                None => continue,
-            },
+            Dealing::Weighted => {
+                match request.deal_weighted(&mut rng, &mut holes, &mut board, &mut scratch) {
+                    Some(weight) => weight,
+                    None => continue,
+                }
+            }
         };
 
         for (hand, hole) in hands.iter_mut().zip(holes.iter()) {

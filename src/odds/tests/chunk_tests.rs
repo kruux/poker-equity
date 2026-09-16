@@ -35,7 +35,10 @@ fn test_published_reference_equities() {
             equities[0].percent(),
             expected
         );
-        assert_eq!(equities[0].std_error, 0.0, "an exact result has no error bar");
+        assert_eq!(
+            equities[0].std_error, 0.0,
+            "an exact result has no error bar"
+        );
     }
 }
 
@@ -244,18 +247,18 @@ fn test_impossible_requests_are_refused() {
 
     // The board wants a card that is dead, which names the card too.
     let dead_board = EquityRequest::from_text(Holdem, &["AhKh", "QsJs"], "2c 7d 9h", "2c");
-    assert!(matches!(
-        &dead_board,
-        Err(PokerError::Game(GameError::DuplicateCard(card))) if card.to_string() == "2c"
-    ), "got {:?}", dead_board);
+    assert!(
+        matches!(
+            &dead_board,
+            Err(PokerError::Game(GameError::DuplicateCard(card))) if card.to_string() == "2c"
+        ),
+        "got {:?}",
+        dead_board
+    );
 
     // Five hearts wanted from a deck with only four left.
-    let too_few = EquityRequest::from_text(
-        Holdem,
-        &["h h", "h h"],
-        "h",
-        "2h 3h 4h 5h 6h 7h 8h 9h Th",
-    );
+    let too_few =
+        EquityRequest::from_text(Holdem, &["h h", "h h"], "h", "2h 3h 4h 5h 6h 7h 8h 9h Th");
     assert!(matches!(
         too_few,
         Err(PokerError::Equity(EquityError::Infeasible(_)))
@@ -288,12 +291,7 @@ fn test_a_short_draw_hand_draws_the_difference() -> Result<(), PokerError> {
 
     // Both stand pat, so there is nothing left to deal and one deal settles
     // it. 7-5-4-3-2 is the best hand in the game.
-    let pat = EquityRequest::from_text(
-        DeuceSeven,
-        &["7h5c4d3s2h", "8h6c5d3h2c"],
-        "",
-        "",
-    )?;
+    let pat = EquityRequest::from_text(DeuceSeven, &["7h5c4d3s2h", "8h6c5d3h2c"], "", "")?;
     let settled = run_exact(&pat)?.expect("two pat hands need no deal");
     assert_eq!(settled.samples, 1, "nothing is drawn");
     assert_eq!(
@@ -325,12 +323,8 @@ fn test_a_short_stud_hand_is_dealt_out() -> Result<(), PokerError> {
     use crate::variants::Stud;
 
     let short = EquityRequest::from_text(Stud, &["AhKhQh", "2c3d4s"], "", "")?;
-    let spelled_out = EquityRequest::from_text(
-        Stud,
-        &["Ah Kh Qh * * * *", "2c 3d 4s * * * *"],
-        "",
-        "",
-    )?;
+    let spelled_out =
+        EquityRequest::from_text(Stud, &["Ah Kh Qh * * * *", "2c 3d 4s * * * *"], "", "")?;
 
     let short = run_chunk(&short, 60_000, 21)?.equities();
     let spelled = run_chunk(&spelled_out, 60_000, 21)?.equities();
@@ -391,7 +385,10 @@ fn test_text_and_masks_are_the_same_request() -> Result<(), PokerError> {
 
     // And a wildcard survives the round trip: "A" is the four aces.
     let spec = crate::notation::parse_hand("A Kh", 2)?;
-    assert_eq!(spec.alternatives[0][0], CardSet::of_rank(crate::cards::Rank::Ace));
+    assert_eq!(
+        spec.alternatives[0][0],
+        CardSet::of_rank(crate::cards::Rank::Ace)
+    );
     assert_eq!(spec.alternatives[0][0].len(), 4);
 
     Ok(())
@@ -409,7 +406,11 @@ fn test_text_and_masks_are_the_same_request() -> Result<(), PokerError> {
 fn test_a_card_cannot_be_in_two_places() {
     // Caught while reading, because both claims are in one field.
     for (hands, board, why) in [
-        (vec!["AhAh", "QsJs"], "", "a hand naming the same card twice"),
+        (
+            vec!["AhAh", "QsJs"],
+            "",
+            "a hand naming the same card twice",
+        ),
         (vec!["AhKh", "QsJs"], "2c 2c 3d", "a board repeating a card"),
     ] {
         let refused = EquityRequest::from_text(Holdem, &hands, board, "");
@@ -426,10 +427,34 @@ fn test_a_card_cannot_be_in_two_places() {
     // "you have used Ah twice" is a mistake a person can fix, where "no deal
     // satisfies this request" is a puzzle.
     for (hands, board, dead, twice, why) in [
-        (vec!["AhKh", "AhQs"], "", "", "Ah", "two seats holding the ace of hearts"),
-        (vec!["AhKh", "QsJs"], "Ah 2c 3d", "", "Ah", "a seat and the board sharing a card"),
-        (vec!["AhKh", "QsJs"], "", "Ah", "Ah", "a seat holding a card that is dead"),
-        (vec!["AhKh", "QsJs"], "2c 3d 4h", "2c", "2c", "the board holding a dead card"),
+        (
+            vec!["AhKh", "AhQs"],
+            "",
+            "",
+            "Ah",
+            "two seats holding the ace of hearts",
+        ),
+        (
+            vec!["AhKh", "QsJs"],
+            "Ah 2c 3d",
+            "",
+            "Ah",
+            "a seat and the board sharing a card",
+        ),
+        (
+            vec!["AhKh", "QsJs"],
+            "",
+            "Ah",
+            "Ah",
+            "a seat holding a card that is dead",
+        ),
+        (
+            vec!["AhKh", "QsJs"],
+            "2c 3d 4h",
+            "2c",
+            "2c",
+            "the board holding a dead card",
+        ),
     ] {
         let refused = EquityRequest::from_text(Holdem, &hands, board, dead);
         assert!(
@@ -477,14 +502,12 @@ fn test_overlapping_wildcards_deal_consistently() -> Result<(), PokerError> {
     assert_eq!(narrowed.share_sum, named.share_sum);
 
     // A wildcard with nothing left to admit is refused rather than spun on.
-    let nothing_left = EquityRequest::from_text(
-        Holdem,
-        &["A Kh", "QsJs"],
-        "",
-        "Ah Ad Ac As",
-    );
+    let nothing_left = EquityRequest::from_text(Holdem, &["A Kh", "QsJs"], "", "Ah Ad Ac As");
     assert!(
-        matches!(nothing_left, Err(PokerError::Equity(EquityError::Infeasible(_)))),
+        matches!(
+            nothing_left,
+            Err(PokerError::Equity(EquityError::Infeasible(_)))
+        ),
         "no ace is left to fill the slot"
     );
 
@@ -600,7 +623,10 @@ fn test_a_deal_that_cannot_be_filled_is_drawn_again() -> Result<(), PokerError> 
     let contended = EquityRequest::from_text(Holdem, &["5 *", "5 *", "5 *", "5 *"], "", "")?;
     let result = run_chunk(&contended, 20_000, 3)?;
     assert_eq!(result.samples, 20_000, "the answer still arrives");
-    assert!(result.attempts > result.samples, "and deals were thrown away");
+    assert!(
+        result.attempts > result.samples,
+        "and deals were thrown away"
+    );
 
     Ok(())
 }
@@ -612,11 +638,7 @@ fn test_a_deal_that_cannot_be_filled_is_drawn_again() -> Result<(), PokerError> 
 #[test]
 fn test_dealing_order_does_not_move_the_answer() -> Result<(), PokerError> {
     let board = "Kh Qd 9c 3s 2h";
-    for hands in [
-        vec!["* *", "5 *"],
-        vec!["5 *", "* *"],
-        vec!["A c", "* *"],
-    ] {
+    for hands in [vec!["* *", "5 *"], vec!["5 *", "* *"], vec!["A c", "* *"]] {
         let request = EquityRequest::from_text(Holdem, &hands, board, "")?;
         let exact = run_exact(&request)?.expect("a full board leaves little to walk");
         let sampled = run_chunk(&request, 300_000, 17)?;
@@ -688,7 +710,10 @@ fn test_an_empty_accumulator_keeps_an_exact_answer_exact() {
 
     let mut total = ChunkResult::empty(2);
     total.merge(&walked);
-    assert!(total.exact, "an enumeration folded into nothing is still an enumeration");
+    assert!(
+        total.exact,
+        "an enumeration folded into nothing is still an enumeration"
+    );
     assert_eq!(
         total.equities()[0].std_error,
         0.0,
@@ -698,6 +723,12 @@ fn test_an_empty_accumulator_keeps_an_exact_answer_exact() {
 
     let drawn = sampled(&["AhAd", "KsKc"], "2c 7d 9h", "", 10_000, 4);
     total.merge(&drawn);
-    assert!(!total.exact, "a sample mixed into an enumeration makes the whole an estimate");
-    assert!(total.equities()[0].std_error > 0.0, "and an estimate carries an error bar");
+    assert!(
+        !total.exact,
+        "a sample mixed into an enumeration makes the whole an estimate"
+    );
+    assert!(
+        total.equities()[0].std_error > 0.0,
+        "and an estimate carries an error bar"
+    );
 }

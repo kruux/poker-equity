@@ -84,10 +84,7 @@ fn test_hand_comparisons() -> Result<(), PokerError> {
     // cards.
     let hand7 = Hand::from_str(Razz, "2h 2d 3c 3s 4h")?; // Plays 4-3-3-2-2
     let hand8 = Hand::from_str(Razz, "2c 3h 4d")?; // Only three cards
-    assert!(
-        hand7 > hand8,
-        "a five-card low beats a three-card holding"
-    );
+    assert!(hand7 > hand8, "a five-card low beats a three-card holding");
 
     Ok(())
 }
@@ -181,19 +178,13 @@ fn test_paired_lows_rank_by_pair_then_kickers() -> Result<(), PokerError> {
     // Same pair, so the kickers decide: 6-4-2 is lower than 6-5-A.
     let lower_kicker = Hand::from_str(Razz, "3h 3d 6c 4s 2h")?;
     let higher_kicker = Hand::from_str(Razz, "3c 3s 6d 5h Ac")?;
-    assert!(
-        lower_kicker > higher_kicker,
-        "3-3-6-4-2 beats 3-3-6-5-A"
-    );
+    assert!(lower_kicker > higher_kicker, "3-3-6-4-2 beats 3-3-6-5-A");
 
     // Different pairs, so the pair decides. The ace is the lowest card, so a
     // pair of aces is the lowest pair there is.
     let pair_of_aces = Hand::from_str(Razz, "Ah Ad 9c 5s 3h")?;
     let pair_of_deuces = Hand::from_str(Razz, "2h 2d 5c 4s 3d")?;
-    assert!(
-        pair_of_aces > pair_of_deuces,
-        "A-A-9-5-3 beats 2-2-5-4-3"
-    );
+    assert!(pair_of_aces > pair_of_deuces, "A-A-9-5-3 beats 2-2-5-4-3");
 
     // ...but both lose to any hand with no pair at all, however high.
     let no_pair = Hand::from_str(Razz, "Kh Jd 8c 6s 4h")?;

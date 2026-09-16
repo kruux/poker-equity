@@ -165,7 +165,11 @@ pub fn high_score(cards: &[Card]) -> u16 {
 /// high, so `A5432` is a bad high-card hand rather than a straight, and
 /// straights and flushes count against you.
 pub fn deuce_seven_score(cards: &[Card]) -> u16 {
-    score(cards, DEUCE_SEVEN_HAND_SCORES, Some(DEUCE_SEVEN_FLUSH_SCORES))
+    score(
+        cards,
+        DEUCE_SEVEN_HAND_SCORES,
+        Some(DEUCE_SEVEN_FLUSH_SCORES),
+    )
 }
 
 /// The high hand over thirty-six cards: a flush beats a full house, and the

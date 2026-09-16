@@ -54,9 +54,9 @@ fn test_rank_and_suit_masks() -> Result<(), PokerError> {
     );
 
     // The four suits partition the deck.
-    let all_suits = Suit::all()
-        .iter()
-        .fold(CardSet::EMPTY, |set, &suit| set.union(CardSet::of_suit(suit)));
+    let all_suits = Suit::all().iter().fold(CardSet::EMPTY, |set, &suit| {
+        set.union(CardSet::of_suit(suit))
+    });
     assert_eq!(all_suits, CardSet::FULL_DECK);
 
     Ok(())

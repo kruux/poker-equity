@@ -12,20 +12,90 @@ use crate::variants::*;
 fn test_every_variant_row_exists() {
     // key, label, hole cards, board cards, deck size
     let rows: Vec<(&str, usize, usize, u32)> = vec![
-        (Holdem.key(), Holdem.hole_cards(), Holdem.board_cards(), Holdem.deck().len()),
-        (ShortDeck.key(), ShortDeck.hole_cards(), ShortDeck.board_cards(), ShortDeck.deck().len()),
-        (Omaha.key(), Omaha.hole_cards(), Omaha.board_cards(), Omaha.deck().len()),
-        (OmahaFive.key(), OmahaFive.hole_cards(), OmahaFive.board_cards(), OmahaFive.deck().len()),
-        (OmahaSix.key(), OmahaSix.hole_cards(), OmahaSix.board_cards(), OmahaSix.deck().len()),
-        (OmahaHiLo.key(), OmahaHiLo.hole_cards(), OmahaHiLo.board_cards(), OmahaHiLo.deck().len()),
-        (OmahaFiveHiLo.key(), OmahaFiveHiLo.hole_cards(), OmahaFiveHiLo.board_cards(), OmahaFiveHiLo.deck().len()),
-        (Courchevel.key(), Courchevel.hole_cards(), Courchevel.board_cards(), Courchevel.deck().len()),
-        (CourchevelHiLo.key(), CourchevelHiLo.hole_cards(), CourchevelHiLo.board_cards(), CourchevelHiLo.deck().len()),
-        (Stud.key(), Stud.hole_cards(), Stud.board_cards(), Stud.deck().len()),
-        (StudHiLo.key(), StudHiLo.hole_cards(), StudHiLo.board_cards(), StudHiLo.deck().len()),
-        (Razz.key(), Razz.hole_cards(), Razz.board_cards(), Razz.deck().len()),
-        (DeuceSeven.key(), DeuceSeven.hole_cards(), DeuceSeven.board_cards(), DeuceSeven.deck().len()),
-        (Badugi.key(), Badugi.hole_cards(), Badugi.board_cards(), Badugi.deck().len()),
+        (
+            Holdem.key(),
+            Holdem.hole_cards(),
+            Holdem.board_cards(),
+            Holdem.deck().len(),
+        ),
+        (
+            ShortDeck.key(),
+            ShortDeck.hole_cards(),
+            ShortDeck.board_cards(),
+            ShortDeck.deck().len(),
+        ),
+        (
+            Omaha.key(),
+            Omaha.hole_cards(),
+            Omaha.board_cards(),
+            Omaha.deck().len(),
+        ),
+        (
+            OmahaFive.key(),
+            OmahaFive.hole_cards(),
+            OmahaFive.board_cards(),
+            OmahaFive.deck().len(),
+        ),
+        (
+            OmahaSix.key(),
+            OmahaSix.hole_cards(),
+            OmahaSix.board_cards(),
+            OmahaSix.deck().len(),
+        ),
+        (
+            OmahaHiLo.key(),
+            OmahaHiLo.hole_cards(),
+            OmahaHiLo.board_cards(),
+            OmahaHiLo.deck().len(),
+        ),
+        (
+            OmahaFiveHiLo.key(),
+            OmahaFiveHiLo.hole_cards(),
+            OmahaFiveHiLo.board_cards(),
+            OmahaFiveHiLo.deck().len(),
+        ),
+        (
+            Courchevel.key(),
+            Courchevel.hole_cards(),
+            Courchevel.board_cards(),
+            Courchevel.deck().len(),
+        ),
+        (
+            CourchevelHiLo.key(),
+            CourchevelHiLo.hole_cards(),
+            CourchevelHiLo.board_cards(),
+            CourchevelHiLo.deck().len(),
+        ),
+        (
+            Stud.key(),
+            Stud.hole_cards(),
+            Stud.board_cards(),
+            Stud.deck().len(),
+        ),
+        (
+            StudHiLo.key(),
+            StudHiLo.hole_cards(),
+            StudHiLo.board_cards(),
+            StudHiLo.deck().len(),
+        ),
+        (
+            Razz.key(),
+            Razz.hole_cards(),
+            Razz.board_cards(),
+            Razz.deck().len(),
+        ),
+        (
+            DeuceSeven.key(),
+            DeuceSeven.hole_cards(),
+            DeuceSeven.board_cards(),
+            DeuceSeven.deck().len(),
+        ),
+        (
+            Badugi.key(),
+            Badugi.hole_cards(),
+            Badugi.board_cards(),
+            Badugi.deck().len(),
+        ),
     ];
 
     let expected: Vec<(&str, usize, usize, u32)> = vec![
@@ -83,19 +153,39 @@ fn test_the_three_names_of_every_game_line_up() {
         ("OmahaFive", OmahaFive.key(), OmahaFive.to_string().leak()),
         ("OmahaSix", OmahaSix.key(), OmahaSix.to_string().leak()),
         ("OmahaHiLo", OmahaHiLo.key(), OmahaHiLo.to_string().leak()),
-        ("OmahaFiveHiLo", OmahaFiveHiLo.key(), OmahaFiveHiLo.to_string().leak()),
-        ("Courchevel", Courchevel.key(), Courchevel.to_string().leak()),
-        ("CourchevelHiLo", CourchevelHiLo.key(), CourchevelHiLo.to_string().leak()),
+        (
+            "OmahaFiveHiLo",
+            OmahaFiveHiLo.key(),
+            OmahaFiveHiLo.to_string().leak(),
+        ),
+        (
+            "Courchevel",
+            Courchevel.key(),
+            Courchevel.to_string().leak(),
+        ),
+        (
+            "CourchevelHiLo",
+            CourchevelHiLo.key(),
+            CourchevelHiLo.to_string().leak(),
+        ),
         ("Stud", Stud.key(), Stud.to_string().leak()),
         ("StudHiLo", StudHiLo.key(), StudHiLo.to_string().leak()),
         ("Razz", Razz.key(), Razz.to_string().leak()),
-        ("DeuceSeven", DeuceSeven.key(), DeuceSeven.to_string().leak()),
+        (
+            "DeuceSeven",
+            DeuceSeven.key(),
+            DeuceSeven.to_string().leak(),
+        ),
         ("Badugi", Badugi.key(), Badugi.to_string().leak()),
     ];
 
     let expected: Vec<(&str, &str, &str)> = vec![
         ("Holdem", "holdem", "Hold'em"),
-        ("ShortDeck", "short_deck", "Short Deck Hold'em (flush beats full house)"),
+        (
+            "ShortDeck",
+            "short_deck",
+            "Short Deck Hold'em (flush beats full house)",
+        ),
         ("Omaha", "omaha", "Omaha"),
         ("OmahaFive", "omaha_five", "5-Card Omaha"),
         ("OmahaSix", "omaha_six", "6-Card Omaha"),

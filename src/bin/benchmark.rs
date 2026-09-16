@@ -43,7 +43,10 @@ fn report_wide(label: &str, per_second: f64) {
 
 fn report(label: &str, seats: usize, per_second: f64) {
     let short: String = label.chars().take(26).collect();
-    println!("{:28} {:>2} seats  {:>13.0} showdowns/s", short, seats, per_second);
+    println!(
+        "{:28} {:>2} seats  {:>13.0} showdowns/s",
+        short, seats, per_second
+    );
 }
 
 fn main() {
@@ -52,7 +55,12 @@ fn main() {
     time_variant!(Holdem, &["AhKh", "QsQd"], "", 400_000);
     time_variant!(Holdem, &["AhKh", "QsQd"], "", 200_000);
     time_variant!(ShortDeck, &["AhKh", "QsQd"], "", 200_000);
-    time_variant!(Holdem, &["AhKh", "QsQd", "7c2d", "JsTs", "9h9c", "4s4d"], "", 200_000);
+    time_variant!(
+        Holdem,
+        &["AhKh", "QsQd", "7c2d", "JsTs", "9h9c", "4s4d"],
+        "",
+        200_000
+    );
     println!();
     time_variant!(Omaha, &["AhKh7c2d", "QsQdJsTd"], "", 40_000);
     time_variant!(Omaha, &["AhKh7c2d", "QsQdJsTd"], "", 100_000);
@@ -68,9 +76,7 @@ fn main() {
     // table rather than working them out per seat pays the most.
     time_variant!(
         Omaha,
-        &[
-            "AhKh7c2d", "QsQdJsTd", "9c8c7d6d", "AsAd5h4h", "KsQh9s8h", "3c3d2h2s"
-        ],
+        &["AhKh7c2d", "QsQdJsTd", "9c8c7d6d", "AsAd5h4h", "KsQh9s8h", "3c3d2h2s"],
         "",
         20_000
     );

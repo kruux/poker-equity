@@ -104,7 +104,10 @@ impl BoardParts {
     /// Every three-card choice from the board. At most `C(5,3)`, and fewer
     /// while the board is short.
     pub(super) fn of(board_cards: &[Card]) -> Self {
-        let mut parts = [Part { key: 0, suited: None }; 10];
+        let mut parts = [Part {
+            key: 0,
+            suited: None,
+        }; 10];
         let mut count = 0;
         for a in 0..board_cards.len() {
             for b in (a + 1)..board_cards.len() {
@@ -132,7 +135,10 @@ pub(super) fn best_score_against(
     }
 
     // At most C(6,2) hole pairs.
-    let mut hole_parts = [Part { key: 0, suited: None }; 15];
+    let mut hole_parts = [Part {
+        key: 0,
+        suited: None,
+    }; 15];
     let mut holes = 0;
     for first in 0..hole_cards.len() {
         for second in (first + 1)..hole_cards.len() {

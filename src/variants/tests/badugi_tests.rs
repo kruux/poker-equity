@@ -21,10 +21,18 @@ fn test_a_badugi_repeats_neither_rank_nor_suit() -> Result<(), PokerError> {
     );
 
     // Two clubs, so one of them has to go: a three-card badugi.
-    assert_eq!(badugi("Ac 2c 3h 4s")?.len(), 3, "two clubs cannot both play");
+    assert_eq!(
+        badugi("Ac 2c 3h 4s")?.len(),
+        3,
+        "two clubs cannot both play"
+    );
 
     // Two deuces, likewise.
-    assert_eq!(badugi("Ac 2d 2h 4s")?.len(), 3, "two deuces cannot both play");
+    assert_eq!(
+        badugi("Ac 2d 2h 4s")?.len(),
+        3,
+        "two deuces cannot both play"
+    );
 
     // All one suit: only one card plays.
     assert_eq!(badugi("Ac 2c 3c 4c")?, vec![Rank::Ace], "a one-card badugi");
@@ -133,7 +141,9 @@ fn test_badugis_score_and_name_agree_everywhere() {
         key
     }
 
-    let deck: Vec<Card> = (0..52).map(|i| Card::from_index(i).expect("a card")).collect();
+    let deck: Vec<Card> = (0..52)
+        .map(|i| Card::from_index(i).expect("a card"))
+        .collect();
     let mut checked = 0;
 
     for a in 0..deck.len() {

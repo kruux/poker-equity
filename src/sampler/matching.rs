@@ -61,7 +61,10 @@ pub fn has_perfect_matching(slots: &[CardSet], cards: &[Card]) -> bool {
 /// This is Hall's condition, decided the same way. It can prove a request
 /// impossible; it never rejects one that is satisfiable.
 pub fn is_feasible(slots: &[CardSet], available: CardSet) -> bool {
-    if slots.iter().any(|slot| slot.intersection(available).is_empty()) {
+    if slots
+        .iter()
+        .any(|slot| slot.intersection(available).is_empty())
+    {
         return false;
     }
     let cards: Vec<Card> = available.iter().collect();

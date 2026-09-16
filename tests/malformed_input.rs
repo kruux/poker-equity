@@ -91,17 +91,33 @@ fn test_no_field_however_malformed_can_panic() {
         // Zero slots through more than any game deals, since the slot count
         // comes from the variant and a new variant could widen it.
         for slots in 0..=8usize {
-            guard!(found, format!("parse_hand({:?}, {})", text, slots), parse_hand(&text, slots));
+            guard!(
+                found,
+                format!("parse_hand({:?}, {})", text, slots),
+                parse_hand(&text, slots)
+            );
             guard!(
                 found,
                 format!("parse_hand_up_to({:?}, {})", text, slots),
                 parse_hand_up_to(&text, slots)
             );
-            guard!(found, format!("parse_board({:?}, {})", text, slots), parse_board(&text, slots));
+            guard!(
+                found,
+                format!("parse_board({:?}, {})", text, slots),
+                parse_board(&text, slots)
+            );
         }
         guard!(found, format!("parse_dead({:?})", text), parse_dead(&text));
-        guard!(found, format!("Card::parse_field({:?})", text), Card::parse_field(&text));
-        guard!(found, format!("{:?}.parse::<Card>()", text), text.parse::<Card>());
+        guard!(
+            found,
+            format!("Card::parse_field({:?})", text),
+            Card::parse_field(&text)
+        );
+        guard!(
+            found,
+            format!("{:?}.parse::<Card>()", text),
+            text.parse::<Card>()
+        );
     }
 
     std::panic::set_hook(hook);
@@ -121,10 +137,31 @@ fn test_no_request_however_odd_can_panic() {
     let mut found = Vec::new();
 
     let fields = [
-        "", "Ah", "AhKh", "AhKhQh", "AhKhQhJh", "AhKhQhJhTh", "AhKhQhJhTh9h", "AhKhQhJhTh9h8h",
-        "AhKhQhJhTh9h8h7h", "**", "AKs", "AhAh", "*",
+        "",
+        "Ah",
+        "AhKh",
+        "AhKhQh",
+        "AhKhQhJh",
+        "AhKhQhJhTh",
+        "AhKhQhJhTh9h",
+        "AhKhQhJhTh9h8h",
+        "AhKhQhJhTh9h8h7h",
+        "**",
+        "AKs",
+        "AhAh",
+        "*",
     ];
-    let boards = ["", "2c", "2c3d", "2c3d4h", "2c3d4h5s", "2c3d4h5s6c", "2c3d4h5s6c7d", "*", "*****"];
+    let boards = [
+        "",
+        "2c",
+        "2c3d",
+        "2c3d4h",
+        "2c3d4h5s",
+        "2c3d4h5s6c",
+        "2c3d4h5s6c7d",
+        "*",
+        "*****",
+    ];
     let deads = ["", "2h", "Ah", "Ah2h3h4h5h6h7h8h9hTh"];
 
     macro_rules! sweep {
@@ -143,9 +180,12 @@ fn test_no_request_however_odd_can_panic() {
                                 dead
                             );
                             guard!(found, label, {
-                                if let Ok(request) =
-                                    EquityRequest::from_text($variant, &[hero, villain], board, dead)
-                                {
+                                if let Ok(request) = EquityRequest::from_text(
+                                    $variant,
+                                    &[hero, villain],
+                                    board,
+                                    dead,
+                                ) {
                                     if dealt < 400 {
                                         dealt += 1;
                                         let _ = run_chunk(&request, 8, 7);
@@ -194,7 +234,12 @@ fn test_no_mask_however_odd_can_panic() {
         for board_len in 0..=6usize {
             let board: Vec<CardSet> = vec![slot; board_len];
             for dead in odd {
-                let label = format!("board of {} x {:#x}, dead {:#x}", board_len, slot.bits(), dead.bits());
+                let label = format!(
+                    "board of {} x {:#x}, dead {:#x}",
+                    board_len,
+                    slot.bits(),
+                    dead.bits()
+                );
                 guard!(found, label, {
                     let spec = parse_hand("AhKh", 2).expect("a fixed, valid field");
                     EquityRequest::from_masks(Holdem, &[spec.clone(), spec], &board, dead)

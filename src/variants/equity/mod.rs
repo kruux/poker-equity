@@ -1,9 +1,6 @@
-
 use crate::{error::PokerError, hand::Hand};
 
-use super::{
-    Badugi, DeuceSeven, Holdem, LowHandRank, PokerVariant, Razz, ShortDeck, Stud,
-};
+use super::{Badugi, DeuceSeven, Holdem, LowHandRank, PokerVariant, Razz, ShortDeck, Stud};
 
 mod omaha;
 mod omaha_hi_lo;

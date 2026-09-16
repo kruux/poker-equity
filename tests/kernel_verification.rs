@@ -42,11 +42,7 @@ fn deck() -> Vec<Card> {
 /// Every one of these rankings orders hands greatest-is-best, while every
 /// table scores them lowest-is-best, so what is checked is that the two are
 /// related by a single order-reversing bijection.
-fn disagreements<R, N, S>(
-    hands: impl Iterator<Item = Vec<Card>>,
-    name: N,
-    score: S,
-) -> Vec<String>
+fn disagreements<R, N, S>(hands: impl Iterator<Item = Vec<Card>>, name: N, score: S) -> Vec<String>
 where
     R: std::fmt::Debug + PartialOrd,
     N: Fn(&[Card]) -> R,
@@ -190,7 +186,14 @@ fn five_card_hands_exhaustive() {
 /// straights, and a pair of aces sitting above a straight.
 #[test]
 fn seven_card_hands_from_a_reduced_deck() {
-    let keep = [Rank::Ace, Rank::Two, Rank::Three, Rank::Four, Rank::Five, Rank::Six];
+    let keep = [
+        Rank::Ace,
+        Rank::Two,
+        Rank::Three,
+        Rank::Four,
+        Rank::Five,
+        Rank::Six,
+    ];
     let deck: Vec<Card> = deck()
         .into_iter()
         .filter(|c| keep.contains(&c.rank()))
@@ -206,8 +209,7 @@ fn seven_card_hands_from_a_reduced_deck() {
                         for f in (e + 1)..deck.len() {
                             for g in (f + 1)..deck.len() {
                                 hands.push(vec![
-                                    deck[a], deck[b], deck[c], deck[d], deck[e], deck[f],
-                                    deck[g],
+                                    deck[a], deck[b], deck[c], deck[d], deck[e], deck[f], deck[g],
                                 ]);
                             }
                         }
@@ -331,11 +333,7 @@ fn low_hands_exhaustive() {
     let hands = five_card_hands(&deck());
     let checked = hands.len();
     report(
-        disagreements(
-            hands.into_iter(),
-            LowHandRank::evaluate,
-            low_a5_score,
-        ),
+        disagreements(hands.into_iter(), LowHandRank::evaluate, low_a5_score),
         checked,
         "five-card ace-to-five lows",
     );
@@ -370,20 +368,12 @@ fn every_kernel_agrees_on_seven_card_hands() {
 
     let checked = hands.len();
     report(
-        disagreements(
-            hands.iter().cloned(),
-            HighHandRank::evaluate,
-            high_score,
-        ),
+        disagreements(hands.iter().cloned(), HighHandRank::evaluate, high_score),
         checked,
         "sampled seven-card high hands",
     );
     report(
-        disagreements(
-            hands.iter().cloned(),
-            LowHandRank::evaluate,
-            low_a5_score,
-        ),
+        disagreements(hands.iter().cloned(), LowHandRank::evaluate, low_a5_score),
         checked,
         "sampled seven-card lows",
     );

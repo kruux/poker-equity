@@ -5,20 +5,35 @@ use crate::error::CardError;
 fn test_card_from_str_valid_inputs() -> Result<(), CardError> {
     // Test each rank
     assert_eq!(Card::parse_field("Ah")?.len(), 1);
-    assert_eq!(Card::parse_field("Ah")?[0], Card::new(Suit::Heart, Rank::Ace));
+    assert_eq!(
+        Card::parse_field("Ah")?[0],
+        Card::new(Suit::Heart, Rank::Ace)
+    );
     assert_eq!(Card::parse_field("Kh")?.len(), 1);
-    assert_eq!(Card::parse_field("Kh")?[0], Card::new(Suit::Heart, Rank::King));
+    assert_eq!(
+        Card::parse_field("Kh")?[0],
+        Card::new(Suit::Heart, Rank::King)
+    );
     assert_eq!(Card::parse_field("Qh")?.len(), 1);
     assert_eq!(
         Card::parse_field("Qh")?[0],
         Card::new(Suit::Heart, Rank::Queen)
     );
     assert_eq!(Card::parse_field("Jh")?.len(), 1);
-    assert_eq!(Card::parse_field("Jh")?[0], Card::new(Suit::Heart, Rank::Jack));
+    assert_eq!(
+        Card::parse_field("Jh")?[0],
+        Card::new(Suit::Heart, Rank::Jack)
+    );
     assert_eq!(Card::parse_field("Th")?.len(), 1);
-    assert_eq!(Card::parse_field("Th")?[0], Card::new(Suit::Heart, Rank::Ten));
+    assert_eq!(
+        Card::parse_field("Th")?[0],
+        Card::new(Suit::Heart, Rank::Ten)
+    );
     assert_eq!(Card::parse_field("9h")?.len(), 1);
-    assert_eq!(Card::parse_field("9h")?[0], Card::new(Suit::Heart, Rank::Nine));
+    assert_eq!(
+        Card::parse_field("9h")?[0],
+        Card::new(Suit::Heart, Rank::Nine)
+    );
     assert_eq!(Card::parse_field("8h")?.len(), 1);
     assert_eq!(
         Card::parse_field("8h")?[0],
@@ -30,18 +45,30 @@ fn test_card_from_str_valid_inputs() -> Result<(), CardError> {
         Card::new(Suit::Heart, Rank::Seven)
     );
     assert_eq!(Card::parse_field("6h")?.len(), 1);
-    assert_eq!(Card::parse_field("6h")?[0], Card::new(Suit::Heart, Rank::Six));
+    assert_eq!(
+        Card::parse_field("6h")?[0],
+        Card::new(Suit::Heart, Rank::Six)
+    );
     assert_eq!(Card::parse_field("5h")?.len(), 1);
-    assert_eq!(Card::parse_field("5h")?[0], Card::new(Suit::Heart, Rank::Five));
+    assert_eq!(
+        Card::parse_field("5h")?[0],
+        Card::new(Suit::Heart, Rank::Five)
+    );
     assert_eq!(Card::parse_field("4h")?.len(), 1);
-    assert_eq!(Card::parse_field("4h")?[0], Card::new(Suit::Heart, Rank::Four));
+    assert_eq!(
+        Card::parse_field("4h")?[0],
+        Card::new(Suit::Heart, Rank::Four)
+    );
     assert_eq!(Card::parse_field("3h")?.len(), 1);
     assert_eq!(
         Card::parse_field("3h")?[0],
         Card::new(Suit::Heart, Rank::Three)
     );
     assert_eq!(Card::parse_field("2h")?.len(), 1);
-    assert_eq!(Card::parse_field("2h")?[0], Card::new(Suit::Heart, Rank::Two));
+    assert_eq!(
+        Card::parse_field("2h")?[0],
+        Card::new(Suit::Heart, Rank::Two)
+    );
     // ... etc
 
     // Test each suit

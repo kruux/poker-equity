@@ -76,10 +76,7 @@ impl RefRank {
         for (slot, &rank) in tiebreak.iter_mut().zip(ranks) {
             *slot = rank + 1;
         }
-        Self {
-            category,
-            tiebreak,
-        }
+        Self { category, tiebreak }
     }
 
     /// The matching `HighHandRank` variant, as Rust source.
@@ -229,7 +226,11 @@ fn eval_flush(mask: u16, wheel: Option<u16>) -> RefRank {
     if let Some(high) = straight_high(mask, wheel) {
         return RefRank::new(STRAIGHT_FLUSH, &[high]);
     }
-    let top: Vec<u8> = (0..13u8).rev().filter(|&r| mask & (1 << r) != 0).take(5).collect();
+    let top: Vec<u8> = (0..13u8)
+        .rev()
+        .filter(|&r| mask & (1 << r) != 0)
+        .take(5)
+        .collect();
     RefRank::new(FLUSH, &top)
 }
 
@@ -390,10 +391,7 @@ fn eval_low(counts: &[u8; 13]) -> RefRank {
             *slot = low_value(*rank);
         }
 
-        let candidate = RefRank {
-            category,
-            tiebreak,
-        };
+        let candidate = RefRank { category, tiebreak };
         if best.as_ref().is_none_or(|found| candidate < *found) {
             best = Some(candidate);
         }
@@ -678,10 +676,7 @@ fn place_keys(keys: &[u32]) -> Vec<u16> {
     displacements
 }
 
-fn write_translation_maps(
-    out_dir: &Path,
-    score_to_rank: &[(u16, RefRank)],
-) -> std::io::Result<()> {
+fn write_translation_maps(out_dir: &Path, score_to_rank: &[(u16, RefRank)]) -> std::io::Result<()> {
     let mut file = BufWriter::new(File::create(out_dir.join("rank_translation.rs"))?);
 
     writeln!(file, "use super::{{FastHandRank, HighHandRank}};")?;

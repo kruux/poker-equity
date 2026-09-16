@@ -110,10 +110,7 @@ fn test_split_equities_sum_to_one() -> Result<(), PokerError> {
         vec!["AhAd2c3d", "KhKsQhQs", "7h8s9dTc"],
     ] {
         let result = run_exact(&EquityRequest::from_text(
-            OmahaHiLo,
-            &hands,
-            "5c 6d 9h",
-            "",
+            OmahaHiLo, &hands, "5c 6d 9h", "",
         )?)?
         .expect("small enough to enumerate");
         let total: f64 = result.equities().iter().map(|player| player.equity).sum();

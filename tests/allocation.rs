@@ -38,8 +38,8 @@ static ALLOCATOR: Counting = Counting;
 /// How many times a run of `samples` deals asks the allocator for memory.
 macro_rules! allocations_for {
     ($variant:expr, $hands:expr, $samples:expr, $seed:expr) => {{
-        let request = EquityRequest::from_text($variant, $hands, "", "")
-            .expect("the spot should be valid");
+        let request =
+            EquityRequest::from_text($variant, $hands, "", "").expect("the spot should be valid");
         // A warm-up, so that whatever the first run grows into is already
         // grown by the time anything is counted.
         run_chunk(&request, 1_000, 1).expect("sampling should not fail");

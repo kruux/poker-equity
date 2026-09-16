@@ -45,7 +45,10 @@ fn test_weighted_sampling_agrees_with_enumeration() -> Result<(), PokerError> {
             sampled.margin_percent(),
             (exact.equity - sampled.equity).abs() / sampled.std_error.max(f64::MIN_POSITIVE)
         );
-        assert!(sampled.std_error > 0.0, "a sampled answer carries an error bar");
+        assert!(
+            sampled.std_error > 0.0,
+            "a sampled answer carries an error bar"
+        );
     }
     Ok(())
 }
@@ -104,7 +107,12 @@ fn test_identical_seats_split_evenly_when_weighted() -> Result<(), PokerError> {
             );
         }
         let total: f64 = result.equities().iter().map(|e| e.equity).sum();
-        assert!((total - 1.0).abs() < 1e-9, "{}: equities summed to {}", label, total);
+        assert!(
+            (total - 1.0).abs() < 1e-9,
+            "{}: equities summed to {}",
+            label,
+            total
+        );
     }
     Ok(())
 }
@@ -129,10 +137,16 @@ fn test_ordinary_spots_are_never_weighted() -> Result<(), PokerError> {
     }
 
     let request = EquityRequest::from_text(Omaha, &["AA**", "KK**"], "", "")?;
-    assert!(!request.is_weighted(), "Omaha aces against kings keeps 82% of its deals");
+    assert!(
+        !request.is_weighted(),
+        "Omaha aces against kings keeps 82% of its deals"
+    );
 
     let request = EquityRequest::from_text(Stud, &["A23", "456"], "", "")?;
-    assert!(!request.is_weighted(), "stud A23 against 456 keeps a third of its deals");
+    assert!(
+        !request.is_weighted(),
+        "stud A23 against 456 keeps a third of its deals"
+    );
 
     Ok(())
 }
@@ -145,13 +159,22 @@ fn test_ordinary_spots_are_never_weighted() -> Result<(), PokerError> {
 #[test]
 fn test_spots_below_the_floor_are_weighted() -> Result<(), PokerError> {
     let request = EquityRequest::from_text(Holdem, &["c c"; 5], "", "")?;
-    assert!(request.is_weighted(), "five club seats keep 1.1% of their deals");
+    assert!(
+        request.is_weighted(),
+        "five club seats keep 1.1% of their deals"
+    );
 
     let request = EquityRequest::from_text(Stud, &["A23", "456", "789", "TJQ"], "", "")?;
-    assert!(request.is_weighted(), "four stud seats naming ranks keep 2.4% of their deals");
+    assert!(
+        request.is_weighted(),
+        "four stud seats naming ranks keep 2.4% of their deals"
+    );
 
     let request = EquityRequest::from_text(Omaha, &["c***"; 6], "", "")?;
-    assert!(request.is_weighted(), "six Omaha seats each wanting a club keep 1.9%");
+    assert!(
+        request.is_weighted(),
+        "six Omaha seats each wanting a club keep 1.9%"
+    );
 
     Ok(())
 }
@@ -189,7 +212,11 @@ fn test_a_constant_weight_changes_nothing() {
             one.std_error,
             other.std_error
         );
-        assert!((one.win - other.win).abs() < 1e-12, "seat {} win rate moved", seat);
+        assert!(
+            (one.win - other.win).abs() < 1e-12,
+            "seat {} win rate moved",
+            seat
+        );
     }
     assert_eq!(
         plain.effective_samples().round(),
@@ -217,7 +244,10 @@ fn test_uneven_weights_cost_effective_samples() {
         uneven.record_weighted(deal, &none, if index % 50 == 0 { 50.0 } else { 1.0 });
     }
 
-    assert_eq!(even.samples, uneven.samples, "both piles hold the same deals");
+    assert_eq!(
+        even.samples, uneven.samples,
+        "both piles hold the same deals"
+    );
     assert!(
         (even.effective_samples() - 100.0).abs() < 1e-9,
         "unweighted deals are worth their count: {}",
@@ -244,7 +274,7 @@ fn test_uneven_weights_cost_effective_samples() {
 fn measure_both_paths() {
     use std::time::Instant;
 
-    use crate::variants::{PokerVariant, EquityCalculation};
+    use crate::variants::{EquityCalculation, PokerVariant};
 
     fn timed<V: PokerVariant + EquityCalculation + Copy>(
         label: &str,
@@ -292,7 +322,11 @@ fn measure_both_paths() {
                 reject_ns,
                 100.0 * yielded,
                 weigh_ns,
-                if chosen { "chose weighted" } else { "chose rejecting" },
+                if chosen {
+                    "chose weighted"
+                } else {
+                    "chose rejecting"
+                },
                 // Choosing the slower path only matters when it is properly
                 // slower. Within a fifth the two are the same speed, and the
                 // floor deliberately leaves those spots where they are.
@@ -310,7 +344,11 @@ fn measure_both_paths() {
                 label,
                 100.0 * yielded,
                 weigh_ns,
-                if chosen { "chose weighted OK" } else { "chose rejecting WRONG" }
+                if chosen {
+                    "chose weighted OK"
+                } else {
+                    "chose rejecting WRONG"
+                }
             ),
             _ => println!("{:<32} no comparison", label),
         }
@@ -321,10 +359,20 @@ fn measure_both_paths() {
     timed("holdem 'A *' vs '* *'", Holdem, &["A *", "* *"], 100_000);
     timed("omaha AA** vs KK**", Omaha, &["AA**", "KK**"], 50_000);
     timed("stud A23 vs 456", Stud, &["A23", "456"], 50_000);
-    timed("stud A23/456/789/TJQ", Stud, &["A23", "456", "789", "TJQ"], 20_000);
+    timed(
+        "stud A23/456/789/TJQ",
+        Stud,
+        &["A23", "456", "789", "TJQ"],
+        20_000,
+    );
     timed("stud 4x 'A**'", Stud, &["A**"; 4], 20_000);
     timed("holdem 5x 'c c'", Holdem, &["c c"; 5], 20_000);
-    timed("holdem 'A c' + 3x 'c c'", Holdem, &["A c", "c c", "c c", "c c"], 20_000);
+    timed(
+        "holdem 'A c' + 3x 'c c'",
+        Holdem,
+        &["A c", "c c", "c c", "c c"],
+        20_000,
+    );
     timed("omaha 6x 'c***'", Omaha, &["c***"; 6], 20_000);
     timed("stud 4x 'A23'", Stud, &["A23"; 4], 20_000);
     timed("holdem 6x 'c c'", Holdem, &["c c"; 6], 20_000);

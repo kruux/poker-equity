@@ -16,7 +16,7 @@ fn request(hands: &[&str], board: &str) -> EquityRequest<Holdem> {
 fn test_small_spots_come_back_exact() {
     let result = equity(
         &request(&["AhAd", "KsKc"], "2c 7d 9h"),
-        Target::Samples(1_000_000)
+        Target::Samples(1_000_000),
     )
     .unwrap();
 
@@ -32,11 +32,7 @@ fn test_small_spots_come_back_exact() {
 #[test]
 fn test_a_sample_target_is_met() {
     let wanted = 120_000;
-    let result = equity(
-        &request(&["A K", "Q J"], ""),
-        Target::Samples(wanted)
-    )
-    .unwrap();
+    let result = equity(&request(&["A K", "Q J"], ""), Target::Samples(wanted)).unwrap();
 
     assert!(!result.exact);
     assert!(
@@ -52,11 +48,7 @@ fn test_a_sample_target_is_met() {
 #[test]
 fn test_a_precision_target_is_met() {
     let wanted = 0.0008;
-    let result = equity(
-        &request(&["AhKh", "22"], ""),
-        Target::StandardError(wanted)
-    )
-    .unwrap();
+    let result = equity(&request(&["AhKh", "22"], ""), Target::StandardError(wanted)).unwrap();
 
     for player in result.equities() {
         assert!(
@@ -130,7 +122,12 @@ fn test_a_batch_spreads_without_changing_the_answer() -> Result<(), PokerError> 
     // same answer to within what sampling allows.
     let gap = (alone.equities()[0].equity - spread.equities()[0].equity).abs();
     let slack = 4.0 * (alone.equities()[0].std_error + spread.equities()[0].std_error);
-    assert!(gap <= slack, "{:.5} apart, against {:.5} of slack", gap, slack);
+    assert!(
+        gap <= slack,
+        "{:.5} apart, against {:.5} of slack",
+        gap,
+        slack
+    );
 
     // One thread is one chunk, deal for deal.
     let single = run_batch(&request, 50_000, 4, 1)?;
@@ -160,7 +157,11 @@ fn test_a_request_carries_its_own_thread_count() -> Result<(), PokerError> {
 
     let mine = request.clone().with_threads(2);
     assert_eq!(mine.threads(), 2);
-    assert_eq!(request.threads(), default_threads(), "the original is untouched");
+    assert_eq!(
+        request.threads(),
+        default_threads(),
+        "the original is untouched"
+    );
 
     // The count is held to what the machine has: none is one, and more than
     // there are cores is every core.
@@ -179,7 +180,12 @@ fn test_a_request_carries_its_own_thread_count() -> Result<(), PokerError> {
     let two = equity(&mine, Target::Samples(200_000))?;
     let gap = (one.equities()[0].equity - two.equities()[0].equity).abs();
     let slack = 4.0 * (one.equities()[0].std_error + two.equities()[0].std_error);
-    assert!(gap <= slack, "{:.5} apart, against {:.5} of slack", gap, slack);
+    assert!(
+        gap <= slack,
+        "{:.5} apart, against {:.5} of slack",
+        gap,
+        slack
+    );
 
     Ok(())
 }
@@ -209,5 +215,9 @@ fn test_an_unreachable_precision_is_refused() {
     }
 
     // A positive, finite one is still perfectly ordinary.
-    assert!(equity(&request(&["AhKh", "QsQd"], "2c 7d 9h"), Target::StandardError(0.01)).is_ok());
+    assert!(equity(
+        &request(&["AhKh", "QsQd"], "2c 7d 9h"),
+        Target::StandardError(0.01)
+    )
+    .is_ok());
 }

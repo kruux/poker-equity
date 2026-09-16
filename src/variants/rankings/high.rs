@@ -258,10 +258,7 @@ impl HighHandRank {
     fn sorted_suits(cards: &[Card]) -> HashMap<Suit, Vec<Card>> {
         let mut cards_by_suit: HashMap<Suit, Vec<Card>> = HashMap::new();
         for &card in cards {
-            cards_by_suit
-                .entry(card.suit())
-                .or_default()
-                .push(card);
+            cards_by_suit.entry(card.suit()).or_default().push(card);
         }
         cards_by_suit
     }

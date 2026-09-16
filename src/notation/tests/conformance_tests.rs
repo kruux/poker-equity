@@ -70,9 +70,7 @@ fn run(row: &Row) -> Result<String, String> {
                 .map(|slots| {
                     slots
                         .iter()
-                        .map(|slot| {
-                            crate::notation::HandSpec::from_slots(&[*slot]).to_string()
-                        })
+                        .map(|slot| crate::notation::HandSpec::from_slots(&[*slot]).to_string())
                         .collect::<Vec<_>>()
                         .join(" ")
                 })

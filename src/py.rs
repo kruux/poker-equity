@@ -16,9 +16,7 @@ use pyo3::types::{PyDict, PyList};
 use crate::cards::{Card, CardSet};
 use crate::error::PokerError;
 use crate::notation::{parse_dead, parse_hand, parse_hand_up_to, HandSpec};
-use crate::odds::{
-    default_threads, run_batch, run_exact, ChunkResult, EquityRequest,
-};
+use crate::odds::{default_threads, run_batch, run_exact, ChunkResult, EquityRequest};
 use crate::variants::*;
 
 /// Runs `body` with the variant named by `key` bound to `variant`.
@@ -30,20 +28,62 @@ use crate::variants::*;
 macro_rules! with_variant {
     ($key:expr, |$variant:ident| $body:expr) => {
         match $key {
-            "holdem" => { let $variant = Holdem; $body }
-            "short_deck" => { let $variant = ShortDeck; $body }
-            "omaha" => { let $variant = Omaha; $body }
-            "omaha_five" => { let $variant = OmahaFive; $body }
-            "omaha_six" => { let $variant = OmahaSix; $body }
-            "omaha_hi_lo" => { let $variant = OmahaHiLo; $body }
-            "omaha_five_hi_lo" => { let $variant = OmahaFiveHiLo; $body }
-            "courchevel" => { let $variant = Courchevel; $body }
-            "courchevel_hi_lo" => { let $variant = CourchevelHiLo; $body }
-            "stud" => { let $variant = Stud; $body }
-            "stud_hi_lo" => { let $variant = StudHiLo; $body }
-            "razz" => { let $variant = Razz; $body }
-            "deuce_seven" => { let $variant = DeuceSeven; $body }
-            "badugi" => { let $variant = Badugi; $body }
+            "holdem" => {
+                let $variant = Holdem;
+                $body
+            }
+            "short_deck" => {
+                let $variant = ShortDeck;
+                $body
+            }
+            "omaha" => {
+                let $variant = Omaha;
+                $body
+            }
+            "omaha_five" => {
+                let $variant = OmahaFive;
+                $body
+            }
+            "omaha_six" => {
+                let $variant = OmahaSix;
+                $body
+            }
+            "omaha_hi_lo" => {
+                let $variant = OmahaHiLo;
+                $body
+            }
+            "omaha_five_hi_lo" => {
+                let $variant = OmahaFiveHiLo;
+                $body
+            }
+            "courchevel" => {
+                let $variant = Courchevel;
+                $body
+            }
+            "courchevel_hi_lo" => {
+                let $variant = CourchevelHiLo;
+                $body
+            }
+            "stud" => {
+                let $variant = Stud;
+                $body
+            }
+            "stud_hi_lo" => {
+                let $variant = StudHiLo;
+                $body
+            }
+            "razz" => {
+                let $variant = Razz;
+                $body
+            }
+            "deuce_seven" => {
+                let $variant = DeuceSeven;
+                $body
+            }
+            "badugi" => {
+                let $variant = Badugi;
+                $body
+            }
             other => Err(PyValueError::new_err(format!(
                 "no game called {:?}; call variants() for the list",
                 other
@@ -103,7 +143,10 @@ fn to_dict(py: Python<'_>, result: &ChunkResult, weighted: bool) -> PyResult<Py<
     // The raw sums, one entry per seat. These add across batches.
     out.set_item("share_sum", result.share_sum.clone())?;
     out.set_item("share_square_sum", result.share_square_sum.clone())?;
-    out.set_item("square_weight_share_sum", result.square_weight_share_sum.clone())?;
+    out.set_item(
+        "square_weight_share_sum",
+        result.square_weight_share_sum.clone(),
+    )?;
     out.set_item("low_share_sum", result.low_share_sum.clone())?;
     out.set_item("win_count", result.win_count.clone())?;
     out.set_item("tie_count", result.tie_count.clone())?;
@@ -182,14 +225,17 @@ fn chunk(
     seed: u64,
     threads: usize,
 ) -> PyResult<Py<PyDict>> {
-    let threads = if threads == 0 { default_threads() } else { threads };
+    let threads = if threads == 0 {
+        default_threads()
+    } else {
+        threads
+    };
     let specs: Vec<HandSpec> = hands.into_iter().map(hand_spec).collect();
     let board: Vec<CardSet> = board.into_iter().map(CardSet::from_bits).collect();
     let dead = CardSet::from_bits(dead);
 
     let result = with_variant!(variant, |game| {
-        let request =
-            EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
+        let request = EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
         let weighted = request.is_weighted();
         py.detach(|| run_batch(&request, samples, seed, threads))
             .map(|result| (result, weighted))
@@ -220,8 +266,7 @@ fn exact(
     let dead = CardSet::from_bits(dead);
 
     let result = with_variant!(variant, |game| {
-        let request =
-            EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
+        let request = EquityRequest::from_masks(game, &specs, &board, dead).map_err(to_py)?;
         let weighted = request.is_weighted();
         py.detach(|| run_exact(&request))
             .map(|result| (result, weighted))
@@ -258,7 +303,11 @@ fn chunk_from_text(
     seed: u64,
     threads: usize,
 ) -> PyResult<Py<PyDict>> {
-    let threads = if threads == 0 { default_threads() } else { threads };
+    let threads = if threads == 0 {
+        default_threads()
+    } else {
+        threads
+    };
     let fields: Vec<&str> = hands.iter().map(String::as_str).collect();
 
     let result = with_variant!(variant, |game| {
@@ -314,9 +363,12 @@ fn exact_from_text(
 #[pyfunction]
 #[pyo3(signature = (text, slots, allow_short=false))]
 fn parse_hand_field(text: &str, slots: usize, allow_short: bool) -> PyResult<Vec<Vec<u64>>> {
-    let read = if allow_short { parse_hand_up_to } else { parse_hand };
-    let spec = read(text, slots)
-        .map_err(|error| PyValueError::new_err(error.underline(text)))?;
+    let read = if allow_short {
+        parse_hand_up_to
+    } else {
+        parse_hand
+    };
+    let spec = read(text, slots).map_err(|error| PyValueError::new_err(error.underline(text)))?;
     Ok(spec
         .alternatives
         .into_iter()
@@ -335,7 +387,8 @@ fn parse_dead_cards(text: &str) -> PyResult<u64> {
 /// The index of a named card, as `rank * 4 + suit`.
 #[pyfunction]
 fn card_index(text: &str) -> PyResult<u8> {
-    let cards = Card::parse_field(text).map_err(|error| PyValueError::new_err(error.to_string()))?;
+    let cards =
+        Card::parse_field(text).map_err(|error| PyValueError::new_err(error.to_string()))?;
     match cards.as_slice() {
         [card] => Ok(card.index()),
         _ => Err(PyValueError::new_err(format!(
@@ -383,7 +436,9 @@ fn score_batch(py: Python<'_>, kernel: &str, hands: Vec<String>) -> PyResult<Vec
     // Parsing and scoring are pure arithmetic, so the GIL is not needed.
     let parsed = hands
         .iter()
-        .map(|hand| Card::parse_field(hand).map_err(|error| PyValueError::new_err(error.to_string())))
+        .map(|hand| {
+            Card::parse_field(hand).map_err(|error| PyValueError::new_err(error.to_string()))
+        })
         .collect::<PyResult<Vec<_>>>()?;
 
     Ok(py.detach(|| parsed.iter().map(|cards| score(cards)).collect()))

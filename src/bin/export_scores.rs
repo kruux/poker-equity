@@ -29,7 +29,13 @@ fn combinations(deck: &[Card], size: usize) -> Vec<Vec<Card>> {
     let mut out = Vec::new();
     let mut chosen = Vec::with_capacity(size);
 
-    fn walk(deck: &[Card], size: usize, from: usize, chosen: &mut Vec<Card>, out: &mut Vec<Vec<Card>>) {
+    fn walk(
+        deck: &[Card],
+        size: usize,
+        from: usize,
+        chosen: &mut Vec<Card>,
+        out: &mut Vec<Vec<Card>>,
+    ) {
         if chosen.len() == size {
             out.push(chosen.clone());
             return;
@@ -116,7 +122,12 @@ fn sample(deck: &[Card], size: usize, count: usize, seed: u64) -> Vec<Vec<Card>>
 
 /// Writes hands and their scores as text, for the checks whose hands are
 /// sampled rather than enumerated and so cannot be implied by their order.
-fn write_hands(path: &Path, hands: &[Vec<Card>], split: usize, scores: &[u16]) -> std::io::Result<()> {
+fn write_hands(
+    path: &Path,
+    hands: &[Vec<Card>],
+    split: usize,
+    scores: &[u16],
+) -> std::io::Result<()> {
     let mut file = BufWriter::new(File::create(path)?);
     for (hand, score) in hands.iter().zip(scores) {
         let text = |cards: &[Card]| {
@@ -168,7 +179,10 @@ fn main() -> std::io::Result<()> {
 
     let short_five = combinations(&short, 5);
     println!("{} five-card hands from the short deck", short_five.len());
-    let scores: Vec<u16> = short_five.iter().map(|hand| short_deck_score(hand)).collect();
+    let scores: Vec<u16> = short_five
+        .iter()
+        .map(|hand| short_deck_score(hand))
+        .collect();
     write(&out.join("short_deck.bin"), &scores)?;
     println!("  wrote short_deck");
 
@@ -189,10 +203,7 @@ fn main() -> std::io::Result<()> {
     // Omaha, where exactly two hole cards play with exactly three of the
     // board. That rule is not in any table; it is in how the hand is built.
     let deals = sample(&full, 9, 200_000, 0x0A_4A_11_5E_ED);
-    let scores: Vec<u16> = deals
-        .iter()
-        .map(|deal| Omaha.score(deal) as u16)
-        .collect();
+    let scores: Vec<u16> = deals.iter().map(|deal| Omaha.score(deal) as u16).collect();
     write_hands(&out.join("omaha.tsv"), &deals, 4, &scores)?;
     println!("{} Omaha deals", deals.len());
 

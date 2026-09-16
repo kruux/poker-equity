@@ -222,16 +222,17 @@ impl ShapePlan {
         cumulative.clear();
         let mut total: u128 = 0;
         for shape in &self.shapes {
-            let weight = groups
-                .iter()
-                .zip(shape.counts.iter())
-                .fold(1u128, |all, (group, &count)| {
-                    if all == 0 {
-                        0
-                    } else {
-                        all.saturating_mul(binomial(group.len(), count as u32))
-                    }
-                });
+            let weight =
+                groups
+                    .iter()
+                    .zip(shape.counts.iter())
+                    .fold(1u128, |all, (group, &count)| {
+                        if all == 0 {
+                            0
+                        } else {
+                            all.saturating_mul(binomial(group.len(), count as u32))
+                        }
+                    });
             total = total.saturating_add(weight);
             cumulative.push(total);
         }

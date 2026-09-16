@@ -98,7 +98,11 @@ impl ChunkResult {
     /// with no deals in it is neither, so it does not vote -- which is what
     /// lets a caller start a loop of its own from [`empty`](Self::empty).
     pub fn merge(&mut self, other: &ChunkResult) {
-        debug_assert_eq!(self.seats(), other.seats(), "chunks must cover the same seats");
+        debug_assert_eq!(
+            self.seats(),
+            other.seats(),
+            "chunks must cover the same seats"
+        );
         if self.samples == 0 {
             self.exact = other.exact;
         } else if other.samples > 0 {
@@ -132,7 +136,10 @@ impl ChunkResult {
     /// that was easy to reach counts for less. A weight of one is a deal that
     /// needed no correction, which is every deal on the ordinary path.
     pub(crate) fn record_weighted(&mut self, shares: &[f64], low_shares: &[f64], weight: f64) {
-        debug_assert!(weight > 0.0 && weight.is_finite(), "a deal's weight must be a positive number");
+        debug_assert!(
+            weight > 0.0 && weight.is_finite(),
+            "a deal's weight must be a positive number"
+        );
         self.samples += 1;
         self.weight_sum += weight;
         self.weight_square_sum += weight * weight;

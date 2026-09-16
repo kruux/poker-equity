@@ -4,10 +4,10 @@ use crate::cards::Card;
 
 use super::{
     omaha::best_score,
-    rankings::{
-        high_score_from_parts, low_a5_score_from_parts, HighHandRank, HiLoHandRank, LowHandRank,
-    },
     rankings::EIGHT_OR_BETTER_LIMIT,
+    rankings::{
+        high_score_from_parts, low_a5_score_from_parts, HiLoHandRank, HighHandRank, LowHandRank,
+    },
     PokerType, PokerVariant,
 };
 

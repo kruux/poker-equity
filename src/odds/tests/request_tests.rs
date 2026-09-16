@@ -2,11 +2,10 @@
 
 use crate::{
     cards::{Card, CardSet},
-    variants::{EquityCalculation, PokerType, PokerVariant},
     error::PokerError,
     odds::{run_chunk, run_exact, EquityRequest},
+    variants::{EquityCalculation, PokerType, PokerVariant},
 };
-
 
 /// Eight-handed stud runs the deck out -- eight sevens is fifty-six against
 /// fifty-two cards -- so the last card is not dealt to each player. One goes
@@ -19,7 +18,9 @@ fn test_eight_handed_stud_shares_the_last_card() -> Result<(), PokerError> {
     use crate::variants::{Razz, Stud, StudHiLo};
 
     // Seven seats fit, so nothing is shared and a board is still an error.
-    let seven = ["Ah2c3d", "4s5h6c", "7d8s9h", "TcJdQs", "Kh2d3c", "4h5c6d", "7s8h9c"];
+    let seven = [
+        "Ah2c3d", "4s5h6c", "7d8s9h", "TcJdQs", "Kh2d3c", "4h5c6d", "7s8h9c",
+    ];
     let request = EquityRequest::from_text(Stud, &seven, "", "")?;
     assert_eq!(request.hole_cards(), 7, "seven seats, seven cards each");
     assert_eq!(request.board_cards(), 0, "nothing in the middle");
@@ -41,13 +42,22 @@ fn test_eight_handed_stud_shares_the_last_card() -> Result<(), PokerError> {
     assert_eq!(known.board_cards(), 1);
 
     // Razz and the split-pot game deal the same way, so they share the rule.
-    assert_eq!(EquityRequest::from_text(Razz, &eight, "", "")?.board_cards(), 1);
-    assert_eq!(EquityRequest::from_text(StudHiLo, &eight, "", "")?.board_cards(), 1);
+    assert_eq!(
+        EquityRequest::from_text(Razz, &eight, "", "")?.board_cards(),
+        1
+    );
+    assert_eq!(
+        EquityRequest::from_text(StudHiLo, &eight, "", "")?.board_cards(),
+        1
+    );
 
     // And it deals: every seat ends up with seven cards to be scored from,
     // six of its own and the one in the middle.
     let result = run_chunk(&request, 2_000, 5)?;
-    assert_eq!(result.samples, 2_000, "eight-handed stud deals without running short");
+    assert_eq!(
+        result.samples, 2_000,
+        "eight-handed stud deals without running short"
+    );
     let total: f64 = result.equities().iter().map(|player| player.equity).sum();
     assert!(
         (total - 1.0).abs() < 1e-9,
@@ -57,7 +67,6 @@ fn test_eight_handed_stud_shares_the_last_card() -> Result<(), PokerError> {
 
     Ok(())
 }
-
 
 /// Keeping one seat's named cards out of another seat's pool must not change
 /// an answer. It throws away only deals that were going to be rejected
@@ -99,7 +108,6 @@ fn test_reserving_named_cards_does_not_bias_the_deal() -> Result<(), PokerError>
 
     Ok(())
 }
-
 
 /// A full ring of stud, played out rather than merely constructed.
 ///
@@ -146,7 +154,9 @@ fn test_a_full_ring_of_stud_plays_out() -> Result<(), PokerError> {
     // one deal to walk, and the answer can be checked against scoring each
     // seat's seven cards directly -- which is the real question, since it is
     // only right if the shared card reached all eight of them.
-    let deck: Vec<Card> = (0..52).map(|i| Card::from_index(i).expect("a card")).collect();
+    let deck: Vec<Card> = (0..52)
+        .map(|i| Card::from_index(i).expect("a card"))
+        .collect();
     let fields: Vec<String> = (0..8)
         .map(|seat| {
             (0..6)
@@ -191,10 +201,22 @@ fn test_a_full_ring_of_stud_plays_out() -> Result<(), PokerError> {
     let total: f64 = razz.equities().iter().map(|player| player.equity).sum();
     assert!((total - 1.0).abs() < 1e-9, "razz pot summed to {}", total);
 
-    let hi_lo = run_chunk(&EquityRequest::from_text(StudHiLo, &eight, "", "")?, 20_000, 3)?;
+    let hi_lo = run_chunk(
+        &EquityRequest::from_text(StudHiLo, &eight, "", "")?,
+        20_000,
+        3,
+    )?;
     let total: f64 = hi_lo.equities().iter().map(|player| player.equity).sum();
-    assert!((total - 1.0).abs() < 1e-9, "stud hi/lo pot summed to {}", total);
-    let low: f64 = hi_lo.equities().iter().map(|player| player.low_equity).sum();
+    assert!(
+        (total - 1.0).abs() < 1e-9,
+        "stud hi/lo pot summed to {}",
+        total
+    );
+    let low: f64 = hi_lo
+        .equities()
+        .iter()
+        .map(|player| player.low_equity)
+        .sum();
     assert!(
         low > 0.0 && low <= 0.5 + 1e-9,
         "the low half is {} of the pot, which cannot be right",
@@ -208,7 +230,9 @@ fn test_a_full_ring_of_stud_plays_out() -> Result<(), PokerError> {
 
     // Third street is as early as a stud hand goes. Two cards is not an
     // earlier street, it is a hand that was never dealt.
-    let two_each = ["Ah2c", "4s5h", "7d8s", "TcJd", "Kh2d", "4h5c", "7s8h", "TdJs"];
+    let two_each = [
+        "Ah2c", "4s5h", "7d8s", "TcJd", "Kh2d", "4h5c", "7s8h", "TdJs",
+    ];
     assert!(matches!(
         EquityRequest::from_text(Stud, &two_each, "", ""),
         Err(PokerError::Equity(EquityError::NotEnoughCards(2)))
@@ -224,7 +248,6 @@ fn test_a_full_ring_of_stud_plays_out() -> Result<(), PokerError> {
 
     Ok(())
 }
-
 
 /// How many cards a field may name, which is not one rule but three.
 ///
@@ -274,14 +297,15 @@ fn test_a_field_may_only_be_short_where_the_game_allows_it() -> Result<(), Poker
     assert!(EquityRequest::from_text(Omaha, &["AhKh7c2d", "QsQdJs"], "", "").is_err());
 
     // A field longer than the game deals is wrong everywhere.
-    assert!(EquityRequest::from_text(Stud, &["AsKsQsJsTs9s8s7s", "AdKdQdJdTd9d8d7d"], "", "")
-        .is_err());
-    assert!(EquityRequest::from_text(DeuceSeven, &["7d5h4c3s2h9c", "7c5s4h3d2c9d"], "", "")
-        .is_err());
+    assert!(
+        EquityRequest::from_text(Stud, &["AsKsQsJsTs9s8s7s", "AdKdQdJdTd9d8d7d"], "", "").is_err()
+    );
+    assert!(
+        EquityRequest::from_text(DeuceSeven, &["7d5h4c3s2h9c", "7c5s4h3d2c9d"], "", "").is_err()
+    );
 
     Ok(())
 }
-
 
 /// A card this game's deck never held is a different mistake from a card
 /// used twice, and says so.
@@ -319,7 +343,11 @@ fn test_a_card_outside_the_deck_says_so() -> Result<(), PokerError> {
 
     // And a real duplicate is still a duplicate.
     let error = EquityRequest::from_text(ShortDeck, &["AhKh", "AhQd"], "", "").unwrap_err();
-    assert!(matches!(error, PokerError::Game(GameError::DuplicateCard(_))), "{:?}", error);
+    assert!(
+        matches!(error, PokerError::Game(GameError::DuplicateCard(_))),
+        "{:?}",
+        error
+    );
 
     Ok(())
 }
@@ -360,11 +388,17 @@ fn test_how_much_of_the_board_may_be_known() -> Result<(), PokerError> {
     // agree about that.
     assert!(matches!(
         EquityRequest::from_text(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "", ""),
-        Err(PokerError::Equity(EquityError::NotEnoughBoardCards { least: 1, found: 0 }))
+        Err(PokerError::Equity(EquityError::NotEnoughBoardCards {
+            least: 1,
+            found: 0
+        }))
     ));
     assert!(matches!(
         EquityRequest::from_text(CourchevelHiLo, &["Ah2c3d4s5c", "QsQdJsTd9h"], "", ""),
-        Err(PokerError::Equity(EquityError::NotEnoughBoardCards { least: 1, found: 0 }))
+        Err(PokerError::Equity(EquityError::NotEnoughBoardCards {
+            least: 1,
+            found: 0
+        }))
     ));
     assert!(EquityRequest::from_text(Courchevel, &["AhKh7c2d3c", "QsQdJsTd4h"], "8s", "").is_ok());
 
@@ -466,7 +500,12 @@ fn test_each_game_seats_what_its_deck_allows() -> Result<(), PokerError> {
                     && seats * variant.hole_cards() > variant.deck().len() as usize,
             );
         let hands = (0..seats)
-            .map(|_| (0..hole).filter_map(|_| deck.next()).map(|c| c.to_string()).collect())
+            .map(|_| {
+                (0..hole)
+                    .filter_map(|_| deck.next())
+                    .map(|c| c.to_string())
+                    .collect()
+            })
             .collect();
         (hands, board)
     }
@@ -563,8 +602,8 @@ fn test_pinning_razz_suits_does_not_move_the_answer() -> Result<(), PokerError> 
     );
 
     let gap = (fast.equities()[0].equity - slow.equities()[0].equity).abs();
-    let slack = 5.0
-        * (fast.equities()[0].std_error.powi(2) + slow.equities()[0].std_error.powi(2)).sqrt();
+    let slack =
+        5.0 * (fast.equities()[0].std_error.powi(2) + slow.equities()[0].std_error.powi(2)).sqrt();
     assert!(
         gap <= slack,
         "pinning moved the answer: {:.5} pinned against {:.5} unpinned",

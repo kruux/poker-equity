@@ -92,7 +92,10 @@ pub enum EquityError {
     InvalidCommunityCards(usize),
     /// A board shorter than the game's floor: how many it shows before the
     /// betting, and how many were named. Only Courchevel has a floor at all.
-    NotEnoughBoardCards { least: usize, found: usize },
+    NotEnoughBoardCards {
+        least: usize,
+        found: usize,
+    },
     /// The sampler gave up looking for deals. How many draws it made, and
     /// how many of them it could use.
     ///
@@ -100,7 +103,10 @@ pub enum EquityError {
     /// as though it were: feasibility is proved before sampling starts, so
     /// the request certainly has deals. The seats simply want the same cards
     /// too often for a draw to find them.
-    SamplingStalled { attempts: u64, found: u64 },
+    SamplingStalled {
+        attempts: u64,
+        found: u64,
+    },
     /// A precision no run can reach. A standard error falls as `1/sqrt(n)`,
     /// so it approaches zero without arriving, and a target of zero -- or of
     /// anything that is not a positive, finite number -- is a promise the
@@ -108,7 +114,10 @@ pub enum EquityError {
     UnreachableTarget(f64),
     /// More seats than the deck can deal: how many were asked for, and how
     /// many the game has room for.
-    TooManyPlayers { asked: usize, room: usize },
+    TooManyPlayers {
+        asked: usize,
+        room: usize,
+    },
     /// No deal satisfies the request, with the field at fault named.
     Infeasible(String),
     /// A notation field could not be read.
@@ -119,7 +128,9 @@ impl EquityError {
     /// What went wrong, in a sentence.
     pub fn description(&self) -> String {
         match self {
-            EquityError::NoPlayers => "a spot needs at least two seats to have an answer".to_string(),
+            EquityError::NoPlayers => {
+                "a spot needs at least two seats to have an answer".to_string()
+            }
             EquityError::NotEnoughCards(n) => format!("Not enough cards in hand: {}", n),
             EquityError::InvalidSimulationCount(n) => format!("Invalid number of simulations: {n}"),
             EquityError::UnequalHandSizes => "Starting hands with different sizes".to_string(),

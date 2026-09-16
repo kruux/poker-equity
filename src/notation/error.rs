@@ -107,7 +107,11 @@ impl fmt::Display for NotationErrorKind {
                 "a dead card must name one card, since every reading changes the answer"
             ),
             Self::TooManySlots { limit, found } => {
-                write!(f, "at most {} cards fit here, but {} were written", limit, found)
+                write!(
+                    f,
+                    "at most {} cards fit here, but {} were written",
+                    limit, found
+                )
             }
         }
     }

@@ -340,65 +340,48 @@ fn test_detailed_hand_ranking() {
     // Create groups of each hand type
     // Straight Flushes
     let sf_high = Hand::<Stud>::from_str(Stud, "Ah Kh Qh Jh Th 2c 3d").unwrap();
-    let sf_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Kh Qh Jh Th 4s 5d").unwrap();
+    let sf_high_diff = Hand::<Stud>::from_str(Stud, "Ah Kh Qh Jh Th 4s 5d").unwrap();
     let sf_low = Hand::<Stud>::from_str(Stud, "9h 8h 7h 6h 5h 2c 3d").unwrap();
 
     // Four of a Kind
     let quad_high = Hand::<Stud>::from_str(Stud, "Ah Ac Ad As Kh 2c 3d").unwrap();
-    let quad_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Ac Ad As Ks 4c 5d").unwrap();
+    let quad_high_diff = Hand::<Stud>::from_str(Stud, "Ah Ac Ad As Ks 4c 5d").unwrap();
     let quad_low = Hand::<Stud>::from_str(Stud, "Kh Kc Kd Ks 2h 3c 4d").unwrap();
 
     // Full House
     let fh_high = Hand::<Stud>::from_str(Stud, "Ah Ac Ad Kh Kc 2c 3d").unwrap();
-    let fh_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Ac Ad Kh Kd 4c 5d").unwrap();
+    let fh_high_diff = Hand::<Stud>::from_str(Stud, "Ah Ac Ad Kh Kd 4c 5d").unwrap();
     let fh_low = Hand::<Stud>::from_str(Stud, "Kh Kc Kd Qh Qc 2c 3d").unwrap();
 
     // Flush
-    let flush_high =
-        Hand::<Stud>::from_str(Stud, "Ah Kh Qh Jh 9h 2c 3d").unwrap();
-    let flush_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Kh Qh Jh 9h 4c 5d").unwrap();
+    let flush_high = Hand::<Stud>::from_str(Stud, "Ah Kh Qh Jh 9h 2c 3d").unwrap();
+    let flush_high_diff = Hand::<Stud>::from_str(Stud, "Ah Kh Qh Jh 9h 4c 5d").unwrap();
     let flush_low = Hand::<Stud>::from_str(Stud, "Kh Qh Jh Th 8h 2c 3d").unwrap();
 
     // Straight
-    let straight_high =
-        Hand::<Stud>::from_str(Stud, "Ah Kc Qd Js Th 2c 3d").unwrap();
-    let straight_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Kc Qd Js Th 4c 5d").unwrap();
-    let straight_low =
-        Hand::<Stud>::from_str(Stud, "Kc Qd Js Th 9h 2c 3d").unwrap();
+    let straight_high = Hand::<Stud>::from_str(Stud, "Ah Kc Qd Js Th 2c 3d").unwrap();
+    let straight_high_diff = Hand::<Stud>::from_str(Stud, "Ah Kc Qd Js Th 4c 5d").unwrap();
+    let straight_low = Hand::<Stud>::from_str(Stud, "Kc Qd Js Th 9h 2c 3d").unwrap();
 
     // Three of a Kind
-    let trips_high =
-        Hand::<Stud>::from_str(Stud, "Ah Ac Ad Kh Qc 2c 3d").unwrap();
-    let trips_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Ac Ad Kh Qc 4c 5d").unwrap();
+    let trips_high = Hand::<Stud>::from_str(Stud, "Ah Ac Ad Kh Qc 2c 3d").unwrap();
+    let trips_high_diff = Hand::<Stud>::from_str(Stud, "Ah Ac Ad Kh Qc 4c 5d").unwrap();
     let trips_low = Hand::<Stud>::from_str(Stud, "Kh Kc Kd Qh Jc 2c 3d").unwrap();
 
     // Two Pair
-    let two_pair_high =
-        Hand::<Stud>::from_str(Stud, "Ah Ac Kh Kc Qc 2c 3d").unwrap();
-    let two_pair_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Ac Kh Kc Qc 4c 5d").unwrap();
-    let two_pair_low =
-        Hand::<Stud>::from_str(Stud, "Qh Qc Jh Jc Tc 2c 3d").unwrap();
+    let two_pair_high = Hand::<Stud>::from_str(Stud, "Ah Ac Kh Kc Qc 2c 3d").unwrap();
+    let two_pair_high_diff = Hand::<Stud>::from_str(Stud, "Ah Ac Kh Kc Qc 4c 5d").unwrap();
+    let two_pair_low = Hand::<Stud>::from_str(Stud, "Qh Qc Jh Jc Tc 2c 3d").unwrap();
 
     // One Pair
     let pair_high = Hand::<Stud>::from_str(Stud, "Ah Ac Kh Qc Jc 2c 3d").unwrap();
-    let pair_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Ac Kh Qc Jc 4c 5d").unwrap();
+    let pair_high_diff = Hand::<Stud>::from_str(Stud, "Ah Ac Kh Qc Jc 4c 5d").unwrap();
     let pair_low = Hand::<Stud>::from_str(Stud, "Kh Kc Qh Jc Tc 2c 3d").unwrap();
 
     // High Card
-    let high_card_high =
-        Hand::<Stud>::from_str(Stud, "Ah Kh Qc Jc 9c 7c 3d").unwrap();
-    let high_card_high_diff =
-        Hand::<Stud>::from_str(Stud, "Ah Kh Qc Jc 9c 8c 4d").unwrap();
-    let high_card_low =
-        Hand::<Stud>::from_str(Stud, "Kh Qh Jc Tc 8c 7c 3d").unwrap();
+    let high_card_high = Hand::<Stud>::from_str(Stud, "Ah Kh Qc Jc 9c 7c 3d").unwrap();
+    let high_card_high_diff = Hand::<Stud>::from_str(Stud, "Ah Kh Qc Jc 9c 8c 4d").unwrap();
+    let high_card_low = Hand::<Stud>::from_str(Stud, "Kh Qh Jc Tc 8c 7c 3d").unwrap();
 
     // Test equal hands
     assert_eq!(sf_high, sf_high_diff);

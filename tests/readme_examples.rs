@@ -4,49 +4,75 @@
 //! reader their trust in the rest of it. These are the same snippets, with
 //! the results printed so a change in the numbers shows up too.
 
-use poker_equity::{cards::{Card, CardSet, Rank, Suit}, notation::HandSpec,
-                       odds::{equity, equity_with_progress, run_chunk, ChunkResult,
-                              EquityRequest, Target},
-                       variants::{DeuceSeven, Holdem, Stud}};
+use poker_equity::{
+    cards::{Card, CardSet, Rank, Suit},
+    notation::HandSpec,
+    odds::{equity, equity_with_progress, run_chunk, ChunkResult, EquityRequest, Target},
+    variants::{DeuceSeven, Holdem, Stud},
+};
 
 #[test]
 fn test_the_readme_still_works() {
     // opening example
     let request = EquityRequest::from_text(Holdem, &["AhAd", "KsKc"], "2c 7d 9h", "").unwrap();
     let result = equity(&request, Target::Exact).unwrap();
-    println!("opening: {:.2}% / {:.2}%", result.equities()[0].percent(), result.equities()[1].percent());
+    println!(
+        "opening: {:.2}% / {:.2}%",
+        result.equities()[0].percent(),
+        result.equities()[1].percent()
+    );
 
     // the short version at the top of the README
     let wide = EquityRequest::from_text(Holdem, &["AhKh", "QsQd"], "", "").unwrap();
     let short = equity(&wide, Target::Samples(500_000)).unwrap();
     let seats = short.equities();
-    println!("short:   {:.2}% +/- {:.2}  /  {:.2}% +/- {:.2}",
-        seats[0].percent(), seats[0].margin_percent(),
-        seats[1].percent(), seats[1].margin_percent());
-    assert!((seats[0].percent() - 46.20).abs() < 0.5, "the README quotes 46.20%");
-    assert!((seats[1].percent() - 53.80).abs() < 0.5, "the README quotes 53.80%");
+    println!(
+        "short:   {:.2}% +/- {:.2}  /  {:.2}% +/- {:.2}",
+        seats[0].percent(),
+        seats[0].margin_percent(),
+        seats[1].percent(),
+        seats[1].margin_percent()
+    );
+    assert!(
+        (seats[0].percent() - 46.20).abs() < 0.5,
+        "the README quotes 46.20%"
+    );
+    assert!(
+        (seats[1].percent() - 53.80).abs() < 0.5,
+        "the README quotes 53.80%"
+    );
 
     // a plain sample count, and a precision target
     let counted = equity(&wide, Target::Samples(500_000)).unwrap();
     assert!(counted.samples >= 500_000);
-    println!("500k:    {:.2}% +/- {:.2}",
-        counted.equities()[0].percent(), counted.equities()[0].margin_percent());
+    println!(
+        "500k:    {:.2}% +/- {:.2}",
+        counted.equities()[0].percent(),
+        counted.equities()[0].margin_percent()
+    );
 
     let precise = equity(&wide, Target::StandardError(0.001)).unwrap();
     assert!(precise.equities().iter().all(|p| p.std_error <= 0.001));
-    println!("precise: {:.2}% after {} deals", precise.equities()[0].percent(), precise.samples);
+    println!(
+        "precise: {:.2}% after {} deals",
+        precise.equities()[0].percent(),
+        precise.samples
+    );
 
     // watching it go
     let mut reports = 0;
     equity_with_progress(&wide, Target::Samples(400_000), |progress| {
         reports += 1;
         assert!(progress.acceptance > 0.0 && progress.acceptance <= 1.0);
-    }).unwrap();
+    })
+    .unwrap();
     println!("watched: {} progress reports", reports);
 
     // chunk loop
     let mut total = ChunkResult::empty(2);
-    for seed in 0..8 { total.merge(&run_chunk(&request, 50_000, seed).unwrap()); }
+    for seed in 0..8 {
+        total.merge(&run_chunk(&request, 50_000, seed).unwrap());
+    }
     println!("merged:  {} deals", total.samples);
 
     // stud and draw
@@ -65,8 +91,12 @@ fn test_the_readme_still_works() {
         ],
         &[],
         CardSet::EMPTY,
-    ).unwrap();
-    println!("masks:   {:.2}%", run_chunk(&masks, 20_000, 1).unwrap().equities()[0].percent());
+    )
+    .unwrap();
+    println!(
+        "masks:   {:.2}%",
+        run_chunk(&masks, 20_000, 1).unwrap().equities()[0].percent()
+    );
 
     // the mask layout claims
     assert_eq!(CardSet::of_rank(Rank::Ace).bits(), 0b1111u64 << 48);

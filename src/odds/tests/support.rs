@@ -90,7 +90,11 @@ where
         .map(|seat| runs.iter().map(|run| run[seat]).sum::<f64>() / runs.len() as f64)
         .collect();
     let tighter: Vec<(f64, f64)> = expected.iter().map(|(v, w)| (*v, w / 2.0)).collect();
-    assert_shares(&mean, &tighter, &format!("{} (averaged over {} runs)", what, runs.len()));
+    assert_shares(
+        &mean,
+        &tighter,
+        &format!("{} (averaged over {} runs)", what, runs.len()),
+    );
     Ok(())
 }
 
@@ -111,5 +115,10 @@ pub(super) fn assert_shares(got: &[f64], expected: &[(f64, f64)], what: &str) {
         );
     }
     let total: f64 = got.iter().sum();
-    assert!((total - 100.0).abs() < 1e-9, "{}: shares summed to {}", what, total);
+    assert!(
+        (total - 100.0).abs() < 1e-9,
+        "{}: shares summed to {}",
+        what,
+        total
+    );
 }

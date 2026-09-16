@@ -121,7 +121,11 @@ fn test_errors_point_at_the_offending_text() {
     assert_eq!(error.offset, 8);
 
     let drawn = error.underline("AhKh, Qs?d");
-    assert!(drawn.contains("        ^"), "underline sits under the ?: {}", drawn);
+    assert!(
+        drawn.contains("        ^"),
+        "underline sits under the ?: {}",
+        drawn
+    );
 }
 
 /// A miscount around a `*` says why, rather than only reporting the number.
@@ -135,11 +139,7 @@ fn test_a_wildcard_miscount_explains_itself() {
             found: 2
         }
     );
-    assert!(
-        error.to_string().contains("never binds"),
-        "got: {}",
-        error
-    );
+    assert!(error.to_string().contains("never binds"), "got: {}", error);
 
     // Without a wildcard it is a plain miscount.
     let error = parse_hand("AhKhQh", 2).unwrap_err();

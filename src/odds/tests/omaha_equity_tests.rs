@@ -43,7 +43,10 @@ fn test_a_bad_omaha_request_is_refused() -> Result<(), PokerError> {
             short
         );
     }
-    assert!(spot(&["2h3h4h5h6h", "TsJsQcKd"], "").is_err(), "five is too many");
+    assert!(
+        spot(&["2h3h4h5h6h", "TsJsQcKd"], "").is_err(),
+        "five is too many"
+    );
 
     // Wildcards are how an unknown hole card is named, and they are fine.
     assert!(spot(&["Ah**Kd", "TsJsQc9d"], "").is_ok());
@@ -172,7 +175,10 @@ fn test_courchevel_starts_with_a_card_on_the_table() -> Result<(), PokerError> {
 
     assert!(matches!(
         EquityRequest::from_text(Courchevel, &hands, "", ""),
-        Err(PokerError::Equity(EquityError::NotEnoughBoardCards { least: 1, found: 0 }))
+        Err(PokerError::Equity(EquityError::NotEnoughBoardCards {
+            least: 1,
+            found: 0
+        }))
     ));
 
     // One card is exactly where Courchevel starts, and four board cards to
@@ -200,7 +206,12 @@ fn test_courchevel_and_five_card_omaha_agree_after_the_flop() -> Result<(), Poke
         .expect("small enough to enumerate");
 
     assert_eq!(courchevel.samples, omaha.samples);
-    for (seat, (a, b)) in courchevel.equities().iter().zip(omaha.equities()).enumerate() {
+    for (seat, (a, b)) in courchevel
+        .equities()
+        .iter()
+        .zip(omaha.equities())
+        .enumerate()
+    {
         assert!(
             (a.equity - b.equity).abs() < 1e-12,
             "seat {} differs: {:.10}% against {:.10}%",

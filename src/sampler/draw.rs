@@ -155,7 +155,11 @@ impl SlotSampler {
 
         // What the picky slots are drawn from. Falls back to the whole slot
         // list when the split was refused, which keeps the old behaviour.
-        let planned: &[CardSet] = if constrained.is_empty() { &slots } else { &constrained };
+        let planned: &[CardSet] = if constrained.is_empty() {
+            &slots
+        } else {
+            &constrained
+        };
         let pool = planned
             .iter()
             .fold(CardSet::EMPTY, |all, slot| all.union(*slot))
@@ -331,7 +335,9 @@ impl SlotSampler {
             // how many. This is the same discipline `Listed` follows.
             Strategy::Shaped(plan) => {
                 plan.draw(rng, out);
-                out[drawn_from..].iter().all(|card| available.contains(*card))
+                out[drawn_from..]
+                    .iter()
+                    .all(|card| available.contains(*card))
             }
             Strategy::DrawAndTest { pool } => {
                 let pool = pool.intersection(available);
