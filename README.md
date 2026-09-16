@@ -1,5 +1,7 @@
 # poker-equity
 
+[![Rust](https://github.com/kruux/poker-equity/actions/workflows/rust.yml/badge.svg)](https://github.com/kruux/poker-equity/actions/workflows/rust.yml)
+
 An equity engine for poker. Give it a game, some hands, a board and some dead
 cards, and it tells you what share of the pot each player wins.
 
