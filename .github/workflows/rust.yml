@@ -103,10 +103,13 @@ jobs:
       - name: Build the benchmarks
         run: cargo codspeed build
 
-      # Runs them under callgrind and counts instructions. CodSpeed measures
-      # the base commit the same way in the same run, so the comparison never
-      # depends on the runner, and comments the difference on the pull
-      # request.
+      # Simulation mode: each benchmark runs once under a simulated CPU,
+      # counting instructions and cache behaviour instead of seconds, so the
+      # figure does not depend on this runner or its load. Walltime is the
+      # other option and wants CodSpeed's own bare-metal machines, which would
+      # put the noise back. CodSpeed measures the base commit the same way in
+      # the same run and comments the difference on the pull request.
       - uses: CodSpeedHQ/action@v5
         with:
+          mode: simulation
           run: cargo codspeed run
