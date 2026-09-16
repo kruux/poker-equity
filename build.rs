@@ -436,6 +436,26 @@ fn enumerate_multisets(size: u8) -> Vec<[u8; 13]> {
     out
 }
 
+/// Records the optimisation level this build is using, for `build_sanity`.
+///
+/// Cargo sets `OPT_LEVEL` for a build script to the level the package is
+/// being compiled at -- 0 for `cargo build`, 3 for `--release`, and whatever
+/// `[profile.test]` says under `cargo test`. Writing it down is how a test
+/// can know whether it is running in an optimised build without timing
+/// anything.
+fn write_opt_level(out_dir: &Path) -> std::io::Result<()> {
+    let level = env::var("OPT_LEVEL").expect("OPT_LEVEL is set by cargo");
+    let mut file = BufWriter::new(File::create(out_dir.join("opt_level.rs"))?);
+    writeln!(
+        file,
+        "/// The `OPT_LEVEL` cargo built this with: \"0\" is unoptimised, and\n\
+         /// \"1\", \"2\", \"3\", \"s\" and \"z\" are not.\n\
+         const OPT_LEVEL: &str = {:?};",
+        level
+    )?;
+    file.flush()
+}
+
 fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
     println!("cargo:rerun-if-env-changed=POKER_EQUITY_BUILD_STATS");
@@ -443,6 +463,8 @@ fn main() -> std::io::Result<()> {
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR is set by cargo");
     let out_dir = Path::new(&out_dir);
+
+    write_opt_level(out_dir)?;
 
     // Every rank multiset of five to seven cards. A hand reaches the rank
     // table only once the flush check has missed, so all of them are needed.
