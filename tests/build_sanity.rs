@@ -16,9 +16,13 @@ use poker_equity::{
 
 /// Hands a second below which the build cannot plausibly be optimised.
 ///
-/// A release build manages around a hundred million; an unoptimised one is
-/// roughly a hundred times slower than that.
-const FLOOR: f64 = 1_000_000.0;
+/// Measured on one desktop core: about 1.8 M/s at opt-level 3, 1.4 M/s at the
+/// 2 the test profile uses, and 127 k/s unoptimised. The gap is a factor of
+/// eleven, and this floor sits in the middle of it rather than just under the
+/// optimised figure, because a CI runner is the slowest machine that will
+/// ever run this — the two-core ones manage 650 k/s optimised, which is still
+/// twice the floor and five times what they would manage without.
+const FLOOR: f64 = 300_000.0;
 
 #[test]
 fn test_the_build_was_optimised() {

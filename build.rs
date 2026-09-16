@@ -24,6 +24,19 @@ use std::path::Path;
 // keeping a copy.
 include!("src/variants/rankings/table_index.rs");
 
+/// Reports a figure about the generated tables, if anyone asked to hear it.
+///
+/// `cargo:warning` is the only channel a build script has to the terminal,
+/// and using it unasked puts seven warnings on every build of every crate
+/// that depends on this one — which teaches a reader to ignore warnings from
+/// this build, including a real one. Set `POKER_EQUITY_BUILD_STATS=1` to see
+/// them.
+fn note(line: std::fmt::Arguments<'_>) {
+    if env::var_os("POKER_EQUITY_BUILD_STATS").is_some() {
+        println!("cargo:warning={}", line);
+    }
+}
+
 /// Rank indices: 0 = Two, 12 = Ace. Index *is* rank order, ace high.
 const RANK_IDENTS: [&str; 13] = [
     "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Jack", "Queen",
@@ -425,6 +438,7 @@ fn enumerate_multisets(size: u8) -> Vec<[u8; 13]> {
 
 fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=POKER_EQUITY_BUILD_STATS");
     println!("cargo:rerun-if-changed=src/variants/rankings/table_index.rs");
 
     let out_dir = env::var("OUT_DIR").expect("OUT_DIR is set by cargo");
@@ -508,20 +522,20 @@ fn main() -> std::io::Result<()> {
                 qualifying
             )?;
             file.flush()?;
-            println!("cargo:warning=eight-or-better lows: {} of them", qualifying);
+            note(format_args!("eight-or-better lows: {} of them", qualifying));
         }
 
-        println!(
-            "cargo:warning={} kernel: {} distinct hand values",
+        note(format_args!(
+            "{} kernel: {} distinct hand values",
             kernel.name(),
             scored.by_score.len()
-        );
+        ));
     }
 
     write_table_module(out_dir, &generated)?;
 
     let kilobytes = (SLOT_COUNT * 2 * 4 + BUCKET_COUNT * 2 + 8192 * 2 * 3) / 1024;
-    println!("cargo:warning=lookup tables: {} KB in total", kilobytes);
+    note(format_args!("lookup tables: {} KB in total", kilobytes));
     Ok(())
 }
 
@@ -665,13 +679,13 @@ fn place_keys(keys: &[u32]) -> Vec<u16> {
         displacements[bucket] = displacement;
     }
 
-    println!(
-        "cargo:warning=perfect hash: {} keys into {} slots ({}% full), largest displacement {}",
+    note(format_args!(
+        "perfect hash: {} keys into {} slots ({}% full), largest displacement {}",
         keys.len(),
         SLOT_COUNT,
         keys.len() * 100 / SLOT_COUNT,
         displacements.iter().max().copied().unwrap_or(0),
-    );
+    ));
 
     displacements
 }

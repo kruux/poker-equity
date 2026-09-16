@@ -1,0 +1,15 @@
+# macOS refuses to link a shared library with symbols it cannot resolve, and a
+# Python extension module deliberately has them: the interpreter supplies the
+# Py* symbols when it loads the module, so pyo3's extension-module feature
+# leaves them out rather than linking a libpython that may not be the one
+# doing the loading. Linux and Windows allow that by default; macOS needs
+# telling. Without this, `cargo build --features python` fails there with a
+# few hundred undefined _Py* symbols.
+#
+# Tools like maturin pass this flag themselves. This file is for the manual
+# build the README describes.
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]

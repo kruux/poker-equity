@@ -59,7 +59,8 @@ Python wants is not always the one Cargo wrote:
 | Windows | `poker_equity.dll` | `poker_equity.pyd` |
 
 macOS is the one that catches people out: CPython loads extension modules named
-`.so` there too, and ignores a `.dylib`. Then, on Linux:
+`.so` there too, and ignores a `.dylib`. Its linker also wants a flag before it
+will accept the module, which `.cargo/config.toml` passes. Then, on Linux:
 
 ```sh
 mkdir -p ~/lib
@@ -598,6 +599,13 @@ QUIET_CORES=2 scripts/quiet run --release --bin benchmark
 Tests build at `opt-level = 2`, because the equity tests run a hundred
 thousand Monte Carlo deals apiece and that is minutes unoptimised against
 seconds optimised.
+
+`build.rs` reports what it generated — how full the perfect hash is, how many
+distinct values each kernel has, what the tables weigh — when asked:
+
+```sh
+POKER_EQUITY_BUILD_STATS=1 cargo build
+```
 
 `tests/fixtures/notation.tsv` is the grammar's source of truth — a plain table
 of input and expected output, with a row for every rule above. It is a flat

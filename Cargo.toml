@@ -11,7 +11,7 @@ repository = "https://github.com/kruux/poker-equity"
 
 # The published archive is the library and what proves it: the validation
 # scripts want pokerkit, and the throttling script is about this machine.
-exclude = ["/validation", "/scripts", "/.vscode"]
+exclude = ["/validation", "/scripts", "/.vscode", "/.github"]
 
 # A cdylib so the Python extension can be built, an rlib so the crate stays a
 # normal Rust library. The core never depends on Python: the binding is one
