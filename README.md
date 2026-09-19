@@ -15,26 +15,6 @@ nothing here has been used in anger yet.
 
 ## Install
 
-**Python.** Any CPython from 3.10 up:
-
-```sh
-pip install poker-equity
-```
-
-Wheels are built for Linux (x86_64 and aarch64), macOS (Intel and Apple
-Silicon) and Windows (x64). Anywhere else pip builds from source, which needs
-a [Rust toolchain](https://rustup.rs).
-
-```python
-import poker_equity as pc
-
-r = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=500_000)
-for seat in r["players"]:
-    print(f"{seat['equity']:.4f} +/- {seat['std_error']:.4f}")
-```
-
-More of it in [Python](#python).
-
 **Rust.**
 
 ```sh
@@ -54,9 +34,29 @@ fn main() -> Result<(), poker_equity::error::PokerError> {
 }
 ```
 
-**From a clone.** `pip install .` builds and installs the Python module with
-the same settings the published wheels use; for Rust, point the dependency at
-the clone with `path = "../poker-equity"`.
+**Python.** Any CPython from 3.10 up:
+
+```sh
+pip install poker-equity
+```
+
+Wheels are built for Linux (x86_64 and aarch64), macOS (Intel and Apple
+Silicon) and Windows (x64). Anywhere else pip builds from source, which needs
+a [Rust toolchain](https://rustup.rs).
+
+```python
+import poker_equity as pe
+
+r = pe.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=500_000)
+for seat in r["players"]:
+    print(f"{seat['equity']:.4f} +/- {seat['std_error']:.4f}")
+```
+
+More of it in [Python](#python).
+
+**From a clone.** For Rust, point the dependency at the clone with
+`path = "../poker-equity"`. For Python, `pip install .` builds and installs the
+module with the same settings the published wheels use.
 
 ## Games
 
@@ -514,16 +514,16 @@ module is under [Install](#install).
 | `exact(variant, hands, board, dead)` | likewise |
 
 ```python
-import poker_equity as pc
+import poker_equity as pe
 
-r = pc.exact_from_text("holdem", ["AhAd", "KsKc"], "2c 7d 9h")
+r = pe.exact_from_text("holdem", ["AhAd", "KsKc"], "2c 7d 9h")
 print(r["players"][0]["equity"])        # 0.916161...
 print(r["exact"], r["samples"])         # True 990
 
 # or masks, skipping the parser: hands[seat][alternative][slot]
-hands = [[[1 << pc.card_index("Ah"), 1 << pc.card_index("Kh")]],
-         [[1 << pc.card_index("Qs"), 1 << pc.card_index("Qd")]]]
-r = pc.chunk("holdem", hands, [], 0, 200_000, seed=3)
+hands = [[[1 << pe.card_index("Ah"), 1 << pe.card_index("Kh")]],
+         [[1 << pe.card_index("Qs"), 1 << pe.card_index("Qd")]]]
+r = pe.chunk("holdem", hands, [], 0, 200_000, seed=3)
 ```
 
 Every seat in `r["players"]` carries `equity`, `win`, `tie`, `low_equity`,
@@ -535,8 +535,8 @@ there is in Rust: ask for a count.
 
 `abi3-py310`, so one wheel per platform covers CPython 3.10 upward. The GIL is
 released around sampling, so a long batch does not block the interpreter.
-`pc.variants()` lists every game with how it deals, so a caller needs no table
-of its own, and `pc.parse_hand_field` hands back masks so another parser can
+`pe.variants()` lists every game with how it deals, so a caller needs no table
+of its own, and `pe.parse_hand_field` hands back masks so another parser can
 be checked against this one.
 
 **Averaging the sums yourself: divide by `weight_sum`, not `samples`.** The two
@@ -544,7 +544,7 @@ are equal for almost every request, so the wrong one costs nothing until a
 spot is weighted, then returns equities hundreds of times too small.
 
 ```python
-r = pc.chunk_from_text("stud", ["A23", "456", "789", "TJQ"], samples=200_000)
+r = pe.chunk_from_text("stud", ["A23", "456", "789", "TJQ"], samples=200_000)
 equity = [total / r["weight_sum"] for total in r["share_sum"]]   # not / samples
 
 spread = (r["share_square_sum"][0]

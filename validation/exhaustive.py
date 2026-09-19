@@ -37,7 +37,7 @@ import sys
 import time
 from pathlib import Path
 
-import poker_equity as pc
+import poker_equity as pe
 from pokerkit.hands import (
     BadugiHand,
     OmahaHoldemHand,
@@ -108,7 +108,7 @@ def check_deals(seed_and_count):
         deals = [rng.sample(FULL_DECK, hole_size + board_size) for _ in range(batch)]
 
         written = ["".join(deal) for deal in deals]
-        ours = pc.score_batch(game, written)
+        ours = pe.score_batch(game, written)
         theirs = [
             evaluator.from_game(
                 "".join(deal[:hole_size]), "".join(deal[hole_size:])
@@ -135,7 +135,7 @@ def check_batch(game, hands):
     kernel, _, _, evaluator, _ = GAMES[game]
     written = ["".join(hand) for hand in hands]
 
-    ours = pc.score_batch(kernel, written)
+    ours = pe.score_batch(kernel, written)
     theirs = [evaluator.from_game(hand).entry.index for hand in written]
 
     ours_to_theirs, theirs_to_ours, clashes = {}, {}, []
