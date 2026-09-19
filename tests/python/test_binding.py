@@ -36,7 +36,7 @@ def close(actual, expected, tolerance, message):
 
 print("every game is reachable by key")
 keys = {v["key"] for v in pc.variants()}
-check(len(keys) == 14, f"fourteen games, got {len(keys)}")
+check(len(keys) == 15, f"fifteen games, got {len(keys)}")
 check("omaha_five_hi_lo" in keys, "five-card Omaha hi/lo is there")
 check(not any(k[0].isdigit() for k in keys), "no key starts with a digit")
 
@@ -58,6 +58,7 @@ for key, hands, board in [
     ("omaha_hi_lo", ["Ah2c3d4s", "KhKsQhQs"], "5c 6d 8h"),
     ("stud", ["Ah2c3d", "Qs Qd Js"], ""),
     ("deuce_seven", ["Th8c4s2h", "9d7h4h2d"], ""),
+    ("five_card_draw", ["AhKhQh7h", "9s8c7d6s"], ""),
     ("badugi", ["Ac2d3h", "4s6s7d"], ""),
 ]:
     result = pc.chunk_from_text(key, hands, board, samples=20_000, seed=5)

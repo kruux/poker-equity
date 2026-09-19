@@ -91,6 +91,12 @@ fn test_every_variant_row_exists() {
             DeuceSeven.deck().len(),
         ),
         (
+            FiveCardDraw.key(),
+            FiveCardDraw.hole_cards(),
+            FiveCardDraw.board_cards(),
+            FiveCardDraw.deck().len(),
+        ),
+        (
             Badugi.key(),
             Badugi.hole_cards(),
             Badugi.board_cards(),
@@ -112,14 +118,15 @@ fn test_every_variant_row_exists() {
         ("stud_hi_lo", 7, 0, 52),
         ("razz", 7, 0, 52),
         ("deuce_seven", 5, 0, 52),
+        ("five_card_draw", 5, 0, 52),
         ("badugi", 4, 0, 52),
     ];
 
-    assert_eq!(rows.len(), 14, "the plan lists fourteen games");
+    assert_eq!(rows.len(), 15, "fifteen games");
     assert_eq!(rows, expected);
 
     let keys: HashSet<&str> = rows.iter().map(|row| row.0).collect();
-    assert_eq!(keys.len(), 14, "every key is its own game");
+    assert_eq!(keys.len(), 15, "every key is its own game");
 
     for key in &keys {
         assert!(
@@ -176,6 +183,11 @@ fn test_the_three_names_of_every_game_line_up() {
             DeuceSeven.key(),
             DeuceSeven.to_string().leak(),
         ),
+        (
+            "FiveCardDraw",
+            FiveCardDraw.key(),
+            FiveCardDraw.to_string().leak(),
+        ),
         ("Badugi", Badugi.key(), Badugi.to_string().leak()),
     ];
 
@@ -197,6 +209,7 @@ fn test_the_three_names_of_every_game_line_up() {
         ("StudHiLo", "stud_hi_lo", "Seven-Card Stud Hi/Lo"),
         ("Razz", "razz", "Razz"),
         ("DeuceSeven", "deuce_seven", "2-7 Lowball (single draw)"),
+        ("FiveCardDraw", "five_card_draw", "5-Card Draw"),
         ("Badugi", "badugi", "Badugi (single draw)"),
     ];
 
@@ -236,6 +249,7 @@ fn test_every_variant_has_a_label() {
         StudHiLo.to_string(),
         Razz.to_string(),
         DeuceSeven.to_string(),
+        FiveCardDraw.to_string(),
         Badugi.to_string(),
     ];
     for label in &labels {
@@ -248,8 +262,9 @@ fn test_every_variant_has_a_label() {
         ShortDeck.to_string()
     );
 
-    // Both draw games model one draw, not three. Equity in triple draw is
-    // undefined without a drawing strategy, so the label says which it is.
+    // The lowball draw games model one draw, not three. Equity in triple
+    // draw is undefined without a drawing strategy, so the label says which
+    // it is. 5-card draw has one draw by its own rules, so says nothing.
     assert!(DeuceSeven.to_string().contains("single draw"));
     assert!(Badugi.to_string().contains("single draw"));
 }

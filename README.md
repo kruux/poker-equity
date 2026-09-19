@@ -68,7 +68,7 @@ will accept the module, which `.cargo/config.toml` passes. Then, on Linux:
 mkdir -p ~/lib
 cp target/release/libpoker_equity.so ~/lib/poker_equity.so
 export PYTHONPATH=~/lib
-python3 -c "import poker_equity; print(len(poker_equity.variants()))"   # 14
+python3 -c "import poker_equity; print(len(poker_equity.variants()))"   # 15
 ```
 
 Copying it into a virtualenv's `site-packages`, or into the directory you run
@@ -105,6 +105,7 @@ end to end. Measured heads-up on one core of an AMD Ryzen 7 9800X3D. Run
 | `stud_hi_lo` | Seven-Card Stud Hi/Lo | 4.12 M/s |
 | `razz` | Razz | 4.84 M/s |
 | `deuce_seven` | 2-7 Lowball, single draw | 10.55 M/s |
+| `five_card_draw` | 5-Card Draw | 10.83 M/s |
 | `badugi` | Badugi, single draw | 5.35 M/s |
 
 Threads share nothing while they sample, so multiply by however many you give
@@ -116,10 +117,11 @@ than greedy: several calculators may be open at once and one must not starve
 the others. `EquityRequest::with_threads` takes as many as you want to give
 it, and nothing needs passing to get the default.
 
-Both draw games model **one** draw. Equity in triple draw is undefined without
-a drawing strategy — a made eight-low and a four-card draw are not comparable
-until you say how the draw resolves — so one draw is modelled and said so,
-rather than a number published from an invented model.
+The lowball draw games model **one** draw. Equity in triple draw is undefined
+without a drawing strategy — a made eight-low and a four-card draw are not
+comparable until you say how the draw resolves — so one draw is modelled and
+said so, rather than a number published from an invented model. 5-card draw
+has a single draw by its own rules, so there the one draw is the whole game.
 
 ## Examples
 

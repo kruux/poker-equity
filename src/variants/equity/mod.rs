@@ -1,6 +1,8 @@
 use crate::{error::PokerError, hand::Hand};
 
-use super::{Badugi, DeuceSeven, Holdem, LowHandRank, PokerVariant, Razz, ShortDeck, Stud};
+use super::{
+    Badugi, DeuceSeven, FiveCardDraw, Holdem, LowHandRank, PokerVariant, Razz, ShortDeck, Stud,
+};
 
 mod omaha;
 mod omaha_hi_lo;
@@ -147,6 +149,7 @@ impl EquityCalculation for ShortDeck {}
 impl EquityCalculation for Stud {}
 impl EquityCalculation for Razz {}
 impl EquityCalculation for DeuceSeven {}
+impl EquityCalculation for FiveCardDraw {}
 impl EquityCalculation for Badugi {}
 
 /// A set of seats at one table, as one bit each.

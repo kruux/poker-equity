@@ -208,6 +208,7 @@ fn test_no_request_however_odd_can_panic() {
     sweep!(StudHiLo);
     sweep!(Razz);
     sweep!(DeuceSeven);
+    sweep!(FiveCardDraw);
     sweep!(Badugi);
 
     std::panic::set_hook(hook);
