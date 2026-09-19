@@ -105,7 +105,7 @@ end to end. Measured heads-up on one core of an AMD Ryzen 7 9800X3D. Run
 | `stud_hi_lo` | Seven-Card Stud Hi/Lo | 4.12 M/s |
 | `razz` | Razz | 4.84 M/s |
 | `deuce_seven` | 2-7 Lowball, single draw | 10.55 M/s |
-| `five_card_draw` | 5-Card Draw | 10.83 M/s |
+| `five_card_draw` | 5-Card Draw, single draw | 10.83 M/s |
 | `badugi` | Badugi, single draw | 5.35 M/s |
 
 Threads share nothing while they sample, so multiply by however many you give
