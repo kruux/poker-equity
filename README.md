@@ -15,18 +15,30 @@ nothing here has been used in anger yet.
 
 ## Install
 
-Nothing is published to crates.io or PyPI yet, so both sides come from a
-clone.
+**Python.** Any CPython from 3.10 up:
 
 ```sh
-git clone https://github.com/kruux/poker-equity && cd poker-equity
+pip install poker-equity
 ```
 
-**Rust.** Point a dependency at the clone, or at the repository:
+Wheels are built for Linux (x86_64 and aarch64), macOS (Intel and Apple
+Silicon) and Windows (x64). Anywhere else pip builds from source, which needs
+a [Rust toolchain](https://rustup.rs).
 
-```toml
-poker-equity = { path = "../poker-equity" }
-# or        = { git = "https://github.com/kruux/poker-equity" }
+```python
+import poker_equity as pc
+
+r = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=500_000)
+for seat in r["players"]:
+    print(f"{seat['equity']:.4f} +/- {seat['std_error']:.4f}")
+```
+
+More of it in [Python](#python).
+
+**Rust.**
+
+```sh
+cargo add poker-equity
 ```
 
 Then a whole program is:
@@ -42,47 +54,9 @@ fn main() -> Result<(), poker_equity::error::PokerError> {
 }
 ```
 
-**Python.** The binding is real and works — it is the wheel that is missing, so
-the module gets built from the clone and put where the interpreter looks. Any
-CPython from 3.10 up, since the extension is `abi3-py310`:
-
-```sh
-cargo build --release --features python
-```
-
-Cargo leaves it in `target/release` under a name Python will not import, so the
-copy is what matters. It must be called `poker_equity`, and the extension
-Python wants is not always the one Cargo wrote:
-
-| Platform | Cargo writes | Copy it to |
-|---|---|---|
-| Linux | `libpoker_equity.so` | `poker_equity.so` |
-| macOS | `libpoker_equity.dylib` | `poker_equity.so` |
-| Windows | `poker_equity.dll` | `poker_equity.pyd` |
-
-macOS is the one that catches people out: CPython loads extension modules named
-`.so` there too, and ignores a `.dylib`. Its linker also wants a flag before it
-will accept the module, which `.cargo/config.toml` passes. Then, on Linux:
-
-```sh
-mkdir -p ~/lib
-cp target/release/libpoker_equity.so ~/lib/poker_equity.so
-export PYTHONPATH=~/lib
-python3 -c "import poker_equity; print(len(poker_equity.variants()))"   # 15
-```
-
-Copying it into a virtualenv's `site-packages`, or into the directory you run
-from, works just as well — `PYTHONPATH` is only the least invasive of them.
-
-```python
-import poker_equity as pc
-
-r = pc.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=500_000)
-for seat in r["players"]:
-    print(f"{seat['equity']:.4f} +/- {seat['std_error']:.4f}")
-```
-
-More of it in [Python](#python).
+**From a clone.** `pip install .` builds and installs the Python module with
+the same settings the published wheels use; for Rust, point the dependency at
+the clone with `path = "../poker-equity"`.
 
 ## Games
 
@@ -621,3 +595,28 @@ POKER_EQUITY_BUILD_STATS=1 cargo build
 of input and expected output, with a row for every rule above. It is a flat
 file rather than Rust so that another implementation of the notation can be
 checked against the same rows.
+
+## Releasing
+
+A release goes to PyPI and crates.io together, from a version tag, and only
+from a tag: pushing to main tests and benchmarks but never publishes.
+
+1. Bump `version` in `Cargo.toml` — the Python package reads it from there —
+   and merge that to main.
+2. Tag the merge and push the tag:
+
+   ```sh
+   git tag vX.Y.Z && git push origin vX.Y.Z
+   ```
+
+3. `.github/workflows/release.yml` checks the tag matches `Cargo.toml` and sits
+   on main, builds a wheel for every platform, installs each one and runs
+   `tests/python/test_binding.py` against it, and packs the crate.
+4. Nothing is published until the `release` environment is approved in the
+   Actions tab. Then both registries are uploaded to, each by trusted
+   publishing, so there is no token stored anywhere.
+
+A version cannot be published twice to either registry — only yanked — so the
+tag is the point of no return. To rehearse, run the workflow by hand from the
+Actions tab: `nowhere` builds and checks every wheel, and `testpypi` goes on to
+publish them to [TestPyPI](https://test.pypi.org/project/poker-equity/).

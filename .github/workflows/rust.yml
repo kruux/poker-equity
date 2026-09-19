@@ -63,24 +63,18 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Build the extension module
-        run: cargo build --release --features python
+      # Exactly what the README tells a reader with a clone to run, and the
+      # same pyproject.toml the release wheels are built from -- so a
+      # packaging mistake shows up on the push that made it, not at a tag.
+      - name: Build and install the package
+        run: python -m pip install .
 
-      # Exactly the copy the README tells a reader to make, per platform:
-      # macOS renames a .dylib to .so, Windows a .dll to .pyd.
-      - name: Install it where Python looks
-        shell: bash
-        run: |
-          mkdir -p pymod
-          case "$RUNNER_OS" in
-            macOS)   cp target/release/libpoker_equity.dylib pymod/poker_equity.so  ;;
-            Windows) cp target/release/poker_equity.dll      pymod/poker_equity.pyd ;;
-            *)       cp target/release/libpoker_equity.so    pymod/poker_equity.so  ;;
-          esac
-
+      # From outside the checkout, so it is the installed package under test.
       - name: Check the binding against the engine
         shell: bash
-        run: PYTHONPATH=pymod python tests/python/test_binding.py
+        run: |
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/tests/python/test_binding.py"
 
   benchmarks:
     name: Benchmarks

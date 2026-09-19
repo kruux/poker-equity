@@ -6,8 +6,8 @@
 # telling. Without this, `cargo build --features python` fails there with a
 # few hundred undefined _Py* symbols.
 #
-# Tools like maturin pass this flag themselves. This file is for the manual
-# build the README describes.
+# maturin, and so `pip install`, passes this flag itself. This file is for
+# building the module with cargo directly.
 [target.aarch64-apple-darwin]
 rustflags = ["-C", "link-arg=-undefined", "-C", "link-arg=dynamic_lookup"]
 
