@@ -80,6 +80,10 @@ macro_rules! with_variant {
                 let $variant = DeuceSeven;
                 $body
             }
+            "five_card_draw" => {
+                let $variant = FiveCardDraw;
+                $body
+            }
             "badugi" => {
                 let $variant = Badugi;
                 $body
@@ -188,6 +192,7 @@ fn variants(py: Python<'_>) -> PyResult<Py<PyList>> {
         "stud_hi_lo",
         "razz",
         "deuce_seven",
+        "five_card_draw",
         "badugi",
     ] {
         let entry: PyResult<Py<PyDict>> = with_variant!(key, |variant| {

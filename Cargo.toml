@@ -2,7 +2,7 @@
 name = "poker-equity"
 version = "0.1.0"
 edition = "2021"
-description = "Equity for fourteen poker variants, sampled or enumerated exactly"
+description = "Equity for fifteen poker variants, sampled or enumerated exactly"
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 keywords = ["poker", "equity", "odds", "holdem", "omaha"]

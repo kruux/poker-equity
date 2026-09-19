@@ -86,6 +86,7 @@ fn main() {
     time_variant!(Razz, &["Ah2c3d", "4s5h7c"], "", 100_000);
     println!();
     time_variant!(DeuceSeven, &["Th8c4s2h", "9d7h4h2d"], "", 100_000);
+    time_variant!(FiveCardDraw, &["AhKhQh7h", "9s8c7d6s"], "", 100_000);
     time_variant!(Badugi, &["Ac2d3h", "4s6s7d"], "", 200_000);
 
     // The two answers a variant gives: `score` orders a hand by reading a

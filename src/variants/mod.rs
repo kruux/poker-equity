@@ -1,6 +1,7 @@
 mod badugi;
 mod deuce_seven;
 mod equity;
+mod five_card_draw;
 mod holdem;
 mod omaha;
 mod omaha_hi_lo;
@@ -15,6 +16,7 @@ pub use deuce_seven::DeuceSeven;
 pub use equity::EquityCalculation;
 pub use equity::HasLow;
 pub use equity::{SeatIter, Seats};
+pub use five_card_draw::FiveCardDraw;
 pub use holdem::Holdem;
 pub use omaha::{Courchevel, Omaha, OmahaFive, OmahaSix};
 pub use omaha_hi_lo::{CourchevelHiLo, OmahaFiveHiLo, OmahaHiLo};
@@ -140,6 +142,7 @@ pub trait PokerVariant: Clone + Copy {
 mod tests {
     mod badugi_tests;
     mod deuce_seven_tests;
+    mod five_card_draw_tests;
     mod holdem_tests;
     mod omaha_hi_lo_tests;
     mod omaha_tests;

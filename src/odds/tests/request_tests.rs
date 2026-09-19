@@ -265,7 +265,7 @@ fn test_a_full_ring_of_stud_plays_out() -> Result<(), PokerError> {
 #[test]
 fn test_a_field_may_only_be_short_where_the_game_allows_it() -> Result<(), PokerError> {
     use crate::error::EquityError;
-    use crate::variants::{Badugi, DeuceSeven, Holdem, Omaha, Razz, Stud, StudHiLo};
+    use crate::variants::{Badugi, DeuceSeven, FiveCardDraw, Holdem, Omaha, Razz, Stud, StudHiLo};
 
     // Stud: short is fine, unevenly short is not.
     assert!(EquityRequest::from_text(Stud, &["AsKsQs", "AdKdQd"], "", "").is_ok());
@@ -291,6 +291,7 @@ fn test_a_field_may_only_be_short_where_the_game_allows_it() -> Result<(), Poker
     assert!(EquityRequest::from_text(DeuceSeven, &["7d5h4c3s2h", "8h6d4s3c"], "", "").is_ok());
     assert!(EquityRequest::from_text(DeuceSeven, &["7d5h4c3s2h", "8h6d"], "", "").is_ok());
     assert!(EquityRequest::from_text(Badugi, &["Ac2d3h4s", "5s6h"], "", "").is_ok());
+    assert!(EquityRequest::from_text(FiveCardDraw, &["AhKhQh7h", "JsJd"], "", "").is_ok());
 
     // Community: every hole card is dealt at once, so short is always wrong.
     assert!(EquityRequest::from_text(Holdem, &["AhKh", "Qs"], "", "").is_err());
@@ -477,8 +478,8 @@ fn test_a_spot_too_large_to_walk_is_declined_rather_than_attempted() -> Result<(
 fn test_each_game_seats_what_its_deck_allows() -> Result<(), PokerError> {
     use crate::error::EquityError;
     use crate::variants::{
-        Badugi, Courchevel, DeuceSeven, Holdem, Omaha, OmahaFive, OmahaHiLo, OmahaSix, Razz,
-        ShortDeck, Stud, StudHiLo,
+        Badugi, Courchevel, DeuceSeven, FiveCardDraw, Holdem, Omaha, OmahaFive, OmahaHiLo,
+        OmahaSix, Razz, ShortDeck, Stud, StudHiLo,
     };
 
     /// Deals `seats` distinct fields from this game's own deck, plus whatever
@@ -564,6 +565,7 @@ fn test_each_game_seats_what_its_deck_allows() -> Result<(), PokerError> {
     seats!(Razz, 8);
     // Draw games have no board at all.
     seats!(DeuceSeven, 10);
+    seats!(FiveCardDraw, 10);
     seats!(Badugi, 13);
 
     Ok(())
@@ -637,7 +639,7 @@ fn test_pinning_razz_suits_does_not_move_the_answer() -> Result<(), PokerError> 
 #[test]
 fn test_open_suits_are_answerable_in_every_game() -> Result<(), PokerError> {
     use crate::odds::run_batch;
-    use crate::variants::{Badugi, DeuceSeven, Omaha, OmahaFive, OmahaHiLo, Stud};
+    use crate::variants::{Badugi, DeuceSeven, FiveCardDraw, Omaha, OmahaFive, OmahaHiLo, Stud};
 
     macro_rules! answers {
         ($variant:expr, $hands:expr) => {{
@@ -658,6 +660,7 @@ fn test_open_suits_are_answerable_in_every_game() -> Result<(), PokerError> {
     answers!(OmahaFive, ["AA***", "KK***"]);
     answers!(Badugi, ["A23", "A24"]);
     answers!(DeuceSeven, ["A234", "A235"]);
+    answers!(FiveCardDraw, ["AA", "KK"]);
     answers!(Stud, ["A23", "A24"]);
 
     Ok(())

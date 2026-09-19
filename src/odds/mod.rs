@@ -11,6 +11,7 @@ mod tests {
     mod calibration;
     mod chunk_tests;
     mod deuce_equity_tests;
+    mod five_card_draw_equity_tests;
     mod holdem_equity_tests;
     mod omaha_equity_tests;
     mod razz_equity_tests;
