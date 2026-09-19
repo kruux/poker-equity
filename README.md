@@ -327,7 +327,7 @@ In stud and the draw games, cards arrive over time, so a field says what a
 player holds **now** and whatever is missing is still to come:
 
 ```rust
-EquityRequest::from_text(SevenCardStud, &["Ah2c3d", "QsQdJs"], "", "")?;
+EquityRequest::from_text(Stud, &["Ah2c3d", "QsQdJs"], "", "")?;
 //                        three known, four still to be dealt
 
 EquityRequest::from_text(DeuceSeven, &["7h5c4d3s", "9h8c6d5h2c"], "", "Kd")?;
