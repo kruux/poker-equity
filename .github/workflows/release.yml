@@ -1,0 +1,197 @@
+name: Release
+
+# Publishing is its own deliberate act: pushing a version tag, then approving
+# the `release` environment. Pushes to main and pull requests only ever run
+# rust.yml, which tests and benchmarks and never packages anything.
+#
+# Running this by hand from the Actions tab builds and tests every wheel
+# without publishing, or publishes to TestPyPI for a rehearsal.
+on:
+  push:
+    tags: [ "v*" ]
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: "Where to publish a manual run"
+        type: choice
+        options: [ nowhere, testpypi ]
+        default: nowhere
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # A tag names the version it releases. If it disagrees with Cargo.toml, or
+  # points at a commit main never had, nothing is built at all.
+  check:
+    name: Check the tag
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: The tag is the version in Cargo.toml
+        run: |
+          version=$(cargo metadata --no-deps --format-version 1 \
+            | python3 -c 'import json, sys; print(json.load(sys.stdin)["packages"][0]["version"])')
+          if [ "$GITHUB_REF_NAME" != "v$version" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match Cargo.toml's $version"
+            exit 1
+          fi
+
+      - name: The tagged commit is on main
+        run: |
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "::error::$GITHUB_REF_NAME points at a commit that is not on main"
+            exit 1
+          fi
+
+  # One abi3 wheel per platform serves every CPython from 3.10 up. Each is
+  # built on the machine it is for, so each can be installed and checked
+  # there before it goes anywhere.
+  wheels:
+    name: Wheel for ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Linux x86_64, os: ubuntu-latest, target: x86_64 }
+          - { name: Linux aarch64, os: ubuntu-24.04-arm, target: aarch64 }
+          - { name: macOS Apple Silicon, os: macos-latest, target: aarch64 }
+          - { name: macOS Intel, os: macos-15-intel, target: x86_64 }
+          - { name: Windows x64, os: windows-latest, target: x64 }
+    steps:
+      - uses: actions/checkout@v5
+
+      # The oldest interpreter the wheel claims to serve. If it loads here it
+      # loads on everything above it.
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      # manylinux builds inside an old-glibc container, so the Linux wheels
+      # install on distributions older than the runner.
+      - name: Build
+        uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          args: --release --out dist
+          manylinux: auto
+
+      # Installed as a user would get it, and run from outside the checkout,
+      # so it is the wheel under test and nothing lying about the tree.
+      - name: Install the wheel and check it
+        shell: bash
+        run: |
+          python -m pip install --no-index --find-links dist poker-equity
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/tests/python/test_binding.py"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheel-${{ matrix.os }}-${{ matrix.target }}
+          path: dist/*.whl
+
+  # For every platform without a wheel: pip builds it from this, which needs
+  # a Rust toolchain. Built here the same way, to prove that works.
+  sdist:
+    name: Source distribution
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      - name: Build
+        uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+
+      - name: Build from it, install and check
+        run: |
+          python -m pip install dist/*.tar.gz
+          cd "$RUNNER_TEMP"
+          python "$GITHUB_WORKSPACE/tests/python/test_binding.py"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: dist/*.tar.gz
+
+  # Packs the crate and builds it from the archive, as crates.io will.
+  # Catches a file the build needs being left out of the package.
+  crate:
+    name: Crate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: Swatinem/rust-cache@v2
+      - name: Package and verify
+        run: cargo publish --dry-run
+
+  pypi:
+    name: Publish to ${{ github.event_name == 'push' && 'PyPI' || 'TestPyPI' }}
+    needs: [ check, wheels, sdist, crate ]
+    # `check` is skipped on a manual run, and a skipped need would skip this
+    # too; `!cancelled()` lets it through as long as nothing actually failed.
+    if: >-
+      !cancelled() && !contains(needs.*.result, 'failure')
+      && (github.event_name == 'push' || inputs.publish == 'testpypi')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # Trusted publishing: PyPI accepts this job's OIDC token in place of a
+      # stored secret. `skip-existing` lets a half-finished release be re-run.
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ github.event_name == 'push' && 'https://upload.pypi.org/legacy/' || 'https://test.pypi.org/legacy/' }}
+          skip-existing: true
+
+  crates-io:
+    name: Publish to crates.io
+    needs: [ check, wheels, sdist, crate ]
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # crates.io only allows trusted publishing for a crate that already
+      # exists, so the first version is published by hand. This lets that --
+      # or a re-run after a partial release -- pass without an error.
+      - name: Is this version already published?
+        id: published
+        run: |
+          version=${GITHUB_REF_NAME#v}
+          status=$(curl -s -o /dev/null -w '%{http_code}' \
+            -A 'poker-equity release workflow (github.com/kruux/poker-equity)' \
+            "https://crates.io/api/v1/crates/poker-equity/$version")
+          echo "exists=$([ "$status" = 200 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - uses: rust-lang/crates-io-auth-action@v1
+        if: steps.published.outputs.exists == 'false'
+        id: auth
+
+      - name: Publish
+        if: steps.published.outputs.exists == 'false'
+        run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}

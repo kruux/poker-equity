@@ -1,0 +1,29 @@
+# The Python package. maturin builds the extension module from the Rust crate
+# with the `python` feature on, so the wheel is the same code `cargo test`
+# checks. Version, description, licence and authors are read from Cargo.toml,
+# so a release changes one file rather than two.
+[build-system]
+requires = ["maturin>=1.9,<2"]
+build-backend = "maturin"
+
+[project]
+name = "poker-equity"
+requires-python = ">=3.10"
+readme = "README.md"
+keywords = ["poker", "equity", "odds", "holdem", "omaha"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Topic :: Games/Entertainment",
+]
+dynamic = ["version", "description", "license", "authors"]
+
+[project.urls]
+Repository = "https://github.com/kruux/poker-equity"
+
+[tool.maturin]
+features = ["python"]
+module-name = "poker_equity"
