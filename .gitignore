@@ -7,3 +7,6 @@ codebase.md
 # and it stays out of the repo. See validation/README.md.
 /.venv
 /disagreements.txt
+
+# Left by running the Python scripts in place.
+__pycache__/
