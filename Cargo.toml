@@ -1,6 +1,6 @@
 [package]
 name = "poker-equity"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["krux <kruuux@proton.me>"]
 edition = "2021"
 description = "Equity for fifteen poker variants, sampled or enumerated exactly"
