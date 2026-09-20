@@ -400,12 +400,19 @@ pub struct PlayerEquity {
     pub tie: f64,         // shared
     pub low_equity: f64,  // the low half alone, in split games
     pub scoop: f64,       // both halves
+    pub high_win: f64,    // the high half, outright
+    pub high_tie: f64,    // the high half, shared
+    pub low_win: f64,     // the low half, outright
+    pub low_tie: f64,     // the low half, shared
     pub std_error: f64,   // zero when the answer was enumerated
 }
 ```
 
 Equity leads because it is the answer — it is what the money does over time.
-Wins and ties are colour. `percent()` and `margin_percent()` give the two
+Wins and ties are colour. In a split game the halves are what equity cannot
+say: taking every low and never the high is half the pot, and so is splitting
+both halves every time. Outside split games the high half is the whole pot, so
+`high_win` and `high_tie` are `win` and `tie`, and the low figures are zero. `percent()` and `margin_percent()` give the two
 numbers a table usually shows: the equity, and the half-width of a 95%
 interval around it.
 
@@ -527,7 +534,9 @@ r = pe.chunk("holdem", hands, [], 0, 200_000, seed=3)
 ```
 
 Every seat in `r["players"]` carries `equity`, `win`, `tie`, `low_equity`,
-`scoop` and `std_error`. Beside them sit the run's own totals — `samples`,
+`scoop`, `high_win`, `high_tie`, `low_win`, `low_tie` and `std_error`, as in
+[What comes back](#what-comes-back). The counts behind the wins, ties and
+halves come back as raw sums too — `win_count`, `high_win_count` and so on. Beside them sit the run's own totals — `samples`,
 `weight_sum`, `share_sum`, `acceptance`, `effective_samples`, `weighted` —
 which are sums rather than averages, so calling again with another seed and
 adding them is how you sample further. There is no precision target here as

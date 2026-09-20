@@ -77,8 +77,25 @@ print("\nthe raw sums cross, so batches can be merged here")
 a = pe.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=100_000, seed=1)
 b = pe.chunk_from_text("holdem", ["AhKh", "QsQd"], samples=100_000, seed=2)
 for field in ("share_sum", "share_square_sum", "low_share_sum",
-              "win_count", "tie_count", "scoop_count"):
+              "win_count", "tie_count", "scoop_count",
+              "high_win_count", "high_tie_count", "low_win_count", "low_tie_count"):
     check(field in a, f"{field} is returned")
+
+print("\neach half of a split pot is counted on its own")
+# Two ways to half the pot on one board: the low alone against the high alone,
+# and both halves split between mirror images. Same equity, different halves.
+apart = pe.exact_from_text("omaha_hi_lo", ["Ac4d9sTs", "KdQcJcJd"], "2c 3d 7h Kh Ks")
+together = pe.exact_from_text("omaha_hi_lo", ["Ac4dKdQc", "As4cKcQd"], "2c 3d 7h Kh Ks")
+halves = ("high_win", "high_tie", "low_win", "low_tie")
+for result in (apart, together):
+    close(result["players"][0]["equity"], 0.5, 1e-12, "half the pot either way")
+check([apart["players"][0][h] for h in halves] == [0, 0, 1, 0], "the low alone")
+check([apart["players"][1][h] for h in halves] == [1, 0, 0, 0], "the high alone")
+check([together["players"][0][h] for h in halves] == [0, 1, 0, 1], "both halves split")
+check(apart["low_win_count"] == [1.0, 0.0], "the counts cross as well as the fractions")
+# Outside a split game the high half is the whole pot.
+check(a["high_win_count"] == a["win_count"], "hold'em's high wins are its wins")
+check(a["low_win_count"] == [0.0, 0.0], "and it has no low")
 merged = sum(x + y for x, y in zip(a["share_sum"][:1], b["share_sum"][:1]))
 close(merged / (a["samples"] + b["samples"]),
       a["players"][0]["equity"], 0.01, "hand-merged batches give the same equity")

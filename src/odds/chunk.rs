@@ -1,3 +1,9 @@
+/// Smaller than any share a pot can be cut into -- the least is half a pot
+/// split twenty-six ways, about 0.02 -- and larger than the rounding a share
+/// picks up on its way here. Comparing against it rather than against exact
+/// values keeps `0.75 - 0.25` counted as the half it is.
+const SLIVER: f64 = 1e-9;
+
 /// What one run of the sampler measured.
 ///
 /// Everything here is a **sum**, never an average, so two chunks merge by
@@ -40,6 +46,21 @@ pub struct ChunkResult {
     pub scoop_count: Vec<f64>,
     /// The low half alone, weighted and summed. Zero in games without one.
     pub low_share_sum: Vec<f64>,
+    /// Deals where the seat took the high half outright, weighted.
+    ///
+    /// The high "half" is the whole pot in a game without a low, and in a
+    /// split game when nobody made one, so outside split games this equals
+    /// [`win_count`](Self::win_count). In a split game it is what tells a
+    /// seat that always takes the low from one that splits everything --
+    /// both have half the pot, and only one of them ever wins the high.
+    pub high_win_count: Vec<f64>,
+    /// Deals where the seat shared the high half with another seat, weighted.
+    pub high_tie_count: Vec<f64>,
+    /// Deals where the seat took the low half outright, weighted. Zero in
+    /// games without a low, and in deals where nobody qualified for one.
+    pub low_win_count: Vec<f64>,
+    /// Deals where the seat shared the low half with another seat, weighted.
+    pub low_tie_count: Vec<f64>,
     /// Whether these numbers come from enumerating every deal rather than
     /// sampling. An exact result has no error bar.
     pub exact: bool,
@@ -60,6 +81,10 @@ impl ChunkResult {
             tie_count: vec![0.0; seats],
             scoop_count: vec![0.0; seats],
             low_share_sum: vec![0.0; seats],
+            high_win_count: vec![0.0; seats],
+            high_tie_count: vec![0.0; seats],
+            low_win_count: vec![0.0; seats],
+            low_tie_count: vec![0.0; seats],
             exact: false,
         }
     }
@@ -120,6 +145,10 @@ impl ChunkResult {
             self.tie_count[seat] += other.tie_count[seat];
             self.scoop_count[seat] += other.scoop_count[seat];
             self.low_share_sum[seat] += other.low_share_sum[seat];
+            self.high_win_count[seat] += other.high_win_count[seat];
+            self.high_tie_count[seat] += other.high_tie_count[seat];
+            self.low_win_count[seat] += other.low_win_count[seat];
+            self.low_tie_count[seat] += other.low_tie_count[seat];
         }
     }
 
@@ -135,6 +164,12 @@ impl ChunkResult {
     /// undone: it is how many hands the seats had to choose from, so a deal
     /// that was easy to reach counts for less. A weight of one is a deal that
     /// needed no correction, which is every deal on the ordinary path.
+    ///
+    /// The halves are read back from the shares rather than reported by the
+    /// game, so every way of awarding a pot is counted the same way. A low
+    /// was awarded exactly when some seat holds a low share; then the high
+    /// half is half the pot, and otherwise it is all of it. A seat's high
+    /// share is what it took less what it took of the low.
     pub(crate) fn record_weighted(&mut self, shares: &[f64], low_shares: &[f64], weight: f64) {
         debug_assert!(
             weight > 0.0 && weight.is_finite(),
@@ -144,6 +179,8 @@ impl ChunkResult {
         self.weight_sum += weight;
         self.weight_square_sum += weight * weight;
         let square = weight * weight;
+        let low_awarded = low_shares.iter().any(|&share| share > SLIVER);
+        let high_half = if low_awarded { 0.5 } else { 1.0 };
 
         for seat in 0..self.seats() {
             let share = shares[seat];
@@ -156,6 +193,19 @@ impl ChunkResult {
                 self.scoop_count[seat] += weight;
             } else if share > 0.0 {
                 self.tie_count[seat] += weight;
+            }
+
+            let low = low_shares[seat];
+            let high = share - low;
+            if high >= high_half - SLIVER {
+                self.high_win_count[seat] += weight;
+            } else if high > SLIVER {
+                self.high_tie_count[seat] += weight;
+            }
+            if low >= 0.5 - SLIVER {
+                self.low_win_count[seat] += weight;
+            } else if low > SLIVER {
+                self.low_tie_count[seat] += weight;
             }
         }
     }
@@ -207,6 +257,10 @@ impl ChunkResult {
                     tie: self.tie_count[seat] / total,
                     low_equity: self.low_share_sum[seat] / total,
                     scoop: self.scoop_count[seat] / total,
+                    high_win: self.high_win_count[seat] / total,
+                    high_tie: self.high_tie_count[seat] / total,
+                    low_win: self.low_win_count[seat] / total,
+                    low_tie: self.low_tie_count[seat] / total,
                     std_error,
                 }
             })
@@ -229,6 +283,15 @@ pub struct PlayerEquity {
     pub low_equity: f64,
     /// How often it took both halves.
     pub scoop: f64,
+    /// How often it took the high half outright. The whole pot counts as the
+    /// high half when there is no low, so outside split games this is `win`.
+    pub high_win: f64,
+    /// How often it shared the high half.
+    pub high_tie: f64,
+    /// How often it took the low half outright. Zero without a low.
+    pub low_win: f64,
+    /// How often it shared the low half.
+    pub low_tie: f64,
     /// One standard error on `equity`; zero when the result is exact.
     pub std_error: f64,
 }

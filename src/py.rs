@@ -155,6 +155,12 @@ fn to_dict(py: Python<'_>, result: &ChunkResult, weighted: bool) -> PyResult<Py<
     out.set_item("win_count", result.win_count.clone())?;
     out.set_item("tie_count", result.tie_count.clone())?;
     out.set_item("scoop_count", result.scoop_count.clone())?;
+    // Each half of a split pot on its own. Outside split games the high half
+    // is the whole pot and the low counts are zero.
+    out.set_item("high_win_count", result.high_win_count.clone())?;
+    out.set_item("high_tie_count", result.high_tie_count.clone())?;
+    out.set_item("low_win_count", result.low_win_count.clone())?;
+    out.set_item("low_tie_count", result.low_tie_count.clone())?;
 
     let players = PyList::empty(py);
     for player in result.equities() {
@@ -164,6 +170,10 @@ fn to_dict(py: Python<'_>, result: &ChunkResult, weighted: bool) -> PyResult<Py<
         seat.set_item("tie", player.tie)?;
         seat.set_item("low_equity", player.low_equity)?;
         seat.set_item("scoop", player.scoop)?;
+        seat.set_item("high_win", player.high_win)?;
+        seat.set_item("high_tie", player.high_tie)?;
+        seat.set_item("low_win", player.low_win)?;
+        seat.set_item("low_tie", player.low_tie)?;
         seat.set_item("std_error", player.std_error)?;
         players.append(seat)?;
     }
